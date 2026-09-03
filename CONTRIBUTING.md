@@ -5,6 +5,8 @@ project needs contract-level enforcement.
 
 ## Local Checks
 
+Install `stellar-cli` 25.2.0 or newer before building contract WASM files.
+
 Run these commands before opening a pull request:
 
 ```bash

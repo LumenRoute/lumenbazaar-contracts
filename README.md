@@ -23,6 +23,8 @@ actual usage amount.
 
 ## Local Verification
 
+Contract WASM builds require `stellar-cli` 25.2.0 or newer.
+
 ```bash
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
