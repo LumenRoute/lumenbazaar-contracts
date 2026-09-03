@@ -36,3 +36,23 @@ Data:
 - `max_amount`
 - `expires_at_ledger`
 - `resource_hash`
+
+## Usage Hash
+
+`settle` requires a non-zero `usage_hash`. The backend should derive this hash
+from a canonical usage receipt that includes:
+
+- session ID
+- resource hash
+- buyer
+- seller
+- asset
+- measured usage unit
+- measured usage quantity
+- settled amount
+- request hash
+- response hash, when available
+- metering start and end ledger or timestamp
+
+The contract stores only the digest. The backend remains responsible for
+retaining and serving the canonical receipt body.

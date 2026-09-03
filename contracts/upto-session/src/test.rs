@@ -345,6 +345,7 @@ fn settle_stores_actual_amount_and_status() {
     let session = client.get_session(&session_id);
 
     assert_eq!(session.settled_amount, 125);
+    assert_eq!(session.usage_hash, Some(usage_hash));
     assert_eq!(session.status, SessionStatus::Settled);
     assert_eq!(token_client.balance(&buyer), 375);
     assert_eq!(token_client.balance(&seller), 125);
@@ -404,4 +405,32 @@ fn settle_surfaces_asset_transfer_failure_without_finalizing_session() {
 
     assert_eq!(session.settled_amount, 0);
     assert_eq!(session.status, SessionStatus::Open);
+}
+
+#[test]
+fn settle_rejects_empty_usage_hash_before_transfer() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
+    let token_client = token::Client::new(&env, &asset);
+    let resource_hash = BytesN::from_array(&env, &[12; 32]);
+    let usage_hash = BytesN::from_array(&env, &[0; 32]);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    assert_eq!(
+        client.try_settle(&session_id, &125, &usage_hash),
+        Err(Ok(ContractError::InvalidUsageHash))
+    );
+    let session = client.get_session(&session_id);
+
+    assert_eq!(session.usage_hash, None);
+    assert_eq!(session.settled_amount, 0);
+    assert_eq!(session.status, SessionStatus::Open);
+    assert_eq!(token_client.balance(&buyer), 500);
+    assert_eq!(token_client.balance(&seller), 0);
 }

@@ -86,7 +86,7 @@ impl UptoSessionContract {
         env: Env,
         session_id: BytesN<32>,
         actual_amount: i128,
-        _usage_hash: BytesN<32>,
+        usage_hash: BytesN<32>,
     ) -> Result<(), ContractError> {
         let mut session =
             storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
@@ -98,6 +98,7 @@ impl UptoSessionContract {
         }
 
         validation::validate_settlement_amount(&env, &session, actual_amount)?;
+        validation::validate_usage_hash(&env, &usage_hash)?;
         session.seller.require_auth();
         token::Client::new(&env, &session.asset).transfer(
             &session.buyer,
@@ -105,6 +106,7 @@ impl UptoSessionContract {
             &actual_amount,
         );
         session.settled_amount = actual_amount;
+        session.usage_hash = Some(usage_hash);
         session.status = SessionStatus::Settled;
         storage::write_session(&env, &session);
 

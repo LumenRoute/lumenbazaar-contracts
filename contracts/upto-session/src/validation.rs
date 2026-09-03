@@ -53,6 +53,14 @@ pub fn validate_settlement_amount(
     Ok(())
 }
 
+pub fn validate_usage_hash(env: &Env, usage_hash: &BytesN<32>) -> Result<(), ContractError> {
+    if usage_hash == &BytesN::from_array(env, &[0; 32]) {
+        return Err(ContractError::InvalidUsageHash);
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     extern crate std;
@@ -192,6 +200,17 @@ mod tests {
         assert_eq!(
             validate_settlement_amount(&env, &session, 50),
             Err(ContractError::ExpiredSession)
+        );
+    }
+
+    #[test]
+    fn rejects_empty_usage_hash() {
+        let env = Env::default();
+        let empty_hash = BytesN::from_array(&env, &[0; 32]);
+
+        assert_eq!(
+            validate_usage_hash(&env, &empty_hash),
+            Err(ContractError::InvalidUsageHash)
         );
     }
 }
