@@ -1,6 +1,7 @@
 #![no_std]
 
 mod errors;
+pub mod storage;
 mod types;
 
 pub use errors::ContractError;
