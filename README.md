@@ -17,6 +17,10 @@ The first production-oriented contract is `upto-session`. It lets a buyer
 authorize a maximum spend for one resource while the seller settles only the
 actual usage amount.
 
+`policy-wallet-example` is example-only smart account policy code.
+
+`test-token` is reserved for local and testnet utility token behavior.
+
 ## Local Verification
 
 ```bash

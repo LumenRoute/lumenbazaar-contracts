@@ -1,5 +1,9 @@
 [workspace]
-members = ["contracts/upto-session"]
+members = [
+    "contracts/policy-wallet-example",
+    "contracts/test-token",
+    "contracts/upto-session",
+]
 resolver = "2"
 
 [workspace.package]
