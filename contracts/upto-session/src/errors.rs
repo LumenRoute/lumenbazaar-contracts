@@ -15,6 +15,7 @@ pub enum ContractError {
     InvalidAsset = 9,
     InvalidSeller = 10,
     TtlExtensionFailed = 11,
+    InvalidResourceHash = 12,
 }
 
 #[cfg(test)]
@@ -34,5 +35,6 @@ mod tests {
         assert_eq!(ContractError::InvalidAsset as u32, 9);
         assert_eq!(ContractError::InvalidSeller as u32, 10);
         assert_eq!(ContractError::TtlExtensionFailed as u32, 11);
+        assert_eq!(ContractError::InvalidResourceHash as u32, 12);
     }
 }

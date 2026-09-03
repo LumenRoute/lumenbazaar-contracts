@@ -4,6 +4,7 @@ mod errors;
 pub mod ids;
 pub mod storage;
 mod types;
+pub mod validation;
 
 pub use errors::ContractError;
 pub use types::{Session, SessionStatus};
@@ -36,6 +37,16 @@ impl UptoSessionContract {
         expires_at_ledger: u32,
         resource_hash: BytesN<32>,
     ) -> Result<BytesN<32>, ContractError> {
+        validation::validate_create_session(
+            &env,
+            &buyer,
+            &seller,
+            &asset,
+            max_amount,
+            expires_at_ledger,
+            &resource_hash,
+        )?;
+
         let sequence = storage::take_next_session_sequence(&env);
         Ok(ids::derive_session_id(
             &env,
