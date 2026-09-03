@@ -83,11 +83,22 @@ impl UptoSessionContract {
     }
 
     pub fn settle(
-        _env: Env,
-        _session_id: BytesN<32>,
+        env: Env,
+        session_id: BytesN<32>,
         _actual_amount: i128,
         _usage_hash: BytesN<32>,
     ) -> Result<(), ContractError> {
+        let session =
+            storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
+
+        match session.status {
+            SessionStatus::Open => {}
+            SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
+            SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
+        }
+
+        session.seller.require_auth();
+
         Ok(())
     }
 
