@@ -16,9 +16,21 @@ fn public_interface_is_callable() {
 
     client.initialize(&buyer);
 
+    let expected_id = ids::derive_session_id(
+        &env,
+        &ids::SessionIdInput {
+            buyer: &buyer,
+            seller: &seller,
+            asset: &asset,
+            max_amount: 100,
+            expires_at_ledger: 10,
+            resource_hash: &resource_hash,
+            sequence: 0,
+        },
+    );
     let session_id = client.create_session(&buyer, &seller, &asset, &100, &10, &resource_hash);
 
-    assert_eq!(session_id, resource_hash);
+    assert_eq!(session_id, expected_id);
     assert_eq!(
         client.try_get_session(&session_id),
         Err(Ok(ContractError::SessionNotFound))

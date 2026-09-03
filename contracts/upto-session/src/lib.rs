@@ -1,6 +1,7 @@
 #![no_std]
 
 mod errors;
+pub mod ids;
 pub mod storage;
 mod types;
 
@@ -27,15 +28,27 @@ impl UptoSessionContract {
     }
 
     pub fn create_session(
-        _env: Env,
-        _buyer: Address,
-        _seller: Address,
-        _asset: Address,
-        _max_amount: i128,
-        _expires_at_ledger: u32,
+        env: Env,
+        buyer: Address,
+        seller: Address,
+        asset: Address,
+        max_amount: i128,
+        expires_at_ledger: u32,
         resource_hash: BytesN<32>,
     ) -> Result<BytesN<32>, ContractError> {
-        Ok(resource_hash)
+        let sequence = storage::take_next_session_sequence(&env);
+        Ok(ids::derive_session_id(
+            &env,
+            &ids::SessionIdInput {
+                buyer: &buyer,
+                seller: &seller,
+                asset: &asset,
+                max_amount,
+                expires_at_ledger,
+                resource_hash: &resource_hash,
+                sequence,
+            },
+        ))
     }
 
     pub fn settle(
