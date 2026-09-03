@@ -3,18 +3,27 @@ extern crate std;
 use super::*;
 use soroban_sdk::{
     testutils::{Address as _, Events as _, Ledger as _},
-    Address, BytesN, Env,
+    token, Address, BytesN, Env,
 };
+
+fn create_test_asset(env: &Env, buyer: &Address, amount: i128) -> Address {
+    let token_admin = Address::generate(env);
+    let asset = env
+        .register_stellar_asset_contract_v2(token_admin)
+        .address();
+    token::StellarAssetClient::new(env, &asset).mint(buyer, &amount);
+    asset
+}
 
 #[test]
 fn public_interface_is_callable() {
     let env = Env::default();
-    env.mock_all_auths();
+    env.mock_all_auths_allowing_non_root_auth();
     let contract_id = env.register(UptoSessionContract, ());
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 100);
     let resource_hash = BytesN::from_array(&env, &[7; 32]);
 
     client.initialize(&buyer);
@@ -321,14 +330,15 @@ fn settle_rejects_finalized_sessions() {
 #[test]
 fn settle_stores_actual_amount_and_status() {
     let env = Env::default();
-    env.mock_all_auths();
+    env.mock_all_auths_allowing_non_root_auth();
     let contract_id = env.register(UptoSessionContract, ());
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[12; 32]);
     let usage_hash = BytesN::from_array(&env, &[13; 32]);
+    let token_client = token::Client::new(&env, &asset);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
     client.settle(&session_id, &125, &usage_hash);
@@ -336,6 +346,8 @@ fn settle_stores_actual_amount_and_status() {
 
     assert_eq!(session.settled_amount, 125);
     assert_eq!(session.status, SessionStatus::Settled);
+    assert_eq!(token_client.balance(&buyer), 375);
+    assert_eq!(token_client.balance(&seller), 125);
 }
 
 #[test]
@@ -371,4 +383,25 @@ fn settle_rejects_invalid_amounts_and_expiry() {
     );
     assert_eq!(client.get_session(&expired_id).settled_amount, 0);
     assert_eq!(client.get_session(&expired_id).status, SessionStatus::Open);
+}
+
+#[test]
+fn settle_surfaces_asset_transfer_failure_without_finalizing_session() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 10);
+    let resource_hash = BytesN::from_array(&env, &[12; 32]);
+    let usage_hash = BytesN::from_array(&env, &[13; 32]);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    assert!(client.try_settle(&session_id, &125, &usage_hash).is_err());
+    let session = client.get_session(&session_id);
+
+    assert_eq!(session.settled_amount, 0);
+    assert_eq!(session.status, SessionStatus::Open);
 }

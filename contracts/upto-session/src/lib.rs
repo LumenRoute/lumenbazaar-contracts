@@ -10,7 +10,7 @@ pub mod validation;
 pub use errors::ContractError;
 pub use types::{Session, SessionStatus};
 
-use soroban_sdk::{contract, contractimpl, Address, BytesN, Env};
+use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env};
 
 #[contract]
 pub struct UptoSessionContract;
@@ -99,6 +99,11 @@ impl UptoSessionContract {
 
         validation::validate_settlement_amount(&env, &session, actual_amount)?;
         session.seller.require_auth();
+        token::Client::new(&env, &session.asset).transfer(
+            &session.buyer,
+            &session.seller,
+            &actual_amount,
+        );
         session.settled_amount = actual_amount;
         session.status = SessionStatus::Settled;
         storage::write_session(&env, &session);
