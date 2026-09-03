@@ -1,6 +1,7 @@
 #![no_std]
 
 mod errors;
+pub mod events;
 pub mod ids;
 pub mod storage;
 mod types;
@@ -62,21 +63,21 @@ impl UptoSessionContract {
             },
         );
 
-        storage::write_session(
-            &env,
-            &Session {
-                id: session_id.clone(),
-                buyer,
-                seller,
-                asset,
-                max_amount,
-                settled_amount: 0,
-                expires_at_ledger,
-                resource_hash,
-                usage_hash: None,
-                status: SessionStatus::Open,
-            },
-        );
+        let session = Session {
+            id: session_id.clone(),
+            buyer,
+            seller,
+            asset,
+            max_amount,
+            settled_amount: 0,
+            expires_at_ledger,
+            resource_hash,
+            usage_hash: None,
+            status: SessionStatus::Open,
+        };
+
+        storage::write_session(&env, &session);
+        events::publish_session_created(&env, &session);
 
         Ok(session_id)
     }

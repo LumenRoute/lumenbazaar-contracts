@@ -2,7 +2,7 @@ extern crate std;
 
 use super::*;
 use soroban_sdk::{
-    testutils::{Address as _, Ledger as _},
+    testutils::{Address as _, Events as _, Ledger as _},
     Address, BytesN, Env,
 };
 
@@ -137,6 +137,22 @@ fn create_session_stores_open_session() {
         assert_eq!(session.usage_hash, None);
         assert_eq!(session.status, SessionStatus::Open);
     });
+}
+
+#[test]
+fn create_session_emits_stable_event() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[5; 32]);
+
+    client.create_session(&buyer, &seller, &asset, &500, &25, &resource_hash);
+
+    assert_eq!(env.events().all().events().len(), 1);
 }
 
 #[test]
