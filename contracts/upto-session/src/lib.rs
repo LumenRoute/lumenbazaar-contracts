@@ -47,8 +47,9 @@ impl UptoSessionContract {
             &resource_hash,
         )?;
 
+        buyer.require_auth();
         let sequence = storage::take_next_session_sequence(&env);
-        Ok(ids::derive_session_id(
+        let session_id = ids::derive_session_id(
             &env,
             &ids::SessionIdInput {
                 buyer: &buyer,
@@ -59,7 +60,25 @@ impl UptoSessionContract {
                 resource_hash: &resource_hash,
                 sequence,
             },
-        ))
+        );
+
+        storage::write_session(
+            &env,
+            &Session {
+                id: session_id.clone(),
+                buyer,
+                seller,
+                asset,
+                max_amount,
+                settled_amount: 0,
+                expires_at_ledger,
+                resource_hash,
+                usage_hash: None,
+                status: SessionStatus::Open,
+            },
+        );
+
+        Ok(session_id)
     }
 
     pub fn settle(
