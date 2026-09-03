@@ -1,4 +1,4 @@
-use crate::ContractError;
+use crate::{ContractError, Session};
 use soroban_sdk::{Address, BytesN, Env};
 
 pub fn validate_create_session(
@@ -28,6 +28,26 @@ pub fn validate_create_session(
 
     if resource_hash == &BytesN::from_array(env, &[0; 32]) {
         return Err(ContractError::InvalidResourceHash);
+    }
+
+    Ok(())
+}
+
+pub fn validate_settlement_amount(
+    env: &Env,
+    session: &Session,
+    actual_amount: i128,
+) -> Result<(), ContractError> {
+    if actual_amount <= 0 {
+        return Err(ContractError::InvalidAmount);
+    }
+
+    if actual_amount > session.max_amount {
+        return Err(ContractError::AmountExceedsCap);
+    }
+
+    if env.ledger().sequence() >= session.expires_at_ledger {
+        return Err(ContractError::ExpiredSession);
     }
 
     Ok(())
@@ -117,6 +137,61 @@ mod tests {
         assert_eq!(
             validate_create_session(&env, &buyer, &seller, &buyer, 100, 10, &resource_hash),
             Err(ContractError::InvalidAsset)
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_settlement_amounts() {
+        let env = Env::default();
+        let (buyer, seller, asset, resource_hash) = valid_inputs(&env);
+        let session = Session {
+            id: BytesN::from_array(&env, &[1; 32]),
+            buyer,
+            seller,
+            asset,
+            max_amount: 100,
+            settled_amount: 0,
+            expires_at_ledger: 50,
+            resource_hash,
+            usage_hash: None,
+            status: crate::SessionStatus::Open,
+        };
+
+        assert_eq!(
+            validate_settlement_amount(&env, &session, 0),
+            Err(ContractError::InvalidAmount)
+        );
+        assert_eq!(
+            validate_settlement_amount(&env, &session, -1),
+            Err(ContractError::InvalidAmount)
+        );
+        assert_eq!(
+            validate_settlement_amount(&env, &session, 101),
+            Err(ContractError::AmountExceedsCap)
+        );
+    }
+
+    #[test]
+    fn rejects_settlement_at_or_after_expiry() {
+        let env = Env::default();
+        env.ledger().set_sequence_number(50);
+        let (buyer, seller, asset, resource_hash) = valid_inputs(&env);
+        let session = Session {
+            id: BytesN::from_array(&env, &[1; 32]),
+            buyer,
+            seller,
+            asset,
+            max_amount: 100,
+            settled_amount: 0,
+            expires_at_ledger: 50,
+            resource_hash,
+            usage_hash: None,
+            status: crate::SessionStatus::Open,
+        };
+
+        assert_eq!(
+            validate_settlement_amount(&env, &session, 50),
+            Err(ContractError::ExpiredSession)
         );
     }
 }

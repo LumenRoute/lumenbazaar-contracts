@@ -36,6 +36,11 @@ fn public_interface_is_callable() {
     assert_eq!(session_id, expected_id);
     assert_eq!(client.get_session(&session_id).id, session_id);
     client.settle(&session_id, &10, &resource_hash);
+    assert_eq!(client.get_session(&session_id).settled_amount, 10);
+    assert_eq!(
+        client.get_session(&session_id).status,
+        SessionStatus::Settled
+    );
     client.cancel(&session_id);
     client.extend_ttl(&session_id);
 }
@@ -311,4 +316,59 @@ fn settle_rejects_finalized_sessions() {
         client.try_settle(&cancelled_id, &10, &usage_hash),
         Err(Ok(ContractError::SessionCancelled))
     );
+}
+
+#[test]
+fn settle_stores_actual_amount_and_status() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[12; 32]);
+    let usage_hash = BytesN::from_array(&env, &[13; 32]);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    client.settle(&session_id, &125, &usage_hash);
+    let session = client.get_session(&session_id);
+
+    assert_eq!(session.settled_amount, 125);
+    assert_eq!(session.status, SessionStatus::Settled);
+}
+
+#[test]
+fn settle_rejects_invalid_amounts_and_expiry() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[12; 32]);
+    let usage_hash = BytesN::from_array(&env, &[13; 32]);
+
+    let zero_amount_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let over_cap_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let expired_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    assert_eq!(
+        client.try_settle(&zero_amount_id, &0, &usage_hash),
+        Err(Ok(ContractError::InvalidAmount))
+    );
+    assert_eq!(
+        client.try_settle(&over_cap_id, &501, &usage_hash),
+        Err(Ok(ContractError::AmountExceedsCap))
+    );
+
+    env.ledger().set_sequence_number(50);
+
+    assert_eq!(
+        client.try_settle(&expired_id, &100, &usage_hash),
+        Err(Ok(ContractError::ExpiredSession))
+    );
+    assert_eq!(client.get_session(&expired_id).settled_amount, 0);
+    assert_eq!(client.get_session(&expired_id).status, SessionStatus::Open);
 }
