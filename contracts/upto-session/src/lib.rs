@@ -14,7 +14,15 @@ pub struct UptoSessionContract;
 
 #[contractimpl]
 impl UptoSessionContract {
-    pub fn initialize(_env: Env, _admin: Address) -> Result<(), ContractError> {
+    pub fn initialize(env: Env, admin: Address) -> Result<(), ContractError> {
+        if storage::has_admin(&env) {
+            return Err(ContractError::AlreadyInitialized);
+        }
+
+        admin.require_auth();
+        storage::write_admin(&env, &admin);
+        storage::write_storage_layout_version(&env);
+
         Ok(())
     }
 

@@ -1,5 +1,5 @@
 use crate::Session;
-use soroban_sdk::{contracttype, BytesN, Env};
+use soroban_sdk::{contracttype, Address, BytesN, Env};
 
 pub const STORAGE_LAYOUT_VERSION: u32 = 1;
 
@@ -16,6 +16,18 @@ pub fn write_storage_layout_version(env: &Env) {
     env.storage()
         .instance()
         .set(&DataKey::StorageLayoutVersion, &STORAGE_LAYOUT_VERSION);
+}
+
+pub fn has_admin(env: &Env) -> bool {
+    env.storage().instance().has(&DataKey::Admin)
+}
+
+pub fn write_admin(env: &Env, admin: &Address) {
+    env.storage().instance().set(&DataKey::Admin, admin);
+}
+
+pub fn read_admin(env: &Env) -> Option<Address> {
+    env.storage().instance().get(&DataKey::Admin)
 }
 
 pub fn read_storage_layout_version(env: &Env) -> Option<u32> {

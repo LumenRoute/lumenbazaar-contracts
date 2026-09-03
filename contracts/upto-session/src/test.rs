@@ -6,6 +6,7 @@ use soroban_sdk::{testutils::Address as _, Address, BytesN, Env};
 #[test]
 fn public_interface_is_callable() {
     let env = Env::default();
+    env.mock_all_auths();
     let contract_id = env.register(UptoSessionContract, ());
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
@@ -25,4 +26,28 @@ fn public_interface_is_callable() {
     client.settle(&session_id, &10, &resource_hash);
     client.cancel(&session_id);
     client.extend_ttl(&session_id);
+}
+
+#[test]
+fn initialize_stores_admin_once() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+
+    client.initialize(&admin);
+
+    env.as_contract(&contract_id, || {
+        assert_eq!(storage::read_admin(&env), Some(admin.clone()));
+        assert_eq!(
+            storage::read_storage_layout_version(&env),
+            Some(storage::STORAGE_LAYOUT_VERSION)
+        );
+    });
+
+    assert_eq!(
+        client.try_initialize(&admin),
+        Err(Ok(ContractError::AlreadyInitialized))
+    );
 }
