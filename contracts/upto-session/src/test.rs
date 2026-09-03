@@ -34,10 +34,7 @@ fn public_interface_is_callable() {
     let session_id = client.create_session(&buyer, &seller, &asset, &100, &10, &resource_hash);
 
     assert_eq!(session_id, expected_id);
-    assert_eq!(
-        client.try_get_session(&session_id),
-        Err(Ok(ContractError::SessionNotFound))
-    );
+    assert_eq!(client.get_session(&session_id).id, session_id);
     client.settle(&session_id, &10, &resource_hash);
     client.cancel(&session_id);
     client.extend_ttl(&session_id);
@@ -171,4 +168,43 @@ fn create_session_requires_buyer_auth() {
     env.as_contract(&contract_id, || {
         assert_eq!(storage::read_next_session_sequence(&env), 0);
     });
+}
+
+#[test]
+fn get_session_returns_full_state() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[6; 32]);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &900, &30, &resource_hash);
+    let session = client.get_session(&session_id);
+
+    assert_eq!(session.id, session_id);
+    assert_eq!(session.buyer, buyer);
+    assert_eq!(session.seller, seller);
+    assert_eq!(session.asset, asset);
+    assert_eq!(session.max_amount, 900);
+    assert_eq!(session.settled_amount, 0);
+    assert_eq!(session.expires_at_ledger, 30);
+    assert_eq!(session.resource_hash, resource_hash);
+    assert_eq!(session.usage_hash, None);
+    assert_eq!(session.status, SessionStatus::Open);
+}
+
+#[test]
+fn get_session_returns_not_found_for_missing_session() {
+    let env = Env::default();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let missing_id = BytesN::from_array(&env, &[8; 32]);
+
+    assert_eq!(
+        client.try_get_session(&missing_id),
+        Err(Ok(ContractError::SessionNotFound))
+    );
 }
