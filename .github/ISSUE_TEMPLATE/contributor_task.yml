@@ -1,0 +1,35 @@
+name: Contributor Task
+description: Scoped implementation task for LumenBazaar contracts.
+title: "[Contracts] "
+labels:
+  - contracts
+  - needs-triage
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What should be implemented or fixed?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Files, modules, and behavior expected to change.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: Concrete checks that prove the work is complete.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: Commands or evidence required before merge.
+    validations:
+      required: true
