@@ -44,19 +44,25 @@ fn public_interface_is_callable() {
 
     assert_eq!(session_id, expected_id);
     assert_eq!(client.get_session(&session_id).id, session_id);
-    client.settle(&session_id, &10, &resource_hash);
+
+    // Test settle
+    let usage_hash = BytesN::from_array(&env, &[25; 32]);
+    client.settle(&session_id, &10, &usage_hash);
     assert_eq!(client.get_session(&session_id).settled_amount, 10);
     assert_eq!(
         client.get_session(&session_id).status,
         SessionStatus::Settled
     );
 
-    // Test cancel on a different open session
+    // Test extend_ttl on settled session - should fail
+    assert!(client.try_extend_ttl(&session_id).is_err());
+
+    // Test cancel and extend_ttl on separate open sessions
     let session_id_2 = client.create_session(&buyer, &seller, &asset, &100, &10, &resource_hash);
     client.cancel(&session_id_2);
 
-    // Test extend_ttl on the settled session
-    client.extend_ttl(&session_id);
+    let session_id_3 = client.create_session(&buyer, &seller, &asset, &100, &10, &resource_hash);
+    client.extend_ttl(&session_id_3);
 }
 
 #[test]
@@ -652,10 +658,13 @@ fn cancel_emits_stable_event() {
     let resource_hash = BytesN::from_array(&env, &[24; 32]);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let initial_event_count = env.events().all().events().len();
 
     client.cancel(&session_id);
+    let final_event_count = env.events().all().events().len();
 
-    assert_eq!(env.events().all().events().len(), 2);
+    // Should have exactly one more event (the cancel event)
+    assert_eq!(final_event_count, initial_event_count + 1);
 }
 
 #[test]
