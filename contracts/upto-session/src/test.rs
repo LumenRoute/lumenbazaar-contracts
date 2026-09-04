@@ -490,11 +490,10 @@ fn settle_emits_stable_event() {
     let usage_hash = BytesN::from_array(&env, &[17; 32]);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
-    env.events().all().events().clear();
 
     client.settle(&session_id, &125, &usage_hash);
 
-    assert_eq!(env.events().all().events().len(), 1);
+    assert_eq!(env.events().all().events().len(), 2);
 }
 
 #[test]
@@ -648,11 +647,10 @@ fn cancel_emits_stable_event() {
     let resource_hash = BytesN::from_array(&env, &[24; 32]);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
-    env.events().all().events().clear();
 
     client.cancel(&session_id);
 
-    assert_eq!(env.events().all().events().len(), 1);
+    assert_eq!(env.events().all().events().len(), 2);
 }
 
 #[test]

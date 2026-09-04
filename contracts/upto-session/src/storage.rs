@@ -76,10 +76,10 @@ pub fn extend_session_ttl(env: &Env, session_id: &BytesN<32>) -> Result<(), ()> 
         // Only extend TTL for open or cancelled sessions, not settled ones
         match session.status {
             crate::SessionStatus::Open | crate::SessionStatus::Cancelled => {
-                // Bump the entry to extend its TTL
+                // Extend the entry's TTL using extend_ttl
                 env.storage()
                     .persistent()
-                    .bump(&DataKey::Session(session_id.clone()), TTL_EXTENSION_AMOUNT);
+                    .extend_ttl(&DataKey::Session(session_id.clone()), TTL_EXTENSION_AMOUNT);
                 Ok(())
             }
             crate::SessionStatus::Settled => Err(()),
