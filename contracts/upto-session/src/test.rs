@@ -50,7 +50,12 @@ fn public_interface_is_callable() {
         client.get_session(&session_id).status,
         SessionStatus::Settled
     );
-    client.cancel(&session_id);
+
+    // Test cancel on a different open session
+    let session_id_2 = client.create_session(&buyer, &seller, &asset, &100, &10, &resource_hash);
+    client.cancel(&session_id_2);
+
+    // Test extend_ttl on the settled session
     client.extend_ttl(&session_id);
 }
 
@@ -638,7 +643,7 @@ fn cancel_rejects_already_cancelled_session() {
 #[test]
 fn cancel_emits_stable_event() {
     let env = Env::default();
-    env.mock_all_auths();
+    env.mock_all_auths_allowing_non_root_auth();
     let contract_id = env.register(UptoSessionContract, ());
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
