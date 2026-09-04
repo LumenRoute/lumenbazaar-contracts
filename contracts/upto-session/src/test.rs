@@ -658,13 +658,29 @@ fn cancel_emits_stable_event() {
     let resource_hash = BytesN::from_array(&env, &[24; 32]);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    // Verify session is open before cancel
+    let session_before = client.get_session(&session_id);
+    assert_eq!(session_before.status, SessionStatus::Open);
+
     let initial_event_count = env.events().all().events().len();
 
-    client.cancel(&session_id);
+    // Cancel should succeed
+    let cancel_result = client.try_cancel(&session_id);
+    assert!(cancel_result.is_ok(), "Cancel should succeed");
+
+    // Verify session is cancelled after cancel
+    let session_after = client.get_session(&session_id);
+    assert_eq!(session_after.status, SessionStatus::Cancelled);
+
     let final_event_count = env.events().all().events().len();
 
     // Should have exactly one more event (the cancel event)
-    assert_eq!(final_event_count, initial_event_count + 1);
+    assert_eq!(
+        final_event_count,
+        initial_event_count + 1,
+        "Should have one cancel event"
+    );
 }
 
 #[test]
