@@ -496,3 +496,142 @@ fn settle_emits_stable_event() {
 
     assert_eq!(env.events().all().events().len(), 1);
 }
+
+#[test]
+fn cancel_allows_buyer_cancellation_before_settlement() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[18; 32]);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_before = client.get_session(&session_id);
+    assert_eq!(session_before.status, SessionStatus::Open);
+
+    client.cancel(&session_id);
+    let session_after = client.get_session(&session_id);
+
+    assert_eq!(session_after.status, SessionStatus::Cancelled);
+}
+
+#[test]
+fn cancel_requires_buyer_auth() {
+    let env = Env::default();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let session_id = BytesN::from_array(&env, &[1; 32]);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[2; 32]);
+
+    env.as_contract(&contract_id, || {
+        storage::write_session(
+            &env,
+            &Session {
+                id: session_id.clone(),
+                buyer,
+                seller,
+                asset,
+                max_amount: 100,
+                settled_amount: 0,
+                expires_at_ledger: 50,
+                resource_hash,
+                usage_hash: None,
+                status: SessionStatus::Open,
+            },
+        );
+    });
+
+    assert!(client.try_cancel(&session_id).is_err());
+}
+
+#[test]
+fn cancel_returns_not_found_for_missing_session() {
+    let env = Env::default();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let missing_id = BytesN::from_array(&env, &[8; 32]);
+
+    assert_eq!(
+        client.try_cancel(&missing_id),
+        Err(Ok(ContractError::SessionNotFound))
+    );
+}
+
+#[test]
+fn cancel_rejects_already_settled_session() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let session_id = BytesN::from_array(&env, &[19; 32]);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[20; 32]);
+    let usage_hash = BytesN::from_array(&env, &[21; 32]);
+
+    env.as_contract(&contract_id, || {
+        storage::write_session(
+            &env,
+            &Session {
+                id: session_id.clone(),
+                buyer,
+                seller,
+                asset,
+                max_amount: 100,
+                settled_amount: 50,
+                expires_at_ledger: 50,
+                resource_hash,
+                usage_hash: Some(usage_hash),
+                status: SessionStatus::Settled,
+            },
+        );
+    });
+
+    assert_eq!(
+        client.try_cancel(&session_id),
+        Err(Ok(ContractError::SessionAlreadySettled))
+    );
+}
+
+#[test]
+fn cancel_rejects_already_cancelled_session() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let session_id = BytesN::from_array(&env, &[22; 32]);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[23; 32]);
+
+    env.as_contract(&contract_id, || {
+        storage::write_session(
+            &env,
+            &Session {
+                id: session_id.clone(),
+                buyer,
+                seller,
+                asset,
+                max_amount: 100,
+                settled_amount: 0,
+                expires_at_ledger: 50,
+                resource_hash,
+                usage_hash: None,
+                status: SessionStatus::Cancelled,
+            },
+        );
+    });
+
+    assert_eq!(
+        client.try_cancel(&session_id),
+        Err(Ok(ContractError::SessionCancelled))
+    );
+}

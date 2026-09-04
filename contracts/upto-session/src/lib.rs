@@ -121,7 +121,20 @@ impl UptoSessionContract {
         Ok(())
     }
 
-    pub fn cancel(_env: Env, _session_id: BytesN<32>) -> Result<(), ContractError> {
+    pub fn cancel(env: Env, session_id: BytesN<32>) -> Result<(), ContractError> {
+        let mut session =
+            storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
+
+        match &session.status {
+            SessionStatus::Open => {}
+            SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
+            SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
+        }
+
+        session.buyer.require_auth();
+        session.status = SessionStatus::Cancelled;
+        storage::write_session(&env, &session);
+
         Ok(())
     }
 
