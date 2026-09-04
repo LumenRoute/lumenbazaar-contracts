@@ -77,9 +77,12 @@ pub fn extend_session_ttl(env: &Env, session_id: &BytesN<32>) -> Result<(), ()> 
         match session.status {
             crate::SessionStatus::Open | crate::SessionStatus::Cancelled => {
                 // Extend the entry's TTL using extend_ttl
-                env.storage()
-                    .persistent()
-                    .extend_ttl(&DataKey::Session(session_id.clone()), TTL_EXTENSION_AMOUNT);
+                // threshold: renew if TTL is less than this, extend_to: renew to this many ledgers
+                env.storage().persistent().extend_ttl(
+                    &DataKey::Session(session_id.clone()),
+                    DEFAULT_TTL_THRESHOLD,
+                    TTL_EXTENSION_AMOUNT,
+                );
                 Ok(())
             }
             crate::SessionStatus::Settled => Err(()),
