@@ -134,6 +134,7 @@ impl UptoSessionContract {
         session.buyer.require_auth();
         session.status = SessionStatus::Cancelled;
         storage::write_session(&env, &session);
+        events::publish_session_cancelled(&env, &session_id, &session.buyer);
 
         Ok(())
     }

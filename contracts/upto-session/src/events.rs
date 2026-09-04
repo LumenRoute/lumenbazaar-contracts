@@ -23,6 +23,13 @@ pub struct SessionSettled {
     pub usage_hash: BytesN<32>,
 }
 
+#[contractevent]
+pub struct SessionCancelled {
+    #[topic]
+    pub session_id: BytesN<32>,
+    pub buyer: Address,
+}
+
 pub fn publish_session_created(env: &Env, session: &Session) {
     SessionCreated {
         session_id: session.id.clone(),
@@ -50,6 +57,14 @@ pub fn publish_session_settled(
         asset: asset.clone(),
         actual_amount,
         usage_hash: usage_hash.clone(),
+    }
+    .publish(env);
+}
+
+pub fn publish_session_cancelled(env: &Env, session_id: &BytesN<32>, buyer: &Address) {
+    SessionCancelled {
+        session_id: session_id.clone(),
+        buyer: buyer.clone(),
     }
     .publish(env);
 }

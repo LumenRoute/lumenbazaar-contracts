@@ -635,3 +635,22 @@ fn cancel_rejects_already_cancelled_session() {
         Err(Ok(ContractError::SessionCancelled))
     );
 }
+
+#[test]
+fn cancel_emits_stable_event() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[24; 32]);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    env.events().all().events().clear();
+
+    client.cancel(&session_id);
+
+    assert_eq!(env.events().all().events().len(), 1);
+}
