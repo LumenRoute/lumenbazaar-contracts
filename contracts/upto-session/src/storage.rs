@@ -72,7 +72,7 @@ pub fn has_session(env: &Env, session_id: &BytesN<32>) -> bool {
 pub fn extend_session_ttl(env: &Env, session_id: &BytesN<32>) -> Result<(), ()> {
     // Extend the TTL of the session storage entry
     // This resets the entry's expiration clock to TTL_EXTENSION_AMOUNT ledgers
-    if let Some(mut session) = read_session(env, session_id) {
+    if let Some(session) = read_session(env, session_id) {
         // Only extend TTL for open or cancelled sessions, not settled ones
         match session.status {
             crate::SessionStatus::Open | crate::SessionStatus::Cancelled => {
