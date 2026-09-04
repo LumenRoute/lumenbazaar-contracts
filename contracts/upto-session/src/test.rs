@@ -434,3 +434,45 @@ fn settle_rejects_empty_usage_hash_before_transfer() {
     assert_eq!(token_client.balance(&buyer), 500);
     assert_eq!(token_client.balance(&seller), 0);
 }
+
+#[test]
+fn settle_prevents_double_settlement() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
+    let token_client = token::Client::new(&env, &asset);
+    let resource_hash = BytesN::from_array(&env, &[14; 32]);
+    let usage_hash = BytesN::from_array(&env, &[15; 32]);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    // First settlement succeeds
+    client.settle(&session_id, &100, &usage_hash);
+    let session_after_first = client.get_session(&session_id);
+    assert_eq!(session_after_first.settled_amount, 100);
+    assert_eq!(session_after_first.status, SessionStatus::Settled);
+    assert_eq!(token_client.balance(&buyer), 400);
+    assert_eq!(token_client.balance(&seller), 100);
+
+    // Second settlement with same amount fails
+    let result_same = client.try_settle(&session_id, &100, &usage_hash);
+    assert_eq!(result_same, Err(Ok(ContractError::SessionAlreadySettled)));
+
+    // Second settlement with different amount also fails
+    let result_different = client.try_settle(&session_id, &50, &usage_hash);
+    assert_eq!(
+        result_different,
+        Err(Ok(ContractError::SessionAlreadySettled))
+    );
+
+    // Session state unchanged after failed settlement attempts
+    let session_after_attempts = client.get_session(&session_id);
+    assert_eq!(session_after_attempts.settled_amount, 100);
+    assert_eq!(session_after_attempts.status, SessionStatus::Settled);
+    assert_eq!(token_client.balance(&buyer), 400);
+    assert_eq!(token_client.balance(&seller), 100);
+}
