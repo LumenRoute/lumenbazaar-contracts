@@ -106,9 +106,17 @@ impl UptoSessionContract {
             &actual_amount,
         );
         session.settled_amount = actual_amount;
-        session.usage_hash = Some(usage_hash);
+        session.usage_hash = Some(usage_hash.clone());
         session.status = SessionStatus::Settled;
         storage::write_session(&env, &session);
+        events::publish_session_settled(
+            &env,
+            &session_id,
+            &session.seller,
+            &session.asset,
+            actual_amount,
+            &usage_hash,
+        );
 
         Ok(())
     }

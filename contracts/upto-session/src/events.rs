@@ -13,6 +13,16 @@ pub struct SessionCreated {
     pub resource_hash: BytesN<32>,
 }
 
+#[contractevent]
+pub struct SessionSettled {
+    #[topic]
+    pub session_id: BytesN<32>,
+    pub seller: Address,
+    pub asset: Address,
+    pub actual_amount: i128,
+    pub usage_hash: BytesN<32>,
+}
+
 pub fn publish_session_created(env: &Env, session: &Session) {
     SessionCreated {
         session_id: session.id.clone(),
@@ -22,6 +32,24 @@ pub fn publish_session_created(env: &Env, session: &Session) {
         max_amount: session.max_amount,
         expires_at_ledger: session.expires_at_ledger,
         resource_hash: session.resource_hash.clone(),
+    }
+    .publish(env);
+}
+
+pub fn publish_session_settled(
+    env: &Env,
+    session_id: &BytesN<32>,
+    seller: &Address,
+    asset: &Address,
+    actual_amount: i128,
+    usage_hash: &BytesN<32>,
+) {
+    SessionSettled {
+        session_id: session_id.clone(),
+        seller: seller.clone(),
+        asset: asset.clone(),
+        actual_amount,
+        usage_hash: usage_hash.clone(),
     }
     .publish(env);
 }

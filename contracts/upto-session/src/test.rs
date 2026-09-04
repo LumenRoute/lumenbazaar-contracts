@@ -476,3 +476,23 @@ fn settle_prevents_double_settlement() {
     assert_eq!(token_client.balance(&buyer), 400);
     assert_eq!(token_client.balance(&seller), 100);
 }
+
+#[test]
+fn settle_emits_stable_event() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
+    let resource_hash = BytesN::from_array(&env, &[16; 32]);
+    let usage_hash = BytesN::from_array(&env, &[17; 32]);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    env.events().all().events().clear();
+
+    client.settle(&session_id, &125, &usage_hash);
+
+    assert_eq!(env.events().all().events().len(), 1);
+}
