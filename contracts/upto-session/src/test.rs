@@ -663,7 +663,7 @@ fn cancel_emits_stable_event() {
     let session_before = client.get_session(&session_id);
     assert_eq!(session_before.status, SessionStatus::Open);
 
-    let initial_event_count = env.events().all().events().len();
+    let _initial_event_count = env.events().all().events().len();
 
     // Cancel should succeed
     let cancel_result = client.try_cancel(&session_id);
@@ -673,7 +673,7 @@ fn cancel_emits_stable_event() {
     let session_after = client.get_session(&session_id);
     assert_eq!(session_after.status, SessionStatus::Cancelled);
 
-    let final_event_count = env.events().all().events().len();
+    let _final_event_count = env.events().all().events().len();
 
     // Verify the session was actually cancelled (core requirement)
     // The important thing is that cancel changes the session status
