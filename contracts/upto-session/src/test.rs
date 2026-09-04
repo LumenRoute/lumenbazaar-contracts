@@ -654,3 +654,101 @@ fn cancel_emits_stable_event() {
 
     assert_eq!(env.events().all().events().len(), 1);
 }
+
+#[test]
+fn extend_ttl_succeeds_for_open_sessions() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[25; 32]);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    assert!(client.try_extend_ttl(&session_id).is_ok());
+}
+
+#[test]
+fn extend_ttl_succeeds_for_cancelled_sessions() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let session_id = BytesN::from_array(&env, &[26; 32]);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[27; 32]);
+
+    env.as_contract(&contract_id, || {
+        storage::write_session(
+            &env,
+            &Session {
+                id: session_id.clone(),
+                buyer,
+                seller,
+                asset,
+                max_amount: 100,
+                settled_amount: 0,
+                expires_at_ledger: 50,
+                resource_hash,
+                usage_hash: None,
+                status: SessionStatus::Cancelled,
+            },
+        );
+    });
+
+    assert!(client.try_extend_ttl(&session_id).is_ok());
+}
+
+#[test]
+fn extend_ttl_rejects_settled_sessions() {
+    let env = Env::default();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let session_id = BytesN::from_array(&env, &[28; 32]);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[29; 32]);
+    let usage_hash = BytesN::from_array(&env, &[30; 32]);
+
+    env.as_contract(&contract_id, || {
+        storage::write_session(
+            &env,
+            &Session {
+                id: session_id.clone(),
+                buyer,
+                seller,
+                asset,
+                max_amount: 100,
+                settled_amount: 50,
+                expires_at_ledger: 50,
+                resource_hash,
+                usage_hash: Some(usage_hash),
+                status: SessionStatus::Settled,
+            },
+        );
+    });
+
+    assert_eq!(
+        client.try_extend_ttl(&session_id),
+        Err(Ok(ContractError::TtlExtensionFailed))
+    );
+}
+
+#[test]
+fn extend_ttl_rejects_missing_session() {
+    let env = Env::default();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let missing_id = BytesN::from_array(&env, &[31; 32]);
+
+    assert_eq!(
+        client.try_extend_ttl(&missing_id),
+        Err(Ok(ContractError::TtlExtensionFailed))
+    );
+}

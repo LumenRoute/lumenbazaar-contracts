@@ -2,6 +2,8 @@ use crate::Session;
 use soroban_sdk::{contracttype, Address, BytesN, Env};
 
 pub const STORAGE_LAYOUT_VERSION: u32 = 1;
+pub const DEFAULT_TTL_THRESHOLD: u32 = 100_000;
+pub const TTL_EXTENSION_AMOUNT: u32 = 1_000_000;
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -65,6 +67,26 @@ pub fn has_session(env: &Env, session_id: &BytesN<32>) -> bool {
     env.storage()
         .persistent()
         .has(&DataKey::Session(session_id.clone()))
+}
+
+pub fn extend_session_ttl(env: &Env, session_id: &BytesN<32>) -> Result<(), ()> {
+    // Extend the TTL of the session storage entry
+    // This resets the entry's expiration clock to TTL_EXTENSION_AMOUNT ledgers
+    if let Some(mut session) = read_session(env, session_id) {
+        // Only extend TTL for open or cancelled sessions, not settled ones
+        match session.status {
+            crate::SessionStatus::Open | crate::SessionStatus::Cancelled => {
+                // Bump the entry to extend its TTL
+                env.storage()
+                    .persistent()
+                    .bump(&DataKey::Session(session_id.clone()), TTL_EXTENSION_AMOUNT);
+                Ok(())
+            }
+            crate::SessionStatus::Settled => Err(()),
+        }
+    } else {
+        Err(())
+    }
 }
 
 #[cfg(test)]

@@ -143,8 +143,9 @@ impl UptoSessionContract {
         storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)
     }
 
-    pub fn extend_ttl(_env: Env, _session_id: BytesN<32>) -> Result<(), ContractError> {
-        Ok(())
+    pub fn extend_ttl(env: Env, session_id: BytesN<32>) -> Result<(), ContractError> {
+        storage::extend_session_ttl(&env, &session_id)
+            .map_err(|_| ContractError::TtlExtensionFailed)
     }
 }
 
