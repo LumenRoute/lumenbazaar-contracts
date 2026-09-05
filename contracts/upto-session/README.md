@@ -37,6 +37,35 @@ Data:
 - `expires_at_ledger`
 - `resource_hash`
 
+### `SessionSettled`
+
+Topics:
+
+- `session_id`
+
+Data:
+
+- `seller`
+- `asset`
+- `actual_amount`
+- `usage_hash`
+
+Settlement is single-use. Once a session reaches `Settled`, any repeated
+`settle` call returns `SessionAlreadySettled` and cannot move additional funds.
+
+### `SessionCancelled`
+
+Topics:
+
+- `session_id`
+
+Data:
+
+- `buyer`
+
+Only the buyer can cancel an open session. Cancellation is rejected for missing
+sessions, settled sessions, and already cancelled sessions.
+
 ## Usage Hash
 
 `settle` requires a non-zero `usage_hash`. The backend should derive this hash
@@ -56,3 +85,20 @@ from a canonical usage receipt that includes:
 
 The contract stores only the digest. The backend remains responsible for
 retaining and serving the canonical receipt body.
+
+## TTL Strategy
+
+Session entries use persistent storage. The public `extend_ttl(session_id)`
+entrypoint renews only open sessions with:
+
+- threshold: `100000` ledgers
+- extension amount: `1000000` ledgers
+
+Missing sessions return `SessionNotFound`. Settled and cancelled sessions return
+`TtlExtensionFailed`, so finalized lifecycle states cannot be kept alive through
+the active-session TTL renewal path.
+
+Instance storage keeps administrator, layout version, and session sequence
+state. Those entries are intentionally separate from per-session persistent
+storage so sequence and contract layout evidence survive independent session
+lifecycle cleanup.

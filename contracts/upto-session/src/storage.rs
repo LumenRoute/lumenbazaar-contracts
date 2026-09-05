@@ -69,27 +69,12 @@ pub fn has_session(env: &Env, session_id: &BytesN<32>) -> bool {
         .has(&DataKey::Session(session_id.clone()))
 }
 
-pub fn extend_session_ttl(env: &Env, session_id: &BytesN<32>) -> bool {
-    // Extend the TTL of the session storage entry
-    // This resets the entry's expiration clock to TTL_EXTENSION_AMOUNT ledgers
-    if let Some(session) = read_session(env, session_id) {
-        // Only extend TTL for open or cancelled sessions, not settled ones
-        match session.status {
-            crate::SessionStatus::Open | crate::SessionStatus::Cancelled => {
-                // Extend the entry's TTL using extend_ttl
-                // threshold: renew if TTL is less than this, extend_to: renew to this many ledgers
-                env.storage().persistent().extend_ttl(
-                    &DataKey::Session(session_id.clone()),
-                    DEFAULT_TTL_THRESHOLD,
-                    TTL_EXTENSION_AMOUNT,
-                );
-                true
-            }
-            crate::SessionStatus::Settled => false,
-        }
-    } else {
-        false
-    }
+pub fn extend_session_ttl(env: &Env, session_id: &BytesN<32>) {
+    env.storage().persistent().extend_ttl(
+        &DataKey::Session(session_id.clone()),
+        DEFAULT_TTL_THRESHOLD,
+        TTL_EXTENSION_AMOUNT,
+    );
 }
 
 #[cfg(test)]

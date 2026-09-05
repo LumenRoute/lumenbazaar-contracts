@@ -60,6 +60,10 @@ fn public_interface_is_callable() {
     // Test cancel and extend_ttl on separate open sessions
     let session_id_2 = client.create_session(&buyer, &seller, &asset, &100, &10, &resource_hash);
     client.cancel(&session_id_2);
+    assert_eq!(
+        client.try_extend_ttl(&session_id_2),
+        Err(Ok(ContractError::TtlExtensionFailed))
+    );
 
     let session_id_3 = client.create_session(&buyer, &seller, &asset, &100, &10, &resource_hash);
     client.extend_ttl(&session_id_3);
@@ -697,7 +701,7 @@ fn extend_ttl_succeeds_for_open_sessions() {
 }
 
 #[test]
-fn extend_ttl_succeeds_for_cancelled_sessions() {
+fn extend_ttl_rejects_cancelled_sessions() {
     let env = Env::default();
     env.mock_all_auths();
     let contract_id = env.register(UptoSessionContract, ());
@@ -726,7 +730,10 @@ fn extend_ttl_succeeds_for_cancelled_sessions() {
         );
     });
 
-    assert!(client.try_extend_ttl(&session_id).is_ok());
+    assert_eq!(
+        client.try_extend_ttl(&session_id),
+        Err(Ok(ContractError::TtlExtensionFailed))
+    );
 }
 
 #[test]
@@ -774,6 +781,6 @@ fn extend_ttl_rejects_missing_session() {
 
     assert_eq!(
         client.try_extend_ttl(&missing_id),
-        Err(Ok(ContractError::TtlExtensionFailed))
+        Err(Ok(ContractError::SessionNotFound))
     );
 }

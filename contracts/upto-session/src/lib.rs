@@ -144,10 +144,17 @@ impl UptoSessionContract {
     }
 
     pub fn extend_ttl(env: Env, session_id: BytesN<32>) -> Result<(), ContractError> {
-        if storage::extend_session_ttl(&env, &session_id) {
-            Ok(())
-        } else {
-            Err(ContractError::TtlExtensionFailed)
+        let session =
+            storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
+
+        match session.status {
+            SessionStatus::Open => {
+                storage::extend_session_ttl(&env, &session_id);
+                Ok(())
+            }
+            SessionStatus::Settled | SessionStatus::Cancelled => {
+                Err(ContractError::TtlExtensionFailed)
+            }
         }
     }
 }
