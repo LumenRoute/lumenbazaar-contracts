@@ -1,7 +1,10 @@
 extern crate std;
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, vec, Address, BytesN, Env};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger as _},
+    vec, Address, BytesN, Env,
+};
 use upto_session::{ContractError, UptoSessionContract, UptoSessionContractClient};
 
 fn initialized_wallet(
@@ -35,15 +38,33 @@ fn set_standard_policy(
     asset: &Address,
     resource_hash: &BytesN<32>,
 ) {
-    client.set_policy(&SpendingPolicy {
+    client.set_policy(&standard_policy(
+        env,
+        agent,
+        seller,
+        asset,
+        resource_hash,
+        100,
+    ));
+}
+
+fn standard_policy(
+    env: &Env,
+    agent: &Address,
+    seller: &Address,
+    asset: &Address,
+    resource_hash: &BytesN<32>,
+    valid_until_ledger: u32,
+) -> SpendingPolicy {
+    SpendingPolicy {
         agent: agent.clone(),
         max_amount_per_payment: 75,
         max_amount_per_day: 100,
-        valid_until_ledger: 100,
+        valid_until_ledger,
         allowed_sellers: vec![env, seller.clone()],
         allowed_assets: vec![env, asset.clone()],
         allowed_resource_hashes: vec![env, resource_hash.clone()],
-    });
+    }
 }
 
 #[test]
@@ -244,5 +265,81 @@ fn rejects_invalid_or_expired_policy_windows() {
             allowed_resource_hashes: vec![&env, resource_hash],
         }),
         Err(Ok(PolicyWalletError::PolicyExpired))
+    );
+}
+
+#[test]
+fn documentation_allowed_payment_example_authorizes() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, agent, seller, asset, _owner, resource_hash) = initialized_wallet(&env);
+    set_standard_policy(&env, &client, &agent, &seller, &asset, &resource_hash);
+
+    assert!(client
+        .try_authorize_payment(&agent, &seller, &asset, &50, &resource_hash)
+        .is_ok());
+    assert_eq!(client.spent_today(&agent), 50);
+}
+
+#[test]
+fn documentation_blocked_payment_example_reports_amount_cap() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, agent, seller, asset, _owner, resource_hash) = initialized_wallet(&env);
+    set_standard_policy(&env, &client, &agent, &seller, &asset, &resource_hash);
+
+    assert_eq!(
+        client.try_check_payment(&agent, &seller, &asset, &76, &resource_hash),
+        Err(Ok(PolicyWalletError::AmountExceedsPaymentCap))
+    );
+}
+
+#[test]
+fn documentation_expired_policy_example_reports_expired() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, agent, seller, asset, _owner, resource_hash) = initialized_wallet(&env);
+    client.set_policy(&standard_policy(
+        &env,
+        &agent,
+        &seller,
+        &asset,
+        &resource_hash,
+        10,
+    ));
+
+    env.ledger().set_sequence_number(11);
+
+    assert_eq!(
+        client.try_check_payment(&agent, &seller, &asset, &50, &resource_hash),
+        Err(Ok(PolicyWalletError::PolicyExpired))
+    );
+}
+
+#[test]
+fn documentation_wrong_seller_example_reports_seller_error() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, agent, seller, asset, _owner, resource_hash) = initialized_wallet(&env);
+    let wrong_seller = Address::generate(&env);
+    set_standard_policy(&env, &client, &agent, &seller, &asset, &resource_hash);
+
+    assert_eq!(
+        client.try_check_payment(&agent, &wrong_seller, &asset, &50, &resource_hash),
+        Err(Ok(PolicyWalletError::SellerNotAllowed))
+    );
+}
+
+#[test]
+fn documentation_wrong_asset_example_reports_asset_error() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, agent, seller, asset, _owner, resource_hash) = initialized_wallet(&env);
+    let wrong_asset = Address::generate(&env);
+    set_standard_policy(&env, &client, &agent, &seller, &asset, &resource_hash);
+
+    assert_eq!(
+        client.try_check_payment(&agent, &seller, &wrong_asset, &50, &resource_hash),
+        Err(Ok(PolicyWalletError::AssetNotAllowed))
     );
 }
