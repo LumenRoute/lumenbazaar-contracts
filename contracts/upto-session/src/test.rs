@@ -3,7 +3,7 @@ extern crate std;
 use super::*;
 use soroban_sdk::{
     testutils::{Address as _, Events as _, Ledger as _, MockAuth, MockAuthInvoke},
-    token, Address, BytesN, Env, IntoVal,
+    token, Address, BytesN, Env, Event, IntoVal,
 };
 use test_token::{TestTokenContract, TestTokenContractClient};
 
@@ -188,9 +188,21 @@ fn create_session_emits_stable_event() {
     let asset = Address::generate(&env);
     let resource_hash = BytesN::from_array(&env, &[5; 32]);
 
-    client.create_session(&buyer, &seller, &asset, &500, &25, &resource_hash);
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &25, &resource_hash);
 
-    assert_eq!(env.events().all().events().len(), 1);
+    assert_eq!(
+        env.events().all().filter_by_contract(&contract_id),
+        std::vec![events::SessionCreated {
+            session_id,
+            buyer,
+            seller,
+            asset,
+            max_amount: 500,
+            expires_at_ledger: 25,
+            resource_hash,
+        }
+        .to_xdr(&env, &contract_id)]
+    );
 }
 
 #[test]
@@ -629,7 +641,17 @@ fn settle_emits_stable_event() {
 
     client.settle(&session_id, &125, &usage_hash);
 
-    assert_eq!(env.events().all().events().len(), 2);
+    assert_eq!(
+        env.events().all().filter_by_contract(&contract_id),
+        std::vec![events::SessionSettled {
+            session_id,
+            seller,
+            asset,
+            actual_amount: 125,
+            usage_hash,
+        }
+        .to_xdr(&env, &contract_id)]
+    );
 }
 
 #[test]
@@ -788,21 +810,21 @@ fn cancel_emits_stable_event() {
     let session_before = client.get_session(&session_id);
     assert_eq!(session_before.status, SessionStatus::Open);
 
-    let _initial_event_count = env.events().all().events().len();
-
-    // Cancel should succeed
     let cancel_result = client.try_cancel(&session_id);
     assert!(cancel_result.is_ok(), "Cancel should succeed");
+
+    assert_eq!(
+        env.events().all().filter_by_contract(&contract_id),
+        std::vec![events::SessionCancelled {
+            session_id: session_id.clone(),
+            buyer: buyer.clone(),
+        }
+        .to_xdr(&env, &contract_id)]
+    );
 
     // Verify session is cancelled after cancel
     let session_after = client.get_session(&session_id);
     assert_eq!(session_after.status, SessionStatus::Cancelled);
-
-    let _final_event_count = env.events().all().events().len();
-
-    // Verify the session was actually cancelled (core requirement)
-    // The important thing is that cancel changes the session status
-    // Event capture in tests may vary based on Soroban environment
 }
 
 #[test]
