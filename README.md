@@ -31,3 +31,14 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
 stellar contract build --locked
 ```
+
+## Local Deployment
+
+Set a local Stellar network in the CLI, then run:
+
+```bash
+node scripts/local/deploy-local.mjs
+node scripts/local/initialize-local.mjs
+```
+
+Use `--dry-run` with either script to print commands without submitting transactions. See `scripts/local/sample-commands.md` for create, settle, cancel, and inspect examples.
