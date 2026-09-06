@@ -31,7 +31,10 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
 stellar contract build --locked
 node scripts/report-resource-usage.mjs
+node scripts/check-backend-handoff.mjs
 ```
+
+Backend integration notes are in `docs/backend-integration-handoff.md`.
 
 ## Local Deployment
 

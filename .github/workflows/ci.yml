@@ -50,3 +50,6 @@ jobs:
           npm --prefix bindings/upto-session install --no-package-lock
           npm --prefix bindings/upto-session run build
           node scripts/smoke-upto-session-bindings.mjs
+
+      - name: Check backend handoff
+        run: node scripts/check-backend-handoff.mjs

@@ -1,0 +1,8 @@
+{
+  "hashAlgorithm": "sha256",
+  "encoding": "hex",
+  "resourceDescriptorCanonicalJson": "{\"asset\":\"C...\",\"method\":\"GET\",\"resourceId\":\"seller-api-weather-hourly\",\"seller\":\"G...\",\"unit\":\"request\",\"url\":\"https://api.example.test/weather/hourly\"}",
+  "resourceHashHex": "e71d5d8aa20ab6db9ae07e7095e6781b20a5996337493f7397c033f18e1be989",
+  "usageReceiptCanonicalJson": "{\"meteredAtLedger\":123456,\"quantity\":42,\"requestId\":\"req_01HZYK7G7MN5P85V3QP4Q8Y9X2\",\"sessionId\":\"32-byte-session-id-hex\",\"unit\":\"request\"}",
+  "usageHashHex": "2379db445a9f37c1f0406e82388b35ef35b4bac2f014af281a4c6b247025b817"
+}
