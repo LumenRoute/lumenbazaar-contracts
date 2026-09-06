@@ -1,0 +1,30 @@
+{
+  "reviewTarget": "upto-session",
+  "generatedBy": "node scripts/generate-audit-freeze.mjs",
+  "files": [
+    {
+      "path": "contracts/upto-session/src/lib.rs",
+      "sha256": "b63fe1a000a6a1c4f77da4482a0a3ee4ebe422c71c68bb12ce751554b9ee406f"
+    },
+    {
+      "path": "contracts/upto-session/src/types.rs",
+      "sha256": "7251a6282d1ee8cc9eca6fd3fd7002627ab3fb63f3c8f6ce57df21b2891751d0"
+    },
+    {
+      "path": "contracts/upto-session/src/errors.rs",
+      "sha256": "568e23c888c51c58269fd2836c7910dae6c66763633a8579186207f41993ddcc"
+    },
+    {
+      "path": "contracts/upto-session/src/events.rs",
+      "sha256": "3079a570bd9a3dcd74deaf81977a7b055695a5f32046177c040776b5d6794918"
+    },
+    {
+      "path": "artifacts/spec/upto-session.xdr-base64.txt",
+      "sha256": "72424d29520667372a97897c50564c809cc45e7832730af82cf7d028087baeea"
+    },
+    {
+      "path": "bindings/upto-session/src/index.ts",
+      "sha256": "11f83a84d782ce0e56febbc527e33b112e0bd2f56fdf323ec714b2168e953326"
+    }
+  ]
+}

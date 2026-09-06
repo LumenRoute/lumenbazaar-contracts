@@ -56,3 +56,6 @@ jobs:
 
       - name: Check security checklist
         run: node scripts/check-security-checklist.mjs
+
+      - name: Check audit readiness
+        run: node scripts/check-audit-readiness.mjs
