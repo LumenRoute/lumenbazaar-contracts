@@ -53,3 +53,6 @@ jobs:
 
       - name: Check backend handoff
         run: node scripts/check-backend-handoff.mjs
+
+      - name: Check security checklist
+        run: node scripts/check-security-checklist.mjs

@@ -13,3 +13,5 @@ Do not open public issues for:
 - Replay or storage collision risks.
 
 Public reports may be opened after a fix or mitigation is available.
+
+The current contract control checklist for review is maintained in `docs/security-checklist.md`.

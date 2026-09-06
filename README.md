@@ -32,9 +32,11 @@ cargo test --workspace --all-features
 stellar contract build --locked
 node scripts/report-resource-usage.mjs
 node scripts/check-backend-handoff.mjs
+node scripts/check-security-checklist.mjs
 ```
 
 Backend integration notes are in `docs/backend-integration-handoff.md`.
+Security review evidence is in `docs/security-checklist.md`.
 
 ## Local Deployment
 
