@@ -402,6 +402,40 @@ fn settle_rejects_invalid_amounts_and_expiry() {
 }
 
 #[test]
+fn expired_open_session_remains_observable_and_buyer_cancellable() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[32; 32]);
+    let usage_hash = BytesN::from_array(&env, &[33; 32]);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    env.ledger().set_sequence_number(50);
+
+    assert_eq!(
+        client.try_settle(&session_id, &100, &usage_hash),
+        Err(Ok(ContractError::ExpiredSession))
+    );
+
+    let expired_session = client.get_session(&session_id);
+    assert_eq!(expired_session.status, SessionStatus::Open);
+    assert_eq!(expired_session.settled_amount, 0);
+    assert_eq!(expired_session.expires_at_ledger, 50);
+
+    client.cancel(&session_id);
+
+    assert_eq!(
+        client.get_session(&session_id).status,
+        SessionStatus::Cancelled
+    );
+}
+
+#[test]
 fn settle_surfaces_asset_transfer_failure_without_finalizing_session() {
     let env = Env::default();
     env.mock_all_auths_allowing_non_root_auth();

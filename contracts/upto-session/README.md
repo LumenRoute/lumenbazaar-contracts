@@ -102,3 +102,16 @@ Instance storage keeps administrator, layout version, and session sequence
 state. Those entries are intentionally separate from per-session persistent
 storage so sequence and contract layout evidence survive independent session
 lifecycle cleanup.
+
+## Expiry Behavior
+
+`settle` rejects sessions at or after `expires_at_ledger` with
+`ExpiredSession`, before seller authorization or token transfer. Expiry does not
+rewrite stored session state by itself: the session remains observable through
+`get_session` so backend indexers can retain the original cap, parties, asset,
+and resource hash.
+
+The buyer may still call `cancel(session_id)` after expiry while the session is
+open. That gives wallets and backend indexers an explicit terminal cancellation
+event without allowing any funds to move. Settled and already cancelled sessions
+continue to reject cancellation with their stable lifecycle errors.
