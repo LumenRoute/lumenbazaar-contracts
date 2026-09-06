@@ -2,8 +2,8 @@ extern crate std;
 
 use super::*;
 use soroban_sdk::{
-    testutils::{Address as _, Events as _, Ledger as _},
-    token, Address, BytesN, Env,
+    testutils::{Address as _, Events as _, Ledger as _, MockAuth, MockAuthInvoke},
+    token, Address, BytesN, Env, IntoVal,
 };
 use test_token::{TestTokenContract, TestTokenContractClient};
 
@@ -295,6 +295,57 @@ fn settle_requires_seller_auth() {
     });
 
     assert!(client.try_settle(&session_id, &10, &usage_hash).is_err());
+}
+
+#[test]
+fn settle_rejects_wrong_seller_auth() {
+    let env = Env::default();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let session_id = BytesN::from_array(&env, &[36; 32]);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let wrong_seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[37; 32]);
+    let usage_hash = BytesN::from_array(&env, &[38; 32]);
+
+    env.as_contract(&contract_id, || {
+        storage::write_session(
+            &env,
+            &Session {
+                id: session_id.clone(),
+                buyer,
+                seller,
+                asset,
+                max_amount: 100,
+                settled_amount: 0,
+                expires_at_ledger: 50,
+                resource_hash,
+                usage_hash: None,
+                status: SessionStatus::Open,
+            },
+        );
+    });
+
+    let result = client
+        .mock_auths(&[MockAuth {
+            address: &wrong_seller,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "settle",
+                args: (session_id.clone(), 10_i128, usage_hash.clone()).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_settle(&session_id, &10, &usage_hash);
+
+    assert!(result.is_err());
+
+    let session = client.get_session(&session_id);
+    assert_eq!(session.status, SessionStatus::Open);
+    assert_eq!(session.settled_amount, 0);
+    assert_eq!(session.usage_hash, None);
 }
 
 #[test]
