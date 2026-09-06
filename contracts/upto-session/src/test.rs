@@ -27,6 +27,47 @@ fn create_local_test_token(env: &Env, buyer: &Address, amount: i128) -> Address 
     token_id
 }
 
+fn print_resource_usage(operation: &str, env: &Env) {
+    let resources = env.cost_estimate().resources();
+    let fee = env.cost_estimate().fee();
+
+    std::println!(
+        concat!(
+            "RESOURCE_USAGE_JSON ",
+            "{{",
+            "\"operation\":\"{}\",",
+            "\"instructions\":{},",
+            "\"mem_bytes\":{},",
+            "\"disk_read_entries\":{},",
+            "\"memory_read_entries\":{},",
+            "\"write_entries\":{},",
+            "\"disk_read_bytes\":{},",
+            "\"write_bytes\":{},",
+            "\"contract_events_size_bytes\":{},",
+            "\"persistent_rent_ledger_bytes\":{},",
+            "\"persistent_entry_rent_bumps\":{},",
+            "\"temporary_rent_ledger_bytes\":{},",
+            "\"temporary_entry_rent_bumps\":{},",
+            "\"estimated_fee_stroops\":{}",
+            "}}"
+        ),
+        operation,
+        resources.instructions,
+        resources.mem_bytes,
+        resources.disk_read_entries,
+        resources.memory_read_entries,
+        resources.write_entries,
+        resources.disk_read_bytes,
+        resources.write_bytes,
+        resources.contract_events_size_bytes,
+        resources.persistent_rent_ledger_bytes,
+        resources.persistent_entry_rent_bumps,
+        resources.temporary_rent_ledger_bytes,
+        resources.temporary_entry_rent_bumps,
+        fee.total,
+    );
+}
+
 #[test]
 fn public_interface_is_callable() {
     let env = Env::default();
@@ -79,6 +120,74 @@ fn public_interface_is_callable() {
 
     let session_id_3 = client.create_session(&buyer, &seller, &asset, &100, &10, &resource_hash);
     client.extend_ttl(&session_id_3);
+}
+
+#[test]
+fn resource_usage_create_session() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[31; 32]);
+
+    client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    print_resource_usage("create_session", &env);
+}
+
+#[test]
+fn resource_usage_settle() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
+    let resource_hash = BytesN::from_array(&env, &[32; 32]);
+    let usage_hash = BytesN::from_array(&env, &[33; 32]);
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    client.settle(&session_id, &125, &usage_hash);
+
+    print_resource_usage("settle", &env);
+}
+
+#[test]
+fn resource_usage_cancel() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[34; 32]);
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    client.cancel(&session_id);
+
+    print_resource_usage("cancel", &env);
+}
+
+#[test]
+fn resource_usage_extend_ttl() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[35; 32]);
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    client.extend_ttl(&session_id);
+
+    print_resource_usage("extend_ttl", &env);
 }
 
 #[test]

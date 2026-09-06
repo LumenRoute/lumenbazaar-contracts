@@ -1,0 +1,70 @@
+{
+  "source": "cargo test -p upto-session resource_usage_ -- --nocapture --test-threads=1",
+  "note": "Local Soroban SDK native estimates; live RPC simulation is required before production fee budgeting.",
+  "rows": [
+    {
+      "operation": "cancel",
+      "instructions": 83921,
+      "mem_bytes": 14012,
+      "disk_read_entries": 0,
+      "memory_read_entries": 4,
+      "write_entries": 2,
+      "disk_read_bytes": 0,
+      "write_bytes": 684,
+      "contract_events_size_bytes": 188,
+      "persistent_rent_ledger_bytes": 32760,
+      "persistent_entry_rent_bumps": 1,
+      "temporary_rent_ledger_bytes": 454463928,
+      "temporary_entry_rent_bumps": 1,
+      "estimated_fee_stroops": 2206755
+    },
+    {
+      "operation": "create_session",
+      "instructions": 94638,
+      "mem_bytes": 18135,
+      "disk_read_entries": 0,
+      "memory_read_entries": 4,
+      "write_entries": 3,
+      "disk_read_bytes": 0,
+      "write_bytes": 836,
+      "contract_events_size_bytes": 436,
+      "persistent_rent_ledger_bytes": 2702700,
+      "persistent_entry_rent_bumps": 2,
+      "temporary_rent_ledger_bytes": 454463928,
+      "temporary_entry_rent_bumps": 1,
+      "estimated_fee_stroops": 2240460
+    },
+    {
+      "operation": "extend_ttl",
+      "instructions": 38305,
+      "mem_bytes": 5062,
+      "disk_read_entries": 0,
+      "memory_read_entries": 2,
+      "write_entries": 0,
+      "disk_read_bytes": 0,
+      "write_bytes": 0,
+      "contract_events_size_bytes": 0,
+      "persistent_rent_ledger_bytes": 601526620,
+      "persistent_entry_rent_bumps": 1,
+      "temporary_rent_ledger_bytes": 0,
+      "temporary_entry_rent_bumps": 0,
+      "estimated_fee_stroops": 5804331
+    },
+    {
+      "operation": "settle",
+      "instructions": 255241,
+      "mem_bytes": 43997,
+      "disk_read_entries": 1,
+      "memory_read_entries": 9,
+      "write_entries": 5,
+      "disk_read_bytes": 92,
+      "write_bytes": 1236,
+      "contract_events_size_bytes": 580,
+      "persistent_rent_ledger_bytes": 116285400,
+      "persistent_entry_rent_bumps": 2,
+      "temporary_rent_ledger_bytes": 908927856,
+      "temporary_entry_rent_bumps": 2,
+      "estimated_fee_stroops": 5541067
+    }
+  ]
+}
