@@ -42,3 +42,11 @@ jobs:
         run: |
           node scripts/generate-specs.mjs --skip-build
           git diff --exit-code -- artifacts/spec
+
+      - name: Check TypeScript bindings
+        run: |
+          node scripts/generate-bindings.mjs --skip-build
+          git diff --exit-code -- bindings/upto-session
+          npm --prefix bindings/upto-session install --no-package-lock
+          npm --prefix bindings/upto-session run build
+          node scripts/smoke-upto-session-bindings.mjs

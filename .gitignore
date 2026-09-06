@@ -1,5 +1,6 @@
 /target/
 **/test_snapshots/
 **/*.wasm
+bindings/*/dist/
 !.cargo/
 !.github/
