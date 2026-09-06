@@ -37,3 +37,8 @@ jobs:
 
       - name: Build WASM contracts
         run: stellar contract build --locked
+
+      - name: Check generated specs
+        run: |
+          node scripts/generate-specs.mjs --skip-build
+          git diff --exit-code -- artifacts/spec
