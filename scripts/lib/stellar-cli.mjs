@@ -36,11 +36,13 @@ export function runStellar(args, { capture = false, dryRun = false } = {}) {
     return "";
   }
 
-  return execFileSync("stellar", args, {
+  const output = execFileSync("stellar", args, {
     cwd: repoRoot,
     encoding: "utf8",
     stdio: capture ? ["ignore", "pipe", "inherit"] : "inherit",
-  }).trim();
+  });
+
+  return typeof output === "string" ? output.trim() : "";
 }
 
 export function buildContracts({ dryRun = false } = {}) {
