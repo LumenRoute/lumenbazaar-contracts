@@ -42,3 +42,15 @@ node scripts/local/initialize-local.mjs
 ```
 
 Use `--dry-run` with either script to print commands without submitting transactions. See `scripts/local/sample-commands.md` for create, settle, cancel, and inspect examples.
+
+## Testnet Deployment
+
+Export the values from `.env.testnet.example`, then run:
+
+```bash
+node scripts/testnet/deploy-testnet.mjs
+node scripts/testnet/initialize-testnet.mjs
+node scripts/testnet/verify-testnet.mjs
+```
+
+The scripts write `deployments/testnet.json`, which is ignored until a reviewed deployment is ready to publish.

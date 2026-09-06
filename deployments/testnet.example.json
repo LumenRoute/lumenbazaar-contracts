@@ -1,0 +1,26 @@
+{
+  "contracts": {
+    "upto-session": {
+      "name": "upto-session",
+      "alias": "lumenbazaar-upto-session-testnet",
+      "network": "testnet",
+      "wasm": "target/wasm32v1-none/release/upto_session.wasm",
+      "contractId": "C..."
+    },
+    "test-token": {
+      "name": "test-token",
+      "alias": "lumenbazaar-test-token-testnet",
+      "network": "testnet",
+      "wasm": "target/wasm32v1-none/release/test_token.wasm",
+      "contractId": "C..."
+    },
+    "policy-wallet-example": {
+      "name": "policy-wallet-example",
+      "alias": "lumenbazaar-policy-wallet-testnet",
+      "network": "testnet",
+      "wasm": "target/wasm32v1-none/release/policy_wallet_example.wasm",
+      "contractId": "C..."
+    }
+  },
+  "generatedAt": "2026-09-06T00:00:00.000Z"
+}

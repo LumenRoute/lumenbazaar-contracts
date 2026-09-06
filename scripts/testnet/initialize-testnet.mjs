@@ -1,0 +1,59 @@
+import { join } from "node:path";
+import {
+  hasFlag,
+  invokeContract,
+  readManifest,
+  repoRoot,
+  sourceAccount,
+} from "../lib/stellar-cli.mjs";
+
+const dryRun = hasFlag("--dry-run");
+const source = sourceAccount("testnet-deployer");
+const manifest = readManifest(join(repoRoot, "deployments", "testnet.json"));
+const contracts = manifest.contracts || {};
+
+const admin = process.env.LUMENBAZAAR_ADMIN || source;
+const tokenAdmin = process.env.LUMENBAZAAR_TEST_TOKEN_ADMIN || admin;
+const policyOwner = process.env.LUMENBAZAAR_POLICY_OWNER || admin;
+const uptoSessionContract =
+  process.env.LUMENBAZAAR_UPTO_SESSION_CONTRACT_ID ||
+  contracts["upto-session"]?.contractId ||
+  "dry-run-upto-session";
+const testTokenContract =
+  process.env.LUMENBAZAAR_TEST_TOKEN_CONTRACT_ID ||
+  contracts["test-token"]?.contractId ||
+  "dry-run-test-token";
+const policyWalletContract =
+  process.env.LUMENBAZAAR_POLICY_WALLET_CONTRACT_ID ||
+  contracts["policy-wallet-example"]?.contractId ||
+  "dry-run-policy-wallet";
+
+invokeContract({
+  contractId: uptoSessionContract,
+  source: admin,
+  network: "testnet",
+  args: ["initialize", "--admin", admin],
+  dryRun,
+});
+
+invokeContract({
+  contractId: testTokenContract,
+  source: tokenAdmin,
+  network: "testnet",
+  args: ["initialize", "--admin", tokenAdmin],
+  dryRun,
+});
+
+invokeContract({
+  contractId: policyWalletContract,
+  source: policyOwner,
+  network: "testnet",
+  args: [
+    "initialize",
+    "--owner",
+    policyOwner,
+    "--upto_session_contract",
+    uptoSessionContract,
+  ],
+  dryRun,
+});
