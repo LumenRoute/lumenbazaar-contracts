@@ -1194,6 +1194,7 @@ name = "policy-wallet-example"
 version = "0.1.0"
 dependencies = [
  "soroban-sdk",
+ "upto-session",
 ]
 
 [[package]]
