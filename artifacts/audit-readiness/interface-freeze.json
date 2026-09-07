@@ -20,7 +20,7 @@
     },
     {
       "path": "artifacts/spec/upto-session.json",
-      "sha256": "44a4c77a6f88d634e13199b5d9929c56e226077701fd8ba57e6e35d94700aaa9"
+      "sha256": "f87ff7972662f5bb69d87167bbef9ad884a64133bcd9e105613fe625acc53592"
     },
     {
       "path": "bindings/upto-session/src/index.ts",

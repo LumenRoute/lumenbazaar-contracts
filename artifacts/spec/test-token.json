@@ -2,14 +2,14 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "balance",
       "inputs": [
         {
           "doc": "",
           "name": "id",
-          "type_": "address"
+          "type": "address"
         }
       ],
+      "name": "balance",
       "outputs": [
         "i128"
       ]
@@ -18,8 +18,8 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "decimals",
       "inputs": [],
+      "name": "decimals",
       "outputs": [
         "u32"
       ]
@@ -28,23 +28,23 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "initialize",
       "inputs": [
         {
           "doc": "",
           "name": "admin",
-          "type_": "address"
+          "type": "address"
         }
       ],
+      "name": "initialize",
       "outputs": [
         {
           "result": {
-            "ok_type": "void",
             "error_type": {
               "udt": {
                 "name": "TokenError"
               }
-            }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -53,28 +53,28 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "mint",
       "inputs": [
         {
           "doc": "",
           "name": "to",
-          "type_": "address"
+          "type": "address"
         },
         {
           "doc": "",
           "name": "amount",
-          "type_": "i128"
+          "type": "i128"
         }
       ],
+      "name": "mint",
       "outputs": [
         {
           "result": {
-            "ok_type": "void",
             "error_type": {
               "udt": {
                 "name": "TokenError"
               }
-            }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -83,8 +83,8 @@
   {
     "function_v0": {
       "doc": "",
+      "inputs": [],
       "name": "name",
-      "inputs": [],
       "outputs": [
         "string"
       ]
@@ -93,8 +93,8 @@
   {
     "function_v0": {
       "doc": "",
+      "inputs": [],
       "name": "symbol",
-      "inputs": [],
       "outputs": [
         "string"
       ]
@@ -103,33 +103,33 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "transfer",
       "inputs": [
         {
           "doc": "",
           "name": "from",
-          "type_": "address"
+          "type": "address"
         },
         {
           "doc": "",
           "name": "to",
-          "type_": "address"
+          "type": "address"
         },
         {
           "doc": "",
           "name": "amount",
-          "type_": "i128"
+          "type": "i128"
         }
       ],
+      "name": "transfer",
       "outputs": [
         {
           "result": {
-            "ok_type": "void",
             "error_type": {
               "udt": {
                 "name": "TokenError"
               }
-            }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -138,8 +138,8 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "utility_only",
       "inputs": [],
+      "name": "utility_only",
       "outputs": [
         "bool"
       ]
@@ -147,9 +147,6 @@
   },
   {
     "udt_error_enum_v0": {
-      "doc": "",
-      "lib": "",
-      "name": "TokenError",
       "cases": [
         {
           "doc": "",
@@ -176,7 +173,10 @@
           "name": "BalanceOverflow",
           "value": 5
         }
-      ]
+      ],
+      "doc": "",
+      "lib": "",
+      "name": "TokenError"
     }
   }
 ]

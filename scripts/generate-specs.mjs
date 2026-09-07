@@ -62,9 +62,25 @@ for (const contract of contracts) {
       stdio: ["ignore", "pipe", "inherit"],
     },
   );
-  const entries = JSON.parse(output);
+  const entries = canonicalize(JSON.parse(output));
   entries.sort((left, right) => entryKey(left).localeCompare(entryKey(right)));
   writeFileSync(contract.spec, `${JSON.stringify(entries, null, 2)}\n`, "ascii");
+}
+
+function canonicalize(value) {
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+
+  if (typeof value !== "object" || value === null) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([key, entryValue]) => [key === "type_" ? "type" : key, canonicalize(entryValue)])
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
 }
 
 function entryKey(entry) {

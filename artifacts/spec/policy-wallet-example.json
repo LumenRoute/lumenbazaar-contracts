@@ -2,47 +2,47 @@
   {
     "function_v0": {
       "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "seller",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "resource_hash",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        }
+      ],
       "name": "authorize_payment",
-      "inputs": [
-        {
-          "doc": "",
-          "name": "agent",
-          "type_": "address"
-        },
-        {
-          "doc": "",
-          "name": "seller",
-          "type_": "address"
-        },
-        {
-          "doc": "",
-          "name": "asset",
-          "type_": "address"
-        },
-        {
-          "doc": "",
-          "name": "amount",
-          "type_": "i128"
-        },
-        {
-          "doc": "",
-          "name": "resource_hash",
-          "type_": {
-            "bytes_n": {
-              "n": 32
-            }
-          }
-        }
-      ],
       "outputs": [
         {
           "result": {
-            "ok_type": "void",
             "error_type": {
               "udt": {
                 "name": "PolicyWalletError"
               }
-            }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -51,47 +51,47 @@
   {
     "function_v0": {
       "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "seller",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "resource_hash",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        }
+      ],
       "name": "check_payment",
-      "inputs": [
-        {
-          "doc": "",
-          "name": "agent",
-          "type_": "address"
-        },
-        {
-          "doc": "",
-          "name": "seller",
-          "type_": "address"
-        },
-        {
-          "doc": "",
-          "name": "asset",
-          "type_": "address"
-        },
-        {
-          "doc": "",
-          "name": "amount",
-          "type_": "i128"
-        },
-        {
-          "doc": "",
-          "name": "resource_hash",
-          "type_": {
-            "bytes_n": {
-              "n": 32
-            }
-          }
-        }
-      ],
       "outputs": [
         {
           "result": {
-            "ok_type": "void",
             "error_type": {
               "udt": {
                 "name": "PolicyWalletError"
               }
-            }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -100,8 +100,8 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "example_only",
       "inputs": [],
+      "name": "example_only",
       "outputs": [
         "bool"
       ]
@@ -110,20 +110,20 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "get_config",
       "inputs": [],
+      "name": "get_config",
       "outputs": [
         {
           "result": {
+            "error_type": {
+              "udt": {
+                "name": "PolicyWalletError"
+              }
+            },
             "ok_type": {
               "udt": {
                 "name": "WalletConfig"
               }
-            },
-            "error_type": {
-              "udt": {
-                "name": "PolicyWalletError"
-              }
             }
           }
         }
@@ -133,26 +133,26 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "get_policy",
       "inputs": [
         {
           "doc": "",
           "name": "agent",
-          "type_": "address"
+          "type": "address"
         }
       ],
+      "name": "get_policy",
       "outputs": [
         {
           "result": {
+            "error_type": {
+              "udt": {
+                "name": "PolicyWalletError"
+              }
+            },
             "ok_type": {
               "udt": {
                 "name": "SpendingPolicy"
               }
-            },
-            "error_type": {
-              "udt": {
-                "name": "PolicyWalletError"
-              }
             }
           }
         }
@@ -162,28 +162,28 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "initialize",
       "inputs": [
         {
           "doc": "",
           "name": "owner",
-          "type_": "address"
+          "type": "address"
         },
         {
           "doc": "",
           "name": "upto_session_contract",
-          "type_": "address"
+          "type": "address"
         }
       ],
+      "name": "initialize",
       "outputs": [
         {
           "result": {
-            "ok_type": "void",
             "error_type": {
               "udt": {
                 "name": "PolicyWalletError"
               }
-            }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -192,17 +192,17 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "require_owner",
       "inputs": [],
+      "name": "require_owner",
       "outputs": [
         {
           "result": {
-            "ok_type": "void",
             "error_type": {
               "udt": {
                 "name": "PolicyWalletError"
               }
-            }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -211,27 +211,27 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "set_policy",
       "inputs": [
         {
           "doc": "",
           "name": "policy",
-          "type_": {
+          "type": {
             "udt": {
               "name": "SpendingPolicy"
             }
           }
         }
       ],
+      "name": "set_policy",
       "outputs": [
         {
           "result": {
-            "ok_type": "void",
             "error_type": {
               "udt": {
                 "name": "PolicyWalletError"
               }
-            }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -240,14 +240,14 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "spent_today",
       "inputs": [
         {
           "doc": "",
           "name": "agent",
-          "type_": "address"
+          "type": "address"
         }
       ],
+      "name": "spent_today",
       "outputs": [
         "i128"
       ]
@@ -255,9 +255,6 @@
   },
   {
     "udt_error_enum_v0": {
-      "doc": "",
-      "lib": "",
-      "name": "PolicyWalletError",
       "cases": [
         {
           "doc": "",
@@ -314,24 +311,25 @@
           "name": "ResourceHashNotAllowed",
           "value": 11
         }
-      ]
+      ],
+      "doc": "",
+      "lib": "",
+      "name": "PolicyWalletError"
     }
   },
   {
     "udt_struct_v0": {
       "doc": "",
-      "lib": "",
-      "name": "SpendingPolicy",
       "fields": [
         {
           "doc": "",
           "name": "agent",
-          "type_": "address"
+          "type": "address"
         },
         {
           "doc": "",
           "name": "allowed_assets",
-          "type_": {
+          "type": {
             "vec": {
               "element_type": "address"
             }
@@ -340,7 +338,7 @@
         {
           "doc": "",
           "name": "allowed_resource_hashes",
-          "type_": {
+          "type": {
             "vec": {
               "element_type": {
                 "bytes_n": {
@@ -353,7 +351,7 @@
         {
           "doc": "",
           "name": "allowed_sellers",
-          "type_": {
+          "type": {
             "vec": {
               "element_type": "address"
             }
@@ -362,48 +360,50 @@
         {
           "doc": "",
           "name": "max_amount_per_day",
-          "type_": "i128"
+          "type": "i128"
         },
         {
           "doc": "",
           "name": "max_amount_per_payment",
-          "type_": "i128"
+          "type": "i128"
         },
         {
           "doc": "",
           "name": "valid_until_ledger",
-          "type_": "u32"
+          "type": "u32"
         }
-      ]
+      ],
+      "lib": "",
+      "name": "SpendingPolicy"
     }
   },
   {
     "udt_struct_v0": {
       "doc": "",
-      "lib": "",
-      "name": "WalletConfig",
       "fields": [
         {
           "doc": "",
           "name": "example_only",
-          "type_": "bool"
+          "type": "bool"
         },
         {
           "doc": "",
           "name": "initialized_at_ledger",
-          "type_": "u32"
+          "type": "u32"
         },
         {
           "doc": "",
           "name": "owner",
-          "type_": "address"
+          "type": "address"
         },
         {
           "doc": "",
           "name": "upto_session_contract",
-          "type_": "address"
+          "type": "address"
         }
-      ]
+      ],
+      "lib": "",
+      "name": "WalletConfig"
     }
   }
 ]

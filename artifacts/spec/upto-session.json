@@ -1,171 +1,171 @@
 [
   {
     "event_v0": {
+      "data_format": "map",
       "doc": "",
       "lib": "",
       "name": "SessionCancelled",
-      "prefix_topics": [
-        "session_cancelled"
-      ],
       "params": [
         {
           "doc": "",
+          "location": "topic_list",
           "name": "session_id",
-          "type_": {
+          "type": {
             "bytes_n": {
               "n": 32
             }
-          },
-          "location": "topic_list"
+          }
         },
         {
           "doc": "",
+          "location": "data",
           "name": "buyer",
-          "type_": "address",
-          "location": "data"
+          "type": "address"
         }
       ],
-      "data_format": "map"
+      "prefix_topics": [
+        "session_cancelled"
+      ]
     }
   },
   {
     "event_v0": {
+      "data_format": "map",
       "doc": "",
       "lib": "",
       "name": "SessionCreated",
-      "prefix_topics": [
-        "session_created"
-      ],
       "params": [
         {
           "doc": "",
+          "location": "topic_list",
           "name": "session_id",
-          "type_": {
+          "type": {
             "bytes_n": {
               "n": 32
             }
-          },
-          "location": "topic_list"
+          }
         },
         {
           "doc": "",
+          "location": "data",
           "name": "buyer",
-          "type_": "address",
-          "location": "data"
+          "type": "address"
         },
         {
           "doc": "",
+          "location": "data",
           "name": "seller",
-          "type_": "address",
-          "location": "data"
+          "type": "address"
         },
         {
           "doc": "",
+          "location": "data",
           "name": "asset",
-          "type_": "address",
-          "location": "data"
+          "type": "address"
         },
         {
           "doc": "",
+          "location": "data",
           "name": "max_amount",
-          "type_": "i128",
-          "location": "data"
+          "type": "i128"
         },
         {
           "doc": "",
+          "location": "data",
           "name": "expires_at_ledger",
-          "type_": "u32",
-          "location": "data"
+          "type": "u32"
         },
         {
           "doc": "",
+          "location": "data",
           "name": "resource_hash",
-          "type_": {
-            "bytes_n": {
-              "n": 32
-            }
-          },
-          "location": "data"
-        }
-      ],
-      "data_format": "map"
-    }
-  },
-  {
-    "event_v0": {
-      "doc": "",
-      "lib": "",
-      "name": "SessionSettled",
-      "prefix_topics": [
-        "session_settled"
-      ],
-      "params": [
-        {
-          "doc": "",
-          "name": "session_id",
-          "type_": {
-            "bytes_n": {
-              "n": 32
-            }
-          },
-          "location": "topic_list"
-        },
-        {
-          "doc": "",
-          "name": "seller",
-          "type_": "address",
-          "location": "data"
-        },
-        {
-          "doc": "",
-          "name": "asset",
-          "type_": "address",
-          "location": "data"
-        },
-        {
-          "doc": "",
-          "name": "actual_amount",
-          "type_": "i128",
-          "location": "data"
-        },
-        {
-          "doc": "",
-          "name": "usage_hash",
-          "type_": {
-            "bytes_n": {
-              "n": 32
-            }
-          },
-          "location": "data"
-        }
-      ],
-      "data_format": "map"
-    }
-  },
-  {
-    "function_v0": {
-      "doc": "",
-      "name": "cancel",
-      "inputs": [
-        {
-          "doc": "",
-          "name": "session_id",
-          "type_": {
+          "type": {
             "bytes_n": {
               "n": 32
             }
           }
         }
       ],
+      "prefix_topics": [
+        "session_created"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
+      "name": "SessionSettled",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "seller",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "actual_amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "usage_hash",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        }
+      ],
+      "prefix_topics": [
+        "session_settled"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        }
+      ],
+      "name": "cancel",
       "outputs": [
         {
           "result": {
-            "ok_type": "void",
             "error_type": {
               "udt": {
                 "name": "ContractError"
               }
-            }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -174,55 +174,55 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "create_session",
       "inputs": [
         {
           "doc": "",
           "name": "buyer",
-          "type_": "address"
+          "type": "address"
         },
         {
           "doc": "",
           "name": "seller",
-          "type_": "address"
+          "type": "address"
         },
         {
           "doc": "",
           "name": "asset",
-          "type_": "address"
+          "type": "address"
         },
         {
           "doc": "",
           "name": "max_amount",
-          "type_": "i128"
+          "type": "i128"
         },
         {
           "doc": "",
           "name": "expires_at_ledger",
-          "type_": "u32"
+          "type": "u32"
         },
         {
           "doc": "",
           "name": "resource_hash",
-          "type_": {
+          "type": {
             "bytes_n": {
               "n": 32
             }
           }
         }
       ],
+      "name": "create_session",
       "outputs": [
         {
           "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
             "ok_type": {
               "bytes_n": {
                 "n": 32
               }
-            },
-            "error_type": {
-              "udt": {
-                "name": "ContractError"
-              }
             }
           }
         }
@@ -232,27 +232,27 @@
   {
     "function_v0": {
       "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        }
+      ],
       "name": "extend_ttl",
-      "inputs": [
-        {
-          "doc": "",
-          "name": "session_id",
-          "type_": {
-            "bytes_n": {
-              "n": 32
-            }
-          }
-        }
-      ],
       "outputs": [
         {
           "result": {
-            "ok_type": "void",
             "error_type": {
               "udt": {
                 "name": "ContractError"
               }
-            }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -261,30 +261,30 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "get_session",
       "inputs": [
         {
           "doc": "",
           "name": "session_id",
-          "type_": {
+          "type": {
             "bytes_n": {
               "n": 32
             }
           }
         }
       ],
+      "name": "get_session",
       "outputs": [
         {
           "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
             "ok_type": {
               "udt": {
                 "name": "Session"
               }
-            },
-            "error_type": {
-              "udt": {
-                "name": "ContractError"
-              }
             }
           }
         }
@@ -294,23 +294,23 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "initialize",
       "inputs": [
         {
           "doc": "",
           "name": "admin",
-          "type_": "address"
+          "type": "address"
         }
       ],
+      "name": "initialize",
       "outputs": [
         {
           "result": {
-            "ok_type": "void",
             "error_type": {
               "udt": {
                 "name": "ContractError"
               }
-            }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -319,12 +319,11 @@
   {
     "function_v0": {
       "doc": "",
-      "name": "settle",
       "inputs": [
         {
           "doc": "",
           "name": "session_id",
-          "type_": {
+          "type": {
             "bytes_n": {
               "n": 32
             }
@@ -333,27 +332,28 @@
         {
           "doc": "",
           "name": "actual_amount",
-          "type_": "i128"
+          "type": "i128"
         },
         {
           "doc": "",
           "name": "usage_hash",
-          "type_": {
+          "type": {
             "bytes_n": {
               "n": 32
             }
           }
         }
       ],
+      "name": "settle",
       "outputs": [
         {
           "result": {
-            "ok_type": "void",
             "error_type": {
               "udt": {
                 "name": "ContractError"
               }
-            }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -361,9 +361,6 @@
   },
   {
     "udt_error_enum_v0": {
-      "doc": "",
-      "lib": "",
-      "name": "ContractError",
       "cases": [
         {
           "doc": "",
@@ -430,34 +427,35 @@
           "name": "InvalidUsageHash",
           "value": 13
         }
-      ]
+      ],
+      "doc": "",
+      "lib": "",
+      "name": "ContractError"
     }
   },
   {
     "udt_struct_v0": {
       "doc": "",
-      "lib": "",
-      "name": "Session",
       "fields": [
         {
           "doc": "",
           "name": "asset",
-          "type_": "address"
+          "type": "address"
         },
         {
           "doc": "",
           "name": "buyer",
-          "type_": "address"
+          "type": "address"
         },
         {
           "doc": "",
           "name": "expires_at_ledger",
-          "type_": "u32"
+          "type": "u32"
         },
         {
           "doc": "",
           "name": "id",
-          "type_": {
+          "type": {
             "bytes_n": {
               "n": 32
             }
@@ -466,12 +464,12 @@
         {
           "doc": "",
           "name": "max_amount",
-          "type_": "i128"
+          "type": "i128"
         },
         {
           "doc": "",
           "name": "resource_hash",
-          "type_": {
+          "type": {
             "bytes_n": {
               "n": 32
             }
@@ -480,17 +478,17 @@
         {
           "doc": "",
           "name": "seller",
-          "type_": "address"
+          "type": "address"
         },
         {
           "doc": "",
           "name": "settled_amount",
-          "type_": "i128"
+          "type": "i128"
         },
         {
           "doc": "",
           "name": "status",
-          "type_": {
+          "type": {
             "udt": {
               "name": "SessionStatus"
             }
@@ -499,7 +497,7 @@
         {
           "doc": "",
           "name": "usage_hash",
-          "type_": {
+          "type": {
             "option": {
               "value_type": {
                 "bytes_n": {
@@ -509,14 +507,13 @@
             }
           }
         }
-      ]
+      ],
+      "lib": "",
+      "name": "Session"
     }
   },
   {
     "udt_union_v0": {
-      "doc": "",
-      "lib": "",
-      "name": "SessionStatus",
       "cases": [
         {
           "void_v0": {
@@ -536,7 +533,10 @@
             "name": "Cancelled"
           }
         }
-      ]
+      ],
+      "doc": "",
+      "lib": "",
+      "name": "SessionStatus"
     }
   }
 ]
