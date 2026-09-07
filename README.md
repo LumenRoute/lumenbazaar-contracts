@@ -39,6 +39,7 @@ node scripts/check-audit-readiness.mjs
 Backend integration notes are in `docs/backend-integration-handoff.md`.
 Security review evidence is in `docs/security-checklist.md`.
 Audit readiness notes are in `docs/audit-readiness.md`.
+Authorization boundaries and known limitations are in `docs/threat-model.md`.
 
 ## Local Deployment
 
@@ -61,4 +62,12 @@ node scripts/testnet/initialize-testnet.mjs
 node scripts/testnet/verify-testnet.mjs
 ```
 
-The scripts write `deployments/testnet.json`, which is ignored until a reviewed deployment is ready to publish.
+The scripts write an ignored `deployments/testnet.json`. Sanitized public deployment evidence is in
+`deployments/testnet-2026-09-06.json`; it records the test-only LBT asset accurately and does not
+claim that deployment alone proves a live payment.
+
+## Related Repositories
+
+- [Frontend](https://github.com/LumenRoute/lumenbazaar-frontend)
+- [Backend](https://github.com/LumenRoute/lumenbazaar-backend)
+- [Documentation](https://github.com/LumenRoute/lumenbazaar-docs)

@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "environment": "testnet",
+  "network": {
+    "name": "Test SDF Network",
+    "passphrase": "Test SDF Network ; September 2015",
+    "horizonUrl": "https://horizon-testnet.stellar.org",
+    "rpcUrl": "https://soroban-testnet.stellar.org"
+  },
+  "sourceCommit": "95ea3270b8a5cb052fee5dd9402ed19dbd5a9001",
+  "deployer": "GAVPY5NSR6I4JNQFM5C4CUEVMNPZWT4A5IGXREQEAAPNSC4EHOHYHKH4",
+  "toolchain": {
+    "stellarCli": "27.1.0",
+    "stellarXdr": "27.0.0",
+    "rustc": "1.93.1"
+  },
+  "contracts": {
+    "upto-session": {
+      "contractId": "CCO7IMY4LYPWNKXEQ44LKTRMPZBQC7UM7JV3MOGGMB5GC4246I7Y2RB6",
+      "artifactSha256": "23ee0112e5748a1450669d82063e72c32cecfea52b0a07d3edd54d727ab45eaf",
+      "upload": {
+        "transactionHash": "6d9accf826cabe0601047ac9b3fda67db9d99a8c7e24055f588f0d46107c65ba",
+        "ledger": 4541327,
+        "createdAt": "2026-09-06T21:30:22Z"
+      },
+      "deploy": {
+        "transactionHash": "f7735fae47dc7e938bb9f8392278e87def964be4101180bccb9f0ba5361f99d6",
+        "ledger": 4541329,
+        "createdAt": "2026-09-06T21:30:32Z"
+      },
+      "initialize": {
+        "transactionHash": "706160135df9a9554cfcea28c93430f6d1ba7cc54971ee647de06a07950be901",
+        "ledger": 4541339,
+        "createdAt": "2026-09-06T21:31:22Z"
+      }
+    },
+    "test-token": {
+      "contractId": "CBDGVXS454MMJGAE7DIHYGJAVQZ2BVPOPWXKPEQC4RWBUNQPUOSG63UG",
+      "artifactSha256": "d8e20cc3439ae32fb57295dd1d38f44b34ebbfef527e64e1bc1661bf5c575b66",
+      "asset": {
+        "code": "LBT",
+        "decimals": 7,
+        "purpose": "Custom test-only token; not USDC"
+      },
+      "upload": {
+        "transactionHash": "f8359cfa103b3c172c9d020521e1cd86ccb8c578d388fb11d34eaab4f5c104c5",
+        "ledger": 4541331,
+        "createdAt": "2026-09-06T21:30:42Z"
+      },
+      "deploy": {
+        "transactionHash": "981f9e511a4fdd8a26dd40c33e3b864e3a571f2a93b7d33f0ad4b2065fd5c993",
+        "ledger": 4541333,
+        "createdAt": "2026-09-06T21:30:52Z"
+      },
+      "initialize": {
+        "transactionHash": "c06e46acea92ccc58969dc28ae148acb6b2569c25adcbc8eb37edf693df4dd6d",
+        "ledger": 4541341,
+        "createdAt": "2026-09-06T21:31:32Z"
+      }
+    },
+    "policy-wallet-example": {
+      "contractId": "CD7YPKX5PTMT7L2LBLGHIEJVNSZAZHACZ4QYW4RPZAWPYIQJO53SUU52",
+      "artifactSha256": "bb459c12ee3fb3d7fd99f76bfac46b28534901193b988e5f4833c888590ed725",
+      "upload": {
+        "transactionHash": "b41642c375307c5c426223f317957e2adce9d14c0a61bb57ea4cd711b30949bc",
+        "ledger": 4541335,
+        "createdAt": "2026-09-06T21:31:02Z"
+      },
+      "deploy": {
+        "transactionHash": "a2c689c49174dd3c005f28e4b8d0eab2604a55e8b6311d1810ebaaf493eb9024",
+        "ledger": 4541336,
+        "createdAt": "2026-09-06T21:31:07Z"
+      },
+      "initialize": {
+        "transactionHash": "5f293373d05c9d84e020a3cc6262d26deb1999b0bcbd0b4c1844c85fb8002ec9",
+        "ledger": 4541343,
+        "createdAt": "2026-09-06T21:31:42Z"
+      }
+    }
+  },
+  "limitations": [
+    "This manifest proves deployment and initialization only; it does not prove a live payment session.",
+    "LBT is a custom test-only token and must not be represented as Circle USDC.",
+    "Testnet evidence is not mainnet evidence."
+  ]
+}
