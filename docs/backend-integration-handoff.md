@@ -23,7 +23,7 @@ No production contract ID is committed in this repository yet.
 ## Generated Interfaces
 
 - TypeScript package: `bindings/upto-session`
-- Spec artifact: `artifacts/spec/upto-session.xdr-base64.txt`
+- Canonical spec artifact: `artifacts/spec/upto-session.json`
 - Binding regeneration: `node scripts/generate-bindings.mjs`
 - Spec regeneration: `node scripts/generate-specs.mjs`
 

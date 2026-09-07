@@ -19,8 +19,8 @@
       "sha256": "3079a570bd9a3dcd74deaf81977a7b055695a5f32046177c040776b5d6794918"
     },
     {
-      "path": "artifacts/spec/upto-session.xdr-base64.txt",
-      "sha256": "72424d29520667372a97897c50564c809cc45e7832730af82cf7d028087baeea"
+      "path": "artifacts/spec/upto-session.json",
+      "sha256": "44a4c77a6f88d634e13199b5d9929c56e226077701fd8ba57e6e35d94700aaa9"
     },
     {
       "path": "bindings/upto-session/src/index.ts",

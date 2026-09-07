@@ -11,7 +11,7 @@ const contracts = [
   {
     name: "upto-session",
     wasm: join(repoRoot, "target", "wasm32v1-none", "release", "upto_session.wasm"),
-    spec: join(specDir, "upto-session.xdr-base64.txt"),
+    spec: join(specDir, "upto-session.json"),
   },
   {
     name: "policy-wallet-example",
@@ -22,12 +22,12 @@ const contracts = [
       "release",
       "policy_wallet_example.wasm",
     ),
-    spec: join(specDir, "policy-wallet-example.xdr-base64.txt"),
+    spec: join(specDir, "policy-wallet-example.json"),
   },
   {
     name: "test-token",
     wasm: join(repoRoot, "target", "wasm32v1-none", "release", "test_token.wasm"),
-    spec: join(specDir, "test-token.xdr-base64.txt"),
+    spec: join(specDir, "test-token.json"),
   },
 ];
 
@@ -45,7 +45,7 @@ for (const contract of contracts) {
     throw new Error(`Missing built WASM for ${contract.name}: ${contract.wasm}`);
   }
 
-  const spec = execFileSync(
+  const output = execFileSync(
     "stellar",
     [
       "contract",
@@ -54,7 +54,7 @@ for (const contract of contracts) {
       "--wasm",
       contract.wasm,
       "--output",
-      "xdr-base64",
+      "json",
     ],
     {
       cwd: repoRoot,
@@ -62,5 +62,17 @@ for (const contract of contracts) {
       stdio: ["ignore", "pipe", "inherit"],
     },
   );
-  writeFileSync(contract.spec, `${spec.trimEnd()}\n`, "ascii");
+  const entries = JSON.parse(output);
+  entries.sort((left, right) => entryKey(left).localeCompare(entryKey(right)));
+  writeFileSync(contract.spec, `${JSON.stringify(entries, null, 2)}\n`, "ascii");
+}
+
+function entryKey(entry) {
+  const [kind, value] = Object.entries(entry)[0] ?? [];
+
+  if (kind === undefined || typeof value !== "object" || value === null) {
+    throw new Error("Stellar CLI returned an invalid contract interface entry.");
+  }
+
+  return `${kind}:${value.name ?? JSON.stringify(value)}`;
 }

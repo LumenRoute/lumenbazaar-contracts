@@ -1,0 +1,409 @@
+[
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "authorize_payment",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "seller",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "asset",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "amount",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "resource_hash",
+          "type_": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "result": {
+            "ok_type": "void",
+            "error_type": {
+              "udt": {
+                "name": "PolicyWalletError"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "check_payment",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "seller",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "asset",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "amount",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "resource_hash",
+          "type_": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "result": {
+            "ok_type": "void",
+            "error_type": {
+              "udt": {
+                "name": "PolicyWalletError"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "example_only",
+      "inputs": [],
+      "outputs": [
+        "bool"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "get_config",
+      "inputs": [],
+      "outputs": [
+        {
+          "result": {
+            "ok_type": {
+              "udt": {
+                "name": "WalletConfig"
+              }
+            },
+            "error_type": {
+              "udt": {
+                "name": "PolicyWalletError"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "get_policy",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "result": {
+            "ok_type": {
+              "udt": {
+                "name": "SpendingPolicy"
+              }
+            },
+            "error_type": {
+              "udt": {
+                "name": "PolicyWalletError"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "initialize",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "upto_session_contract",
+          "type_": "address"
+        }
+      ],
+      "outputs": [
+        {
+          "result": {
+            "ok_type": "void",
+            "error_type": {
+              "udt": {
+                "name": "PolicyWalletError"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "require_owner",
+      "inputs": [],
+      "outputs": [
+        {
+          "result": {
+            "ok_type": "void",
+            "error_type": {
+              "udt": {
+                "name": "PolicyWalletError"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "set_policy",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "policy",
+          "type_": {
+            "udt": {
+              "name": "SpendingPolicy"
+            }
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "result": {
+            "ok_type": "void",
+            "error_type": {
+              "udt": {
+                "name": "PolicyWalletError"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "name": "spent_today",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        }
+      ],
+      "outputs": [
+        "i128"
+      ]
+    }
+  },
+  {
+    "udt_error_enum_v0": {
+      "doc": "",
+      "lib": "",
+      "name": "PolicyWalletError",
+      "cases": [
+        {
+          "doc": "",
+          "name": "AlreadyInitialized",
+          "value": 1
+        },
+        {
+          "doc": "",
+          "name": "NotInitialized",
+          "value": 2
+        },
+        {
+          "doc": "",
+          "name": "InvalidPolicy",
+          "value": 3
+        },
+        {
+          "doc": "",
+          "name": "PolicyNotFound",
+          "value": 4
+        },
+        {
+          "doc": "",
+          "name": "PolicyExpired",
+          "value": 5
+        },
+        {
+          "doc": "",
+          "name": "InvalidAmount",
+          "value": 6
+        },
+        {
+          "doc": "",
+          "name": "AmountExceedsPaymentCap",
+          "value": 7
+        },
+        {
+          "doc": "",
+          "name": "AmountExceedsDailyCap",
+          "value": 8
+        },
+        {
+          "doc": "",
+          "name": "SellerNotAllowed",
+          "value": 9
+        },
+        {
+          "doc": "",
+          "name": "AssetNotAllowed",
+          "value": 10
+        },
+        {
+          "doc": "",
+          "name": "ResourceHashNotAllowed",
+          "value": 11
+        }
+      ]
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "",
+      "lib": "",
+      "name": "SpendingPolicy",
+      "fields": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "allowed_assets",
+          "type_": {
+            "vec": {
+              "element_type": "address"
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "allowed_resource_hashes",
+          "type_": {
+            "vec": {
+              "element_type": {
+                "bytes_n": {
+                  "n": 32
+                }
+              }
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "allowed_sellers",
+          "type_": {
+            "vec": {
+              "element_type": "address"
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "max_amount_per_day",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "max_amount_per_payment",
+          "type_": "i128"
+        },
+        {
+          "doc": "",
+          "name": "valid_until_ledger",
+          "type_": "u32"
+        }
+      ]
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "",
+      "lib": "",
+      "name": "WalletConfig",
+      "fields": [
+        {
+          "doc": "",
+          "name": "example_only",
+          "type_": "bool"
+        },
+        {
+          "doc": "",
+          "name": "initialized_at_ledger",
+          "type_": "u32"
+        },
+        {
+          "doc": "",
+          "name": "owner",
+          "type_": "address"
+        },
+        {
+          "doc": "",
+          "name": "upto_session_contract",
+          "type_": "address"
+        }
+      ]
+    }
+  }
+]

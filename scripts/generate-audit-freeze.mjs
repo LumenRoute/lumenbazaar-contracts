@@ -11,7 +11,7 @@ const files = [
   "contracts/upto-session/src/types.rs",
   "contracts/upto-session/src/errors.rs",
   "contracts/upto-session/src/events.rs",
-  "artifacts/spec/upto-session.xdr-base64.txt",
+  "artifacts/spec/upto-session.json",
   "bindings/upto-session/src/index.ts",
 ];
 
