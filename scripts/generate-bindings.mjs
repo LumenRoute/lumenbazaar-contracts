@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,3 +32,26 @@ execFileSync(
     stdio: "inherit",
   },
 );
+
+const bindingPath = join(outputDir, "src", "index.ts");
+const binding = readFileSync(bindingPath, "utf8");
+const contractSpecPattern = /new ContractSpec\(\[\s*([\s\S]*?)\s*\]\)/;
+const match = binding.match(contractSpecPattern);
+
+if (match === null) {
+  throw new Error("Generated binding does not contain a ContractSpec array.");
+}
+
+const encodedEntries = [...match[1].matchAll(/"([A-Za-z0-9+/=]+)"/g)].map((entry) => entry[1]);
+const remainder = match[1].replaceAll(/"[A-Za-z0-9+/=]+"/g, "").replaceAll(/[\s,]/g, "");
+
+if (encodedEntries.length === 0 || remainder.length > 0) {
+  throw new Error("Generated ContractSpec array has an unexpected format.");
+}
+
+const canonicalContractSpec = `new ContractSpec([\n${encodedEntries
+  .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
+  .map((entry) => `        ${JSON.stringify(entry)}`)
+  .join(",\n")}\n      ])`;
+
+writeFileSync(bindingPath, binding.replace(contractSpecPattern, canonicalContractSpec), "utf8");

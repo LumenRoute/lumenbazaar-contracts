@@ -63,7 +63,7 @@ for (const contract of contracts) {
     },
   );
   const entries = canonicalize(JSON.parse(output));
-  entries.sort((left, right) => entryKey(left).localeCompare(entryKey(right)));
+  entries.sort((left, right) => compareAscii(entryKey(left), entryKey(right)));
   writeFileSync(contract.spec, `${JSON.stringify(entries, null, 2)}\n`, "ascii");
 }
 
@@ -79,8 +79,12 @@ function canonicalize(value) {
   return Object.fromEntries(
     Object.entries(value)
       .map(([key, entryValue]) => [key === "type_" ? "type" : key, canonicalize(entryValue)])
-      .sort(([left], [right]) => left.localeCompare(right)),
+      .sort(([left], [right]) => compareAscii(left, right)),
   );
+}
+
+function compareAscii(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function entryKey(entry) {
