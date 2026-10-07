@@ -31,6 +31,7 @@ for (const artifact of [
   "docs/security-checklist.md",
   "artifacts/resource-usage/upto-session.md",
   "docs/backend-integration-handoff.md",
+  "artifacts/interface/upto-session-v2.json",
   "deployments/testnet.example.json",
 ]) {
   if (!existsSync(join(repoRoot, artifact))) {

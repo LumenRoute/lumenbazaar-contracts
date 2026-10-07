@@ -55,3 +55,8 @@ const canonicalContractSpec = `new ContractSpec([\n${encodedEntries
   .join(",\n")}\n      ])`;
 
 writeFileSync(bindingPath, binding.replace(contractSpecPattern, canonicalContractSpec), "utf8");
+
+const packagePath = join(outputDir, "package.json");
+const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
+packageJson.version = "2.0.0";
+writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");

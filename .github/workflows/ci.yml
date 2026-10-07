@@ -53,6 +53,9 @@ jobs:
           npm --prefix bindings/upto-session run build
           node scripts/smoke-upto-session-bindings.mjs
 
+      - name: Check interface fixtures
+        run: node scripts/generate-interface-fixtures.mjs --check
+
       - name: Check backend handoff
         run: node scripts/check-backend-handoff.mjs
 

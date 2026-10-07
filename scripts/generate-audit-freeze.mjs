@@ -13,6 +13,8 @@ const files = [
   "contracts/upto-session/src/events.rs",
   "artifacts/spec/upto-session.json",
   "bindings/upto-session/src/index.ts",
+  "bindings/upto-session/package.json",
+  "artifacts/interface/upto-session-v2.json",
 ];
 
 const freeze = {

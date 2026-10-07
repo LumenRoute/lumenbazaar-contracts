@@ -429,6 +429,16 @@
   {
     "function_v0": {
       "doc": "",
+      "inputs": [],
+      "name": "interface_version",
+      "outputs": [
+        "u32"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
       "inputs": [
         {
           "doc": "",

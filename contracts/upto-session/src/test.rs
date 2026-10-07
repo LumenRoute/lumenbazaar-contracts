@@ -101,6 +101,8 @@ fn public_interface_is_callable() {
     let asset = create_test_asset(&env, &buyer, 300);
     let resource_hash = BytesN::from_array(&env, &[7; 32]);
 
+    assert_eq!(client.interface_version(), 2);
+
     initialize_for_asset(&env, &client, &buyer, &asset);
 
     let expected_id = ids::derive_session_id(

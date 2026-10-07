@@ -15,8 +15,14 @@ use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
 #[contract]
 pub struct UptoSessionContract;
 
+pub const INTERFACE_VERSION: u32 = 2;
+
 #[contractimpl]
 impl UptoSessionContract {
+    pub fn interface_version() -> u32 {
+        INTERFACE_VERSION
+    }
+
     pub fn initialize(
         env: Env,
         admin: Address,

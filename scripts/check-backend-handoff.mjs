@@ -15,7 +15,12 @@ const hashes = JSON.parse(
   ),
 );
 
+if (hashes.contractVersion !== "0.2.0" || hashes.interfaceVersion !== 2) {
+  throw new Error("Backend handoff fixture must target contract 0.2.0 interface 2");
+}
+
 const requiredFunctions = [
+  "interface_version",
   "initialize",
   "create_session",
   "get_session",

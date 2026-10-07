@@ -6,6 +6,7 @@ This package describes the current review boundary for LumenBazaar contracts.
 
 The review target is the `upto-session` contract public interface:
 
+- `interface_version()` -> `2`
 - `initialize(admin, supported_assets)`
 - `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash)`
 - `get_session(session_id)`
@@ -14,12 +15,13 @@ The review target is the `upto-session` contract public interface:
 - `recover_expired(session_id)`
 - `extend_ttl(session_id)`
 
-The frozen interface evidence is stored in `artifacts/audit-readiness/interface-freeze.json`. It hashes the public contract files, generated XDR spec, and generated TypeScript binding.
+The frozen interface evidence is stored in `artifacts/audit-readiness/interface-freeze.json`. It hashes the public contract files, generated XDR spec, versioned TypeScript binding, and the complete public event/error fixture at `artifacts/interface/upto-session-v2.json`.
 
 Regenerate only after an intentional interface change:
 
 ```bash
 node scripts/generate-audit-freeze.mjs
+node scripts/generate-interface-fixtures.mjs --check
 node scripts/check-audit-readiness.mjs
 ```
 

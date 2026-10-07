@@ -3,6 +3,11 @@
 `upto-session` enforces capped metered payment sessions for LumenBazaar x402
 `upto` flows.
 
+This is contract version `0.2.0` and interface version `2`.
+`interface_version()` is the decoder compatibility check for clients. Version
+2 requires a new deployment and is not wire-compatible with the unfunded v1
+session and event shapes.
+
 ## Session ID Derivation
 
 Session IDs are deterministic SHA-256 digests of the XDR encoding of:

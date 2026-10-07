@@ -24,15 +24,21 @@ No production contract ID is committed in this repository yet.
 
 - TypeScript package: `bindings/upto-session`
 - Canonical spec artifact: `artifacts/spec/upto-session.json`
+- Decoding fixture: `artifacts/interface/upto-session-v2.json`
 - Binding regeneration: `node scripts/generate-bindings.mjs`
 - Spec regeneration: `node scripts/generate-specs.mjs`
 
 Backend services should prefer the generated TypeScript package for transaction construction and result decoding.
 
+The corrected escrow contract and generated package are version `0.2.0`; the
+public `interface_version()` result and every public event use interface/event
+version `2`.
+
 ## Upto Session Functions
 
 | Function | Backend use |
 | --- | --- |
+| `interface_version()` | Require result `2` before decoding v2 session state or events. |
 | `initialize(admin, supported_assets)` | One-time deployment setup with an immutable non-empty token allowlist. Do not call from request handlers. |
 | `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash)` | Create a buyer-authorized spending cap and escrow the full cap for a resource. |
 | `get_session(session_id)` | Read current session state for API responses, reconciliation, and settlement guards. |
@@ -40,6 +46,16 @@ Backend services should prefer the generated TypeScript package for transaction 
 | `cancel(session_id)` | Buyer-authorized cancellation before settlement. |
 | `recover_expired(session_id)` | Permissionless full refund to the stored buyer at or after expiry. |
 | `extend_ttl(session_id)` | Extend storage TTL for still-open sessions. |
+
+## V1 To V2 Compatibility
+
+Version 2 is a new deployment, not an in-place upgrade. It changes
+`initialize` by adding `supported_assets`, adds `escrowed_amount` and the
+`Expired` status to session decoding, adds `recover_expired` and
+`interface_version`, and replaces the old event payloads with versioned escrow
+payloads. A backend must reject a contract whose `interface_version()` is not
+`2`; decoding it with v2 types is not supported. Error codes 1 through 13 retain
+their names and values, while codes 14 through 22 are additive.
 
 ## Stable Errors
 
