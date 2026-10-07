@@ -3,6 +3,13 @@
 This document covers the `upto-session` contract and the example-only policy wallet. The custom
 `test-token` exists only for local and testnet validation and is not a production asset.
 
+The accepted funding design is
+[ADR 0001: Escrow-Funded Upto Sessions](adr/0001-escrow-funded-upto-sessions.md).
+The current source and published deployment still use the audited unfunded
+behavior until the subsequent implementation, test, versioning, and deployment
+gates complete. Planned escrow behavior must not be represented as deployed
+evidence.
+
 ## Assets and trust boundaries
 
 - Buyers authorize session creation and cancellation for their own funds.
