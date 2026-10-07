@@ -3,6 +3,11 @@
 `upto-session` enforces capped metered payment sessions for LumenBazaar x402
 `upto` flows.
 
+This is contract version `0.2.0` and interface version `2`.
+`interface_version()` is the decoder compatibility check for clients. Version
+2 requires a new deployment and is not wire-compatible with the unfunded v1
+session and event shapes.
+
 ## Session ID Derivation
 
 Session IDs are deterministic SHA-256 digests of the XDR encoding of:
@@ -36,6 +41,8 @@ Data:
 - `max_amount`
 - `expires_at_ledger`
 - `resource_hash`
+- `event_version` (`2`)
+- `escrowed_amount`
 
 ### `SessionSettled`
 
@@ -49,6 +56,8 @@ Data:
 - `asset`
 - `actual_amount`
 - `usage_hash`
+- `event_version` (`2`)
+- `refunded_amount`
 
 Settlement is single-use. Once a session reaches `Settled`, any repeated
 `settle` call returns `SessionAlreadySettled` and cannot move additional funds.
@@ -62,9 +71,31 @@ Topics:
 Data:
 
 - `buyer`
+- `asset`
+- `event_version` (`2`)
+- `refunded_amount`
 
 Only the buyer can cancel an open session. Cancellation is rejected for missing
 sessions, settled sessions, and already cancelled sessions.
+
+### `SessionRecovered`
+
+Topics:
+
+- `session_id`
+
+Data:
+
+- `buyer`
+- `asset`
+- `event_version` (`2`)
+- `refunded_amount`
+- `expired_at_ledger`
+- `recovered_at_ledger`
+
+Anyone may call `recover_expired(session_id)` at or after expiry. The caller
+cannot choose the recipient or amount; the complete escrow returns to the
+stored buyer.
 
 ## Usage Hash
 
@@ -111,7 +142,7 @@ rewrite stored session state by itself: the session remains observable through
 `get_session` so backend indexers can retain the original cap, parties, asset,
 and resource hash.
 
-The buyer may still call `cancel(session_id)` after expiry while the session is
-open. That gives wallets and backend indexers an explicit terminal cancellation
-event without allowing any funds to move. Settled and already cancelled sessions
-continue to reject cancellation with their stable lifecycle errors.
+The buyer may cancel only before expiry. At the exact expiry ledger and later,
+settlement and cancellation return `ExpiredSession`, while permissionless
+`recover_expired` returns the complete escrow to the stored buyer and records
+the `Expired` terminal state. Repeated recovery returns `SessionExpired`.

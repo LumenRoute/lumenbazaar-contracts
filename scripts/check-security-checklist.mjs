@@ -12,6 +12,10 @@ const validation = readFileSync(
   join(repoRoot, "contracts", "upto-session", "src", "validation.rs"),
   "utf8",
 );
+const propertyTests = readFileSync(
+  join(repoRoot, "contracts", "upto-session", "src", "property_test.rs"),
+  "utf8",
+);
 
 const controls = [
   {
@@ -40,8 +44,9 @@ const controls = [
     name: "Expiry handling",
     tests: [
       "rejects_expired_sessions",
-      "rejects_settlement_at_or_after_expiry",
-      "expired_open_session_remains_observable_and_buyer_cancellable",
+      "expiry_boundary_selects_exactly_one_terminal_path",
+      "expiry_recovery_is_permissionless_fixed_recipient_and_single_use",
+      "expiry_recovery_emits_versioned_receipt",
     ],
   },
   {
@@ -56,6 +61,10 @@ const controls = [
       "cancel_emits_stable_event",
     ],
   },
+  {
+    name: "Generated state-machine invariants",
+    tests: ["generated_sequences_preserve_value_caps_and_isolation"],
+  },
 ];
 
 for (const control of controls) {
@@ -66,7 +75,7 @@ for (const control of controls) {
     if (!checklist.includes(test)) {
       throw new Error(`Checklist does not cite ${test}`);
     }
-    if (!tests.includes(test) && !validation.includes(test)) {
+    if (!tests.includes(test) && !validation.includes(test) && !propertyTests.includes(test)) {
       throw new Error(`Cited test does not exist: ${test}`);
     }
   }

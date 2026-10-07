@@ -21,6 +21,24 @@
           "location": "data",
           "name": "buyer",
           "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "refunded_amount",
+          "type": "i128"
         }
       ],
       "prefix_topics": [
@@ -84,10 +102,81 @@
               "n": 32
             }
           }
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "escrowed_amount",
+          "type": "i128"
         }
       ],
       "prefix_topics": [
         "session_created"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
+      "name": "SessionRecovered",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "buyer",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "refunded_amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "expired_at_ledger",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "recovered_at_ledger",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "session_recovered"
       ]
     }
   },
@@ -135,6 +224,18 @@
               "n": 32
             }
           }
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "refunded_amount",
+          "type": "i128"
         }
       ],
       "prefix_topics": [
@@ -299,9 +400,57 @@
           "doc": "",
           "name": "admin",
           "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "supported_assets",
+          "type": {
+            "vec": {
+              "element_type": "address"
+            }
+          }
         }
       ],
       "name": "initialize",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [],
+      "name": "interface_version",
+      "outputs": [
+        "u32"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        }
+      ],
+      "name": "recover_expired",
       "outputs": [
         {
           "result": {
@@ -426,6 +575,51 @@
           "doc": "",
           "name": "InvalidUsageHash",
           "value": 13
+        },
+        {
+          "doc": "",
+          "name": "UnsupportedAsset",
+          "value": 14
+        },
+        {
+          "doc": "",
+          "name": "InvalidSupportedAssets",
+          "value": 15
+        },
+        {
+          "doc": "",
+          "name": "SessionDurationTooLong",
+          "value": 16
+        },
+        {
+          "doc": "",
+          "name": "LiabilityOverflow",
+          "value": 17
+        },
+        {
+          "doc": "",
+          "name": "LiabilityUnderflow",
+          "value": 18
+        },
+        {
+          "doc": "",
+          "name": "EscrowUnderfunded",
+          "value": 19
+        },
+        {
+          "doc": "",
+          "name": "NotInitialized",
+          "value": 20
+        },
+        {
+          "doc": "",
+          "name": "SessionExpired",
+          "value": 21
+        },
+        {
+          "doc": "",
+          "name": "SessionNotExpired",
+          "value": 22
         }
       ],
       "doc": "",
@@ -446,6 +640,11 @@
           "doc": "",
           "name": "buyer",
           "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "escrowed_amount",
+          "type": "i128"
         },
         {
           "doc": "",
@@ -531,6 +730,12 @@
           "void_v0": {
             "doc": "",
             "name": "Cancelled"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Expired"
           }
         }
       ],

@@ -8,6 +8,7 @@ Contract IDs are recorded by deployment scripts:
 
 - Local: `deployments/local.json`
 - Testnet: `deployments/testnet.json`
+- Published corrected v2 testnet: `deployments/testnet-2026-10-07.json`
 - Testnet shape example: `deployments/testnet.example.json`
 
 Backend environments should consume these values:
@@ -24,21 +25,38 @@ No production contract ID is committed in this repository yet.
 
 - TypeScript package: `bindings/upto-session`
 - Canonical spec artifact: `artifacts/spec/upto-session.json`
+- Decoding fixture: `artifacts/interface/upto-session-v2.json`
 - Binding regeneration: `node scripts/generate-bindings.mjs`
 - Spec regeneration: `node scripts/generate-specs.mjs`
 
 Backend services should prefer the generated TypeScript package for transaction construction and result decoding.
 
+The corrected escrow contract and generated package are version `0.2.0`; the
+public `interface_version()` result and every public event use interface/event
+version `2`.
+
 ## Upto Session Functions
 
 | Function | Backend use |
 | --- | --- |
-| `initialize(admin)` | One-time deployment setup. Do not call from request handlers. |
-| `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash)` | Create a buyer-authorized spending cap for a resource. |
+| `interface_version()` | Require result `2` before decoding v2 session state or events. |
+| `initialize(admin, supported_assets)` | One-time deployment setup with an immutable non-empty token allowlist. Do not call from request handlers. |
+| `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash)` | Create a buyer-authorized spending cap and escrow the full cap for a resource. |
 | `get_session(session_id)` | Read current session state for API responses, reconciliation, and settlement guards. |
 | `settle(session_id, actual_amount, usage_hash)` | Seller-authorized settlement for actual usage. |
 | `cancel(session_id)` | Buyer-authorized cancellation before settlement. |
+| `recover_expired(session_id)` | Permissionless full refund to the stored buyer at or after expiry. |
 | `extend_ttl(session_id)` | Extend storage TTL for still-open sessions. |
+
+## V1 To V2 Compatibility
+
+Version 2 is a new deployment, not an in-place upgrade. It changes
+`initialize` by adding `supported_assets`, adds `escrowed_amount` and the
+`Expired` status to session decoding, adds `recover_expired` and
+`interface_version`, and replaces the old event payloads with versioned escrow
+payloads. A backend must reject a contract whose `interface_version()` is not
+`2`; decoding it with v2 types is not supported. Error codes 1 through 13 retain
+their names and values, while codes 14 through 22 are additive.
 
 ## Stable Errors
 
@@ -57,6 +75,15 @@ Backend services should prefer the generated TypeScript package for transaction 
 | 11 | `TtlExtensionFailed` | Do not retry for finalized sessions. |
 | 12 | `InvalidResourceHash` | Reject empty or malformed resource hash input. |
 | 13 | `InvalidUsageHash` | Reject empty or malformed usage hash input. |
+| 14 | `UnsupportedAsset` | Reject assets outside the immutable deployment allowlist. |
+| 15 | `InvalidSupportedAssets` | Reject an empty or duplicate initialization allowlist. |
+| 16 | `SessionDurationTooLong` | Reject an expiry more than 518,400 ledgers ahead. |
+| 17 | `LiabilityOverflow` | Stop and investigate liability arithmetic or corrupted state. |
+| 18 | `LiabilityUnderflow` | Stop and investigate liability arithmetic or corrupted state. |
+| 19 | `EscrowUnderfunded` | Reject creation if token custody does not cover aggregate liability. |
+| 20 | `NotInitialized` | Initialize a new deployment before creating sessions. |
+| 21 | `SessionExpired` | Treat as finalized by expiry recovery. |
+| 22 | `SessionNotExpired` | Do not recover before the exact expiry ledger. |
 
 ## Hash Inputs
 
@@ -99,3 +126,4 @@ Example hashes are committed in `artifacts/backend-handoff/usage-hashes.example.
 - Verify backend seller identity matches `session.seller`.
 - Record settlement attempt ID, `usage_hash`, ledger, transaction hash, and decoded result.
 - Treat duplicate settlement attempts as idempotent by fetching `get_session` after `SessionAlreadySettled`.
+- At or after expiry, call `recover_expired`; it requires no caller signature and can refund only the stored buyer.

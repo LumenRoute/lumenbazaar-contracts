@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 2,
+  "environment": "testnet",
+  "network": {
+    "name": "Test SDF Network",
+    "passphrase": "Test SDF Network ; September 2015",
+    "horizonUrl": "https://horizon-testnet.stellar.org",
+    "rpcUrl": "https://soroban-testnet.stellar.org"
+  },
+  "sourceCommit": "41940839d8f49c733b1815e108fc9740b1285f32",
+  "deployer": "GAVPY5NSR6I4JNQFM5C4CUEVMNPZWT4A5IGXREQEAAPNSC4EHOHYHKH4",
+  "admin": "GCYEX7MPJL64ZJ7ABZSPRC7YEBSI7OMC62FFEVFHCZFREBOYJPQDUCYJ",
+  "toolchain": {
+    "stellarCli": "28.0.0",
+    "stellarXdr": "28.0.0",
+    "rustc": "1.93.1",
+    "sorobanSdk": "28.0.0",
+    "target": "wasm32v1-none"
+  },
+  "contracts": {
+    "upto-session": {
+      "contractId": "CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3",
+      "artifactSha256": "121431386fedf8149476cbcd79740c242101286520d16456bce5affa7a0a2241",
+      "wasmHash": "121431386fedf8149476cbcd79740c242101286520d16456bce5affa7a0a2241",
+      "interfaceSha256": "e1304ea52035b735ea69d61e44cc219d365c7de5f6b7b43bdd2150a62dd8234e",
+      "interfaceVersion": 2,
+      "upload": {
+        "wasmHash": "121431386fedf8149476cbcd79740c242101286520d16456bce5affa7a0a2241",
+        "transactionHash": "1b0b2938c3589be0d02a404982de0ba0543af26f62c140c395e279cd8f76ec9c",
+        "ledger": 5067415,
+        "createdAt": "2026-10-07T08:11:02Z"
+      },
+      "deploy": {
+        "transactionHash": "f3f4fcc890b648029dfdabd3053d659af496890063e0c1051b8580733d65d9a3",
+        "ledger": 5067421,
+        "createdAt": "2026-10-07T08:11:32Z"
+      },
+      "initialize": {
+        "transactionHash": "7c6891b9703004b4c060f47dd5cfa3c01458805a49333647c64a88f1e22ced7d",
+        "ledger": 5067460,
+        "createdAt": "2026-10-07T08:14:47Z"
+      }
+    },
+    "test-token": {
+      "contractId": "CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS",
+      "artifactSha256": "3e08bd7b09e3b2d277d5b02d84b52bb7b78ef8c71c794f221b6c7cf3b7a81324",
+      "wasmHash": "3e08bd7b09e3b2d277d5b02d84b52bb7b78ef8c71c794f221b6c7cf3b7a81324",
+      "interfaceSha256": "252d240b4cf22b22f12a6b3161864d248ff6df2c809dbc0289996bdb42f64e5a",
+      "asset": {
+        "code": "LBT",
+        "decimals": 7,
+        "purpose": "Custom test-only token; not USDC"
+      },
+      "upload": {
+        "wasmHash": "3e08bd7b09e3b2d277d5b02d84b52bb7b78ef8c71c794f221b6c7cf3b7a81324",
+        "transactionHash": "1f85b13b65be1527f109cd195c7ac9a4ec3af378cd108440b79e6f4ba28fa387",
+        "ledger": 5067425,
+        "createdAt": "2026-10-07T08:11:52Z"
+      },
+      "deploy": {
+        "transactionHash": "8a60df3b3370e49e80e38bd257f11d339257d261f058b6570af24c43496e3104",
+        "ledger": 5067430,
+        "createdAt": "2026-10-07T08:12:17Z"
+      },
+      "initialize": {
+        "transactionHash": "a986d531e8869746f692b9ec3db0cc3583d39f46a83b9dd8a93a0edaf5b75f9b",
+        "ledger": 5067445,
+        "createdAt": "2026-10-07T08:13:32Z"
+      }
+    },
+    "policy-wallet-example": {
+      "contractId": "CDV2BMIT6CSRKQVWL7OH33KG22ADLOGOR2PDUHBHPSHFIMKXUWPX4GFH",
+      "artifactSha256": "c9eb787ddfe517b8b285e6a35943853aec89cada602f910a0a0153152fc7bf8c",
+      "wasmHash": "c9eb787ddfe517b8b285e6a35943853aec89cada602f910a0a0153152fc7bf8c",
+      "interfaceSha256": "14d45e0ff2788e685f1160be186205b41be42e1dcb940c04c8d9214a7ca73c61",
+      "upload": {
+        "wasmHash": "c9eb787ddfe517b8b285e6a35943853aec89cada602f910a0a0153152fc7bf8c",
+        "transactionHash": "35b2d73f0b0941540806e6c901e217917bce68d6f8af448d6a8ff8cf3b52f054",
+        "ledger": 5067436,
+        "createdAt": "2026-10-07T08:12:47Z"
+      },
+      "deploy": {
+        "transactionHash": "1500e02ab7013500ec0aa51e8e701a7bd46c75f2d19c95f547c3916c12c60d95",
+        "ledger": 5067440,
+        "createdAt": "2026-10-07T08:13:07Z"
+      },
+      "initialize": {
+        "transactionHash": "d7f5798e2eeba70fb73fdbd46729235648c89a979b77527131a11cc0f0e371d6",
+        "ledger": 5067466,
+        "createdAt": "2026-10-07T08:15:17Z"
+      }
+    }
+  },
+  "limitations": [
+    "This manifest proves deployment, initialization, and live interface equality only; lifecycle evidence is published separately.",
+    "LBT is a custom test-only token and must not be represented as Circle USDC.",
+    "Testnet evidence is not mainnet evidence."
+  ]
+}

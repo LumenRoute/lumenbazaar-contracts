@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "exceptions": [
+    {
+      "advisory": "RUSTSEC-2024-0436",
+      "package": "paste 1.0.15",
+      "classification": "unmaintained",
+      "owner": "contracts-maintainers",
+      "expiresOn": "2026-11-07",
+      "dependencyPath": "soroban-sdk 28.0.0 -> soroban-env-host 28.0.2 -> ark-ff 0.5.0 / soroban-wasmi 0.31.1-soroban.20.0.1 -> paste 1.0.15",
+      "resolution": "Remove the exception when the released Soroban SDK dependency graph no longer includes paste; recheck on every dependency audit and before expiry.",
+      "risk": "The advisory is an unmaintained-package warning, not a reported vulnerability. paste is used by upstream host-side test dependencies and is not linked into deployed contract WASM."
+    }
+  ]
+}

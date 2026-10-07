@@ -5,13 +5,18 @@ const distSource = await readFile(
   new URL("../bindings/upto-session/dist/index.js", import.meta.url),
   "utf8",
 );
+const packageJson = JSON.parse(
+  await readFile(new URL("../bindings/upto-session/package.json", import.meta.url), "utf8"),
+);
 
 const requiredMethods = [
+  "interface_version",
   "initialize",
   "create_session",
   "get_session",
   "settle",
   "cancel",
+  "recover_expired",
   "extend_ttl",
 ];
 
@@ -21,6 +26,12 @@ if (typeof bindings.Client !== "function") {
 
 if (bindings.ContractError?.[5]?.message !== "SessionNotFound") {
   throw new Error("Expected stable SessionNotFound error mapping");
+}
+if (bindings.ContractError?.[22]?.message !== "SessionNotExpired") {
+  throw new Error("Expected complete v2 ContractError mapping");
+}
+if (packageJson.version !== "2.0.0") {
+  throw new Error("Expected generated binding package version 2.0.0");
 }
 
 for (const method of requiredMethods) {

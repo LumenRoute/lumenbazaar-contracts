@@ -29,18 +29,24 @@ const policyWalletContract =
   "dry-run-policy-wallet";
 
 invokeContract({
-  contractId: uptoSessionContract,
-  source: admin,
-  network: "testnet",
-  args: ["initialize", "--admin", admin],
-  dryRun,
-});
-
-invokeContract({
   contractId: testTokenContract,
   source: tokenAdmin,
   network: "testnet",
   args: ["initialize", "--admin", tokenAdmin],
+  dryRun,
+});
+
+invokeContract({
+  contractId: uptoSessionContract,
+  source: admin,
+  network: "testnet",
+  args: [
+    "initialize",
+    "--admin",
+    admin,
+    "--supported_assets",
+    JSON.stringify([testTokenContract]),
+  ],
   dryRun,
 });
 

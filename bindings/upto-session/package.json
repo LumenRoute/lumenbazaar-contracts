@@ -1,5 +1,5 @@
 {
-  "version": "0.0.0",
+  "version": "2.0.0",
   "name": "upto-session",
   "type": "module",
   "exports": "./dist/index.js",
@@ -8,7 +8,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@stellar/stellar-sdk": "^16.0.1",
+    "@stellar/stellar-sdk": "17.2.1",
     "buffer": "6.0.3"
   },
   "devDependencies": {

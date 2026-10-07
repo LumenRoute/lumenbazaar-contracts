@@ -11,6 +11,8 @@ pub struct SessionCreated {
     pub max_amount: i128,
     pub expires_at_ledger: u32,
     pub resource_hash: BytesN<32>,
+    pub event_version: u32,
+    pub escrowed_amount: i128,
 }
 
 #[contractevent]
@@ -21,6 +23,8 @@ pub struct SessionSettled {
     pub asset: Address,
     pub actual_amount: i128,
     pub usage_hash: BytesN<32>,
+    pub event_version: u32,
+    pub refunded_amount: i128,
 }
 
 #[contractevent]
@@ -28,6 +32,21 @@ pub struct SessionCancelled {
     #[topic]
     pub session_id: BytesN<32>,
     pub buyer: Address,
+    pub asset: Address,
+    pub event_version: u32,
+    pub refunded_amount: i128,
+}
+
+#[contractevent]
+pub struct SessionRecovered {
+    #[topic]
+    pub session_id: BytesN<32>,
+    pub buyer: Address,
+    pub asset: Address,
+    pub event_version: u32,
+    pub refunded_amount: i128,
+    pub expired_at_ledger: u32,
+    pub recovered_at_ledger: u32,
 }
 
 pub fn publish_session_created(env: &Env, session: &Session) {
@@ -39,6 +58,8 @@ pub fn publish_session_created(env: &Env, session: &Session) {
         max_amount: session.max_amount,
         expires_at_ledger: session.expires_at_ledger,
         resource_hash: session.resource_hash.clone(),
+        event_version: 2,
+        escrowed_amount: session.escrowed_amount,
     }
     .publish(env);
 }
@@ -49,6 +70,7 @@ pub fn publish_session_settled(
     seller: &Address,
     asset: &Address,
     actual_amount: i128,
+    refunded_amount: i128,
     usage_hash: &BytesN<32>,
 ) {
     SessionSettled {
@@ -57,14 +79,38 @@ pub fn publish_session_settled(
         asset: asset.clone(),
         actual_amount,
         usage_hash: usage_hash.clone(),
+        event_version: 2,
+        refunded_amount,
     }
     .publish(env);
 }
 
-pub fn publish_session_cancelled(env: &Env, session_id: &BytesN<32>, buyer: &Address) {
+pub fn publish_session_cancelled(
+    env: &Env,
+    session_id: &BytesN<32>,
+    buyer: &Address,
+    asset: &Address,
+    refunded_amount: i128,
+) {
     SessionCancelled {
         session_id: session_id.clone(),
         buyer: buyer.clone(),
+        asset: asset.clone(),
+        event_version: 2,
+        refunded_amount,
+    }
+    .publish(env);
+}
+
+pub fn publish_session_recovered(env: &Env, session: &Session, refunded_amount: i128) {
+    SessionRecovered {
+        session_id: session.id.clone(),
+        buyer: session.buyer.clone(),
+        asset: session.asset.clone(),
+        event_version: 2,
+        refunded_amount,
+        expired_at_ledger: session.expires_at_ledger,
+        recovered_at_ledger: env.ledger().sequence(),
     }
     .publish(env);
 }

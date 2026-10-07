@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,6 +7,8 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const skipBuild = process.argv.includes("--skip-build");
 const wasm = join(repoRoot, "target", "wasm32v1-none", "release", "upto_session.wasm");
 const outputDir = join(repoRoot, "bindings", "upto-session");
+const packageLockPath = join(outputDir, "package-lock.json");
+const packageLock = existsSync(packageLockPath) ? readFileSync(packageLockPath, "utf8") : null;
 
 if (!skipBuild) {
   execFileSync("stellar", ["contract", "build", "--locked"], {
@@ -55,3 +57,13 @@ const canonicalContractSpec = `new ContractSpec([\n${encodedEntries
   .join(",\n")}\n      ])`;
 
 writeFileSync(bindingPath, binding.replace(contractSpecPattern, canonicalContractSpec), "utf8");
+
+const packagePath = join(outputDir, "package.json");
+const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));
+packageJson.version = "2.0.0";
+packageJson.dependencies["@stellar/stellar-sdk"] = "17.2.1";
+writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
+
+if (packageLock !== null) {
+  writeFileSync(packageLockPath, packageLock, "utf8");
+}

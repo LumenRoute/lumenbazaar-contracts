@@ -15,9 +15,14 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
-          rustup default stable
-          rustup target add wasm32v1-none
+          rustup toolchain install 1.93.1 --profile minimal --component rustfmt --component clippy
+          rustup default 1.93.1
+          rustup target add wasm32v1-none --toolchain 1.93.1
+
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.12.0
 
       - name: Install Stellar CLI
         run: |
@@ -26,6 +31,12 @@ jobs:
           sudo mv stellar /usr/local/bin/stellar
           stellar version
 
+      - name: Audit dependencies
+        run: |
+          cargo install cargo-audit --version 0.22.2 --locked
+          node scripts/check-dependency-exceptions.mjs
+          cargo audit --deny warnings --ignore RUSTSEC-2024-0436
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
@@ -33,6 +44,8 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: Run tests
+        env:
+          LUMENBAZAAR_PROPERTY_CASES: "128"
         run: cargo test --workspace --all-features
 
       - name: Build WASM contracts
@@ -47,9 +60,13 @@ jobs:
         run: |
           node scripts/generate-bindings.mjs --skip-build
           git diff --exit-code -- bindings/upto-session
-          npm --prefix bindings/upto-session install --no-package-lock
+          npm --prefix bindings/upto-session ci
+          npm --prefix bindings/upto-session audit --omit=dev
           npm --prefix bindings/upto-session run build
           node scripts/smoke-upto-session-bindings.mjs
+
+      - name: Check interface fixtures
+        run: node scripts/generate-interface-fixtures.mjs --check
 
       - name: Check backend handoff
         run: node scripts/check-backend-handoff.mjs
@@ -62,3 +79,6 @@ jobs:
 
       - name: Check public deployment evidence
         run: node scripts/check-deployment-evidence.mjs
+
+      - name: Check public lifecycle evidence
+        run: node scripts/check-testnet-lifecycle.mjs
