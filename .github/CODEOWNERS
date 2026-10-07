@@ -1,6 +1,9 @@
 * @Hallab7
 
 /contracts/ @Hallab7
+/artifacts/ @Hallab7
+/bindings/ @Hallab7
 /scripts/testnet/ @Hallab7
 /deployments/ @Hallab7
+/Cargo.lock @Hallab7
 /.github/ @Hallab7
