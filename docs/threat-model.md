@@ -5,10 +5,10 @@ This document covers the `upto-session` contract and the example-only policy wal
 
 The accepted funding design is
 [ADR 0001: Escrow-Funded Upto Sessions](adr/0001-escrow-funded-upto-sessions.md).
-The current source implements the selected escrow model. The published testnet
-deployment still uses the audited unfunded release until the later versioning
-and deployment gates complete; source behavior must not be represented as live
-deployment evidence.
+The current source implements the selected escrow model. The corrected v2
+testnet deployment and lifecycle evidence are published in
+`deployments/testnet-2026-10-07.json` and
+`artifacts/testnet/lifecycle-2026-10-07.json`.
 
 ## Assets and trust boundaries
 
@@ -37,8 +37,9 @@ deployment evidence.
 - Settlement at or after the expiry ledger is rejected.
 - Contract storage TTL can outlive or expire independently of off-chain records. Operators must not
   treat a missing off-chain record as proof that an on-chain session is absent.
-- TTL extension is limited to open sessions. The repository's tests cover missing, settled, and
-  cancelled session rejection, but live boundary-ledger evidence is still required before release.
+- TTL extension is limited to open sessions. Tests cover missing, settled, and cancelled session
+  rejection. The public lifecycle evidence also covers settlement rejection at the live expiry
+  boundary and permissionless recovery seven ledgers after expiry.
 
 ## Administration and upgrades
 
@@ -52,8 +53,10 @@ deployment evidence.
 ## Known limitations
 
 - `upto` is a LumenBazaar extension and is not presented as an upstream-standard Stellar x402 scheme.
-- Unit tests use Soroban's test environment and do not replace live testnet authorization evidence.
-- The published deployment manifest proves upload, deployment, and initialization, not create,
-  settle, cancel, expiry, or adversarial live transactions.
+- The live evidence uses LBT, a custom test-only token, not Circle USDC or another production asset.
+- Rejected operations fail during simulation and therefore have no submitted transaction hash; the
+  evidence records the observation ledger, exact command, and deterministic rejection instead.
+- Testnet lifecycle evidence does not prove mainnet readiness, production monitoring, or backend
+  idempotency.
 - Production use requires an independently reviewed token, a live transaction submission client,
   durable backend idempotency, and monitoring for failed or delayed finality.

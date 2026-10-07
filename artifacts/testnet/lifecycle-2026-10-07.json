@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "network": "testnet",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "sourceCommit": "41940839d8f49c733b1815e108fc9740b1285f32",
+  "deploymentManifest": "deployments/testnet-2026-10-07.json",
+  "contractId": "CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3",
+  "asset": {
+    "contractId": "CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS",
+    "code": "LBT",
+    "decimals": 7,
+    "purpose": "Custom test-only token; not USDC"
+  },
+  "actors": {
+    "admin": "GCYEX7MPJL64ZJ7ABZSPRC7YEBSI7OMC62FFEVFHCZFREBOYJPQDUCYJ",
+    "buyer": "GC3BUJJML3SWDJM62FGVSFGJMHF5FIDUB2JKXPOQFW5YC32GHYF6BQA3",
+    "seller": "GDDOA5IMNKAAPZLUSSVRAKJT3ZMKSGAUXPRV7NGUWDDWJKMRH5XUGWPO",
+    "attackerAndRecoveryCaller": "GACEQ7VOYCL535J77MKQYNHMWWCGXHHDL6B4E7B6OGQ7OX3PRQHJQJWM"
+  },
+  "balances": {
+    "beforeMint": {
+      "buyer": "0",
+      "seller": "0",
+      "attacker": "0",
+      "escrowContract": "0"
+    },
+    "mintedToBuyer": "50000000",
+    "afterLifecycle": {
+      "buyer": "43500000",
+      "seller": "6500000",
+      "attacker": "0",
+      "escrowContract": "0"
+    }
+  },
+  "successfulOperations": [
+    {
+      "name": "mint_test_tokens",
+      "transactionHash": "c2c16520f6ffa921795950a55e4d9d8788d419b11ae46db6185765453d93b79e",
+      "ledger": 5067565,
+      "createdAt": "2026-10-07T08:23:32Z",
+      "command": "stellar contract invoke --id CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS --source-account lumenbazaar-testnet-admin-v2 --network testnet -- mint --to GC3BUJJML3SWDJM62FGVSFGJMHF5FIDUB2JKXPOQFW5YC32GHYF6BQA3 --amount 50000000"
+    },
+    {
+      "name": "create_settlement_session",
+      "sessionId": "5f8f2ce89c680fdfbe3b182db86ef18afbd86ffde1bcb255a5e246f1f94ed896",
+      "transactionHash": "a64122ab94a89725d5733929e815b9cc30e82a11c0eac54e971d1917ea6c2333",
+      "ledger": 5067573,
+      "createdAt": "2026-10-07T08:24:12Z",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-buyer-v2 --network testnet -- create_session --buyer GC3BUJJML3SWDJM62FGVSFGJMHF5FIDUB2JKXPOQFW5YC32GHYF6BQA3 --seller GDDOA5IMNKAAPZLUSSVRAKJT3ZMKSGAUXPRV7NGUWDDWJKMRH5XUGWPO --asset CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS --max_amount 10000000 --expires_at_ledger 5067971 --resource_hash 1111111111111111111111111111111111111111111111111111111111111111",
+      "event": {
+        "name": "SessionCreated",
+        "eventVersion": 2,
+        "maxAmount": "10000000",
+        "escrowedAmount": "10000000",
+        "expiresAtLedger": 5067971
+      }
+    },
+    {
+      "name": "settle_session",
+      "sessionId": "5f8f2ce89c680fdfbe3b182db86ef18afbd86ffde1bcb255a5e246f1f94ed896",
+      "transactionHash": "b642b9f3ec95d88424709b8e4b04e87ea6656f395fe680205a02a9a7d44b927f",
+      "ledger": 5067587,
+      "createdAt": "2026-10-07T08:25:22Z",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-seller-v2 --network testnet -- settle --session_id 5f8f2ce89c680fdfbe3b182db86ef18afbd86ffde1bcb255a5e246f1f94ed896 --actual_amount 6500000 --usage_hash a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+      "event": {
+        "name": "SessionSettled",
+        "eventVersion": 2,
+        "actualAmount": "6500000",
+        "refundedAmount": "3500000",
+        "usageHash": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+      }
+    },
+    {
+      "name": "create_cancel_session",
+      "sessionId": "72ba07a5fa5a74ac6db30cd886280c228e2ef21b09aa66ab3ebf3c837ae0067e",
+      "transactionHash": "37d5d0581a6fa16e00d365bb6228b22f7897d0fd7ea781c2d834b2841dc4ea35",
+      "ledger": 5067597,
+      "createdAt": "2026-10-07T08:26:12Z",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-buyer-v2 --network testnet -- create_session --buyer GC3BUJJML3SWDJM62FGVSFGJMHF5FIDUB2JKXPOQFW5YC32GHYF6BQA3 --seller GDDOA5IMNKAAPZLUSSVRAKJT3ZMKSGAUXPRV7NGUWDDWJKMRH5XUGWPO --asset CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS --max_amount 5000000 --expires_at_ledger 5067995 --resource_hash 2222222222222222222222222222222222222222222222222222222222222222",
+      "event": { "name": "SessionCreated", "eventVersion": 2, "maxAmount": "5000000", "escrowedAmount": "5000000" }
+    },
+    {
+      "name": "cancel_session",
+      "sessionId": "72ba07a5fa5a74ac6db30cd886280c228e2ef21b09aa66ab3ebf3c837ae0067e",
+      "transactionHash": "1401a954485f9bfc55bdce3b74262452854f6e2d34e7fa66f6aec468a04be9f1",
+      "ledger": 5067604,
+      "createdAt": "2026-10-07T08:26:47Z",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-buyer-v2 --network testnet -- cancel --session_id 72ba07a5fa5a74ac6db30cd886280c228e2ef21b09aa66ab3ebf3c837ae0067e",
+      "event": { "name": "SessionCancelled", "eventVersion": 2, "refundedAmount": "5000000" }
+    },
+    {
+      "name": "create_expiry_session",
+      "sessionId": "af92bf501e45a7c60fbd223293c2922db0fd97a0b1470766325a453bc8bd00ff",
+      "transactionHash": "0fac88326c2f864f869b108aaf4ab932b0d48261ec938c0c874dc91a20fd9331",
+      "ledger": 5067615,
+      "createdAt": "2026-10-07T08:27:42Z",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-buyer-v2 --network testnet -- create_session --buyer GC3BUJJML3SWDJM62FGVSFGJMHF5FIDUB2JKXPOQFW5YC32GHYF6BQA3 --seller GDDOA5IMNKAAPZLUSSVRAKJT3ZMKSGAUXPRV7NGUWDDWJKMRH5XUGWPO --asset CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS --max_amount 3000000 --expires_at_ledger 5067620 --resource_hash 3333333333333333333333333333333333333333333333333333333333333333",
+      "event": { "name": "SessionCreated", "eventVersion": 2, "maxAmount": "3000000", "escrowedAmount": "3000000", "expiresAtLedger": 5067620 }
+    },
+    {
+      "name": "recover_expired_session",
+      "sessionId": "af92bf501e45a7c60fbd223293c2922db0fd97a0b1470766325a453bc8bd00ff",
+      "transactionHash": "d40127ee6706d20c4dd73f5d7dbe9c27ccef72d0553f5056e65d53b58897c9bc",
+      "ledger": 5067627,
+      "createdAt": "2026-10-07T08:28:42Z",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-attacker-v2 --network testnet -- recover_expired --session_id af92bf501e45a7c60fbd223293c2922db0fd97a0b1470766325a453bc8bd00ff",
+      "event": { "name": "SessionRecovered", "eventVersion": 2, "refundedAmount": "3000000", "expiredAtLedger": 5067620, "recoveredAtLedger": 5067627 }
+    },
+    {
+      "name": "create_auxiliary_cross_session_fixture",
+      "sessionId": "9eb2f4c9755c2e18b3f01cad0c10660c8bc94f6a8b65ecc5363449a1a6880b25",
+      "transactionHash": "712cd3c0e448f92ad96843d98bb80b6442d9fa36fbf3583bc49e0b40e700de9e",
+      "ledger": 5067633,
+      "createdAt": "2026-10-07T08:29:12Z",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-buyer-v2 --network testnet -- create_session --buyer GC3BUJJML3SWDJM62FGVSFGJMHF5FIDUB2JKXPOQFW5YC32GHYF6BQA3 --seller GACEQ7VOYCL535J77MKQYNHMWWCGXHHDL6B4E7B6OGQ7OX3PRQHJQJWM --asset CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS --max_amount 2000000 --expires_at_ledger 5068031 --resource_hash 4444444444444444444444444444444444444444444444444444444444444444",
+      "event": { "name": "SessionCreated", "eventVersion": 2, "maxAmount": "2000000", "escrowedAmount": "2000000" }
+    },
+    {
+      "name": "cancel_auxiliary_cross_session_fixture",
+      "sessionId": "9eb2f4c9755c2e18b3f01cad0c10660c8bc94f6a8b65ecc5363449a1a6880b25",
+      "transactionHash": "715b777397be04d12f0ad8edace3cb31412a4379ba4d2b6c92e8fd74162f80c0",
+      "ledger": 5067645,
+      "createdAt": "2026-10-07T08:30:12Z",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-buyer-v2 --network testnet -- cancel --session_id 9eb2f4c9755c2e18b3f01cad0c10660c8bc94f6a8b65ecc5363449a1a6880b25",
+      "event": { "name": "SessionCancelled", "eventVersion": 2, "refundedAmount": "2000000" }
+    },
+    {
+      "name": "create_rejection_fixture",
+      "sessionId": "c7649ee16037d5920284ec52ff24865261e2b660cdadf27d6c49f42bc1868085",
+      "transactionHash": "6899086aaeccd0081023f8f370ae8be0a0cbb7c53bf63cf35f651eac51dae4a8",
+      "ledger": 5067667,
+      "createdAt": "2026-10-07T08:32:02Z",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-buyer-v2 --network testnet -- create_session --buyer GC3BUJJML3SWDJM62FGVSFGJMHF5FIDUB2JKXPOQFW5YC32GHYF6BQA3 --seller GDDOA5IMNKAAPZLUSSVRAKJT3ZMKSGAUXPRV7NGUWDDWJKMRH5XUGWPO --asset CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS --max_amount 1000000 --expires_at_ledger 5068065 --resource_hash 5555555555555555555555555555555555555555555555555555555555555555",
+      "event": { "name": "SessionCreated", "eventVersion": 2, "maxAmount": "1000000", "escrowedAmount": "1000000" }
+    },
+    {
+      "name": "cancel_rejection_fixture",
+      "sessionId": "c7649ee16037d5920284ec52ff24865261e2b660cdadf27d6c49f42bc1868085",
+      "transactionHash": "c0705aa58e5857ac58565bbd90cc9f59dbd99f8d185a3306da52432fd56af6d5",
+      "ledger": 5067682,
+      "createdAt": "2026-10-07T08:33:17Z",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-buyer-v2 --network testnet -- cancel --session_id c7649ee16037d5920284ec52ff24865261e2b660cdadf27d6c49f42bc1868085",
+      "event": { "name": "SessionCancelled", "eventVersion": 2, "refundedAmount": "1000000" }
+    },
+    {
+      "name": "create_cross_session_fixture",
+      "sessionId": "cb273bb35596f6796f3818f3afc165efbb90a8ffa49d4b4280e121a703dbaea1",
+      "transactionHash": "b8c9ec5f7c9954802f6ae32ae3846002c92850768164e1a990f9aee8bac90fe2",
+      "ledger": 5067691,
+      "createdAt": "2026-10-07T08:34:02Z",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-buyer-v2 --network testnet -- create_session --buyer GC3BUJJML3SWDJM62FGVSFGJMHF5FIDUB2JKXPOQFW5YC32GHYF6BQA3 --seller GACEQ7VOYCL535J77MKQYNHMWWCGXHHDL6B4E7B6OGQ7OX3PRQHJQJWM --asset CB256KDRXDO2FYJN3YBYZE5KCU46WIIE67DRP5T7HI45DRH2GM6YOJFS --max_amount 1000000 --expires_at_ledger 5068088 --resource_hash 6666666666666666666666666666666666666666666666666666666666666666",
+      "event": { "name": "SessionCreated", "eventVersion": 2, "maxAmount": "1000000", "escrowedAmount": "1000000" }
+    },
+    {
+      "name": "cancel_cross_session_fixture",
+      "sessionId": "cb273bb35596f6796f3818f3afc165efbb90a8ffa49d4b4280e121a703dbaea1",
+      "transactionHash": "4b6411ff8c630ad882243312d086f0400ed17aaa72d161a3fdb164af1d0a19a8",
+      "ledger": 5067702,
+      "createdAt": "2026-10-07T08:34:57Z",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-buyer-v2 --network testnet -- cancel --session_id cb273bb35596f6796f3818f3afc165efbb90a8ffa49d4b4280e121a703dbaea1",
+      "event": { "name": "SessionCancelled", "eventVersion": 2, "refundedAmount": "1000000" }
+    }
+  ],
+  "rejections": [
+    {
+      "name": "wrong_signer",
+      "observedAtLedger": 5067673,
+      "transactionHash": null,
+      "result": "Missing signing key for account GDDOA5IMNKAAPZLUSSVRAKJT3ZMKSGAUXPRV7NGUWDDWJKMRH5XUGWPO",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-attacker-v2 --network testnet -- settle --session_id c7649ee16037d5920284ec52ff24865261e2b660cdadf27d6c49f42bc1868085 --actual_amount 500000 --usage_hash e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+    },
+    {
+      "name": "over_cap",
+      "observedAtLedger": 5067677,
+      "transactionHash": null,
+      "result": "Error(Contract, #8 AmountExceedsCap)",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-seller-v2 --network testnet -- settle --session_id c7649ee16037d5920284ec52ff24865261e2b660cdadf27d6c49f42bc1868085 --actual_amount 1000001 --usage_hash e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+    },
+    {
+      "name": "expired_settlement",
+      "observedAtLedger": 5067620,
+      "transactionHash": null,
+      "result": "Error(Contract, #4 ExpiredSession)",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-seller-v2 --network testnet -- settle --session_id af92bf501e45a7c60fbd223293c2922db0fd97a0b1470766325a453bc8bd00ff --actual_amount 1000000 --usage_hash c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+    },
+    {
+      "name": "repeated_settle",
+      "observedAtLedger": 5067705,
+      "transactionHash": null,
+      "result": "Error(Contract, #6 SessionAlreadySettled)",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-seller-v2 --network testnet -- settle --session_id 5f8f2ce89c680fdfbe3b182db86ef18afbd86ffde1bcb255a5e246f1f94ed896 --actual_amount 6500000 --usage_hash a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+    },
+    {
+      "name": "repeated_cancel",
+      "observedAtLedger": 5067708,
+      "transactionHash": null,
+      "result": "Error(Contract, #7 SessionCancelled)",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-buyer-v2 --network testnet -- cancel --session_id 72ba07a5fa5a74ac6db30cd886280c228e2ef21b09aa66ab3ebf3c837ae0067e"
+    },
+    {
+      "name": "cross_session_seller",
+      "observedAtLedger": 5067697,
+      "transactionHash": null,
+      "result": "Missing signing key for account GACEQ7VOYCL535J77MKQYNHMWWCGXHHDL6B4E7B6OGQ7OX3PRQHJQJWM",
+      "command": "stellar contract invoke --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --source-account lumenbazaar-testnet-seller-v2 --network testnet -- settle --session_id cb273bb35596f6796f3818f3afc165efbb90a8ffa49d4b4280e121a703dbaea1 --actual_amount 500000 --usage_hash f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1"
+    }
+  ],
+  "terminalSessions": {
+    "5f8f2ce89c680fdfbe3b182db86ef18afbd86ffde1bcb255a5e246f1f94ed896": { "status": "Settled", "escrowedAmount": "0", "settledAmount": "6500000" },
+    "72ba07a5fa5a74ac6db30cd886280c228e2ef21b09aa66ab3ebf3c837ae0067e": { "status": "Cancelled", "escrowedAmount": "0", "settledAmount": "0" },
+    "af92bf501e45a7c60fbd223293c2922db0fd97a0b1470766325a453bc8bd00ff": { "status": "Expired", "escrowedAmount": "0", "settledAmount": "0" },
+    "9eb2f4c9755c2e18b3f01cad0c10660c8bc94f6a8b65ecc5363449a1a6880b25": { "status": "Cancelled", "escrowedAmount": "0", "settledAmount": "0" },
+    "c7649ee16037d5920284ec52ff24865261e2b660cdadf27d6c49f42bc1868085": { "status": "Cancelled", "escrowedAmount": "0", "settledAmount": "0" },
+    "cb273bb35596f6796f3818f3afc165efbb90a8ffa49d4b4280e121a703dbaea1": { "status": "Cancelled", "escrowedAmount": "0", "settledAmount": "0" }
+  },
+  "eventQuery": "stellar events --start-ledger 5067573 --id CCENNI5ZMMD3DCJXG5MURDXWUU3NG6JCFHDCDSEI4OMNWDJRY2IR36L3 --type contract --network testnet --output json",
+  "limitations": [
+    "Rejected calls fail during simulation and therefore correctly have no transaction hash.",
+    "LBT is a custom test-only token, not Circle USDC.",
+    "This evidence is for Stellar testnet and makes no mainnet claim."
+  ]
+}

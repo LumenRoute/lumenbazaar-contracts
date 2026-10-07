@@ -28,7 +28,8 @@ node scripts/check-audit-readiness.mjs
 ## Known Limitations
 
 - No mainnet deployment is approved by this repository.
-- Testnet IDs are not committed until a reviewed deployment is intentionally published.
+- Corrected v2 testnet IDs and lifecycle evidence are published, but testnet evidence is not a
+  production or mainnet approval.
 - Local SDK resource usage is a regression signal, not a replacement for target-network RPC simulation.
 - `policy-wallet-example` is example-only smart account policy code and is not production wallet infrastructure.
 - `test-token` is utility code for local and testnet testing and is not a production asset.
@@ -80,6 +81,8 @@ Primary evidence:
 - `artifacts/resource-usage/upto-session.md`
 - `docs/backend-integration-handoff.md`
 - `docs/release-toolchain.md`
+- `deployments/testnet-2026-10-07.json`
+- `artifacts/testnet/lifecycle-2026-10-07.json`
 
 ## Deployment Procedure
 

@@ -79,3 +79,6 @@ jobs:
 
       - name: Check public deployment evidence
         run: node scripts/check-deployment-evidence.mjs
+
+      - name: Check public lifecycle evidence
+        run: node scripts/check-testnet-lifecycle.mjs

@@ -8,6 +8,7 @@ Contract IDs are recorded by deployment scripts:
 
 - Local: `deployments/local.json`
 - Testnet: `deployments/testnet.json`
+- Published corrected v2 testnet: `deployments/testnet-2026-10-07.json`
 - Testnet shape example: `deployments/testnet.example.json`
 
 Backend environments should consume these values:
