@@ -24,6 +24,8 @@ pub enum ContractError {
     LiabilityUnderflow = 18,
     EscrowUnderfunded = 19,
     NotInitialized = 20,
+    SessionExpired = 21,
+    SessionNotExpired = 22,
 }
 
 #[cfg(test)]
@@ -52,5 +54,7 @@ mod tests {
         assert_eq!(ContractError::LiabilityUnderflow as u32, 18);
         assert_eq!(ContractError::EscrowUnderfunded as u32, 19);
         assert_eq!(ContractError::NotInitialized as u32, 20);
+        assert_eq!(ContractError::SessionExpired as u32, 21);
+        assert_eq!(ContractError::SessionNotExpired as u32, 22);
     }
 }

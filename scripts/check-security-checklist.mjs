@@ -40,8 +40,9 @@ const controls = [
     name: "Expiry handling",
     tests: [
       "rejects_expired_sessions",
-      "rejects_settlement_at_or_after_expiry",
-      "expired_open_session_remains_observable_and_buyer_cancellable",
+      "expiry_boundary_selects_exactly_one_terminal_path",
+      "expiry_recovery_is_permissionless_fixed_recipient_and_single_use",
+      "expiry_recovery_emits_versioned_receipt",
     ],
   },
   {

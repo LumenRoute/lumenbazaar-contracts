@@ -21,6 +21,7 @@ const requiredFunctions = [
   "get_session",
   "settle",
   "cancel",
+  "recover_expired",
   "extend_ttl",
 ];
 const requiredErrors = [
@@ -44,6 +45,8 @@ const requiredErrors = [
   "LiabilityUnderflow",
   "EscrowUnderfunded",
   "NotInitialized",
+  "SessionExpired",
+  "SessionNotExpired",
 ];
 
 for (const item of [...requiredFunctions, ...requiredErrors]) {

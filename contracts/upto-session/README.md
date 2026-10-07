@@ -73,6 +73,25 @@ Data:
 Only the buyer can cancel an open session. Cancellation is rejected for missing
 sessions, settled sessions, and already cancelled sessions.
 
+### `SessionRecovered`
+
+Topics:
+
+- `session_id`
+
+Data:
+
+- `buyer`
+- `asset`
+- `event_version` (`2`)
+- `refunded_amount`
+- `expired_at_ledger`
+- `recovered_at_ledger`
+
+Anyone may call `recover_expired(session_id)` at or after expiry. The caller
+cannot choose the recipient or amount; the complete escrow returns to the
+stored buyer.
+
 ## Usage Hash
 
 `settle` requires a non-zero `usage_hash`. The backend should derive this hash
@@ -118,7 +137,7 @@ rewrite stored session state by itself: the session remains observable through
 `get_session` so backend indexers can retain the original cap, parties, asset,
 and resource hash.
 
-The buyer may still call `cancel(session_id)` after expiry while the session is
-open. That returns the complete escrow and gives wallets and backend indexers an
-explicit terminal cancellation event. Settled and already cancelled sessions
-continue to reject cancellation with their stable lifecycle errors.
+The buyer may cancel only before expiry. At the exact expiry ledger and later,
+settlement and cancellation return `ExpiredSession`, while permissionless
+`recover_expired` returns the complete escrow to the stored buyer and records
+the `Expired` terminal state. Repeated recovery returns `SessionExpired`.

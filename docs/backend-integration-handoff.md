@@ -38,6 +38,7 @@ Backend services should prefer the generated TypeScript package for transaction 
 | `get_session(session_id)` | Read current session state for API responses, reconciliation, and settlement guards. |
 | `settle(session_id, actual_amount, usage_hash)` | Seller-authorized settlement for actual usage. |
 | `cancel(session_id)` | Buyer-authorized cancellation before settlement. |
+| `recover_expired(session_id)` | Permissionless full refund to the stored buyer at or after expiry. |
 | `extend_ttl(session_id)` | Extend storage TTL for still-open sessions. |
 
 ## Stable Errors
@@ -64,6 +65,8 @@ Backend services should prefer the generated TypeScript package for transaction 
 | 18 | `LiabilityUnderflow` | Stop and investigate liability arithmetic or corrupted state. |
 | 19 | `EscrowUnderfunded` | Reject creation if token custody does not cover aggregate liability. |
 | 20 | `NotInitialized` | Initialize a new deployment before creating sessions. |
+| 21 | `SessionExpired` | Treat as finalized by expiry recovery. |
+| 22 | `SessionNotExpired` | Do not recover before the exact expiry ledger. |
 
 ## Hash Inputs
 
@@ -106,3 +109,4 @@ Example hashes are committed in `artifacts/backend-handoff/usage-hashes.example.
 - Verify backend seller identity matches `session.seller`.
 - Record settlement attempt ID, `usage_hash`, ledger, transaction hash, and decoded result.
 - Treat duplicate settlement attempts as idempotent by fetching `get_session` after `SessionAlreadySettled`.
+- At or after expiry, call `recover_expired`; it requires no caller signature and can refund only the stored buyer.

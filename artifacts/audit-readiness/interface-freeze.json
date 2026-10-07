@@ -4,27 +4,27 @@
   "files": [
     {
       "path": "contracts/upto-session/src/lib.rs",
-      "sha256": "0ab52d9fed23a17357e2f074e953bda067b9b2e3b77c93e0979632a5bebf1e24"
+      "sha256": "a4091952e3e984f23469a88e9fffe437fe725a6de5ea278fdc61ff8eb065b532"
     },
     {
       "path": "contracts/upto-session/src/types.rs",
-      "sha256": "baaa06824b8203620fb8548b2623f2ec8f47e60304e2db0bad591a4d642906a7"
+      "sha256": "fd060a95245567e602da4a6064f7a39b0d45b48e4be4c03416389ed7532e35ab"
     },
     {
       "path": "contracts/upto-session/src/errors.rs",
-      "sha256": "3933fdc33aac627c043fab0920a96d1e7b5b8adbcb805d08f80a8d13352d3751"
+      "sha256": "7ba05f3759cbb716cc51825513afe940e786d06f380da140dfde1709d4e0d1e4"
     },
     {
       "path": "contracts/upto-session/src/events.rs",
-      "sha256": "06195ee4f9c6ab87f00007a527d281b84218eb92eb4db159af4a54fe57d3da8d"
+      "sha256": "89043e9b193859e785822bcab58d01a05f7f25af6dc95b7d3b4e3dcdc7fc97ad"
     },
     {
       "path": "artifacts/spec/upto-session.json",
-      "sha256": "104fb0ec8a18e067d0bdd88bc1c1eaedb08e4c460f82b4f27b3c306f265e30ae"
+      "sha256": "9af9c01f3bde1828d701bada6eba89c18876c562241ac45a7d3f993800cc591b"
     },
     {
       "path": "bindings/upto-session/src/index.ts",
-      "sha256": "cacfea784f73dea29a1cab8eed0ffcb5a4a7a3e732b1e79e66615ef1c515dc24"
+      "sha256": "c70e67cccc5fadeaa6a1dcaa2354882a5e5fa55b38ed653c4752600e5ed88918"
     }
   ]
 }

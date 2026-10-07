@@ -11,6 +11,7 @@ The review target is the `upto-session` contract public interface:
 - `get_session(session_id)`
 - `settle(session_id, actual_amount, usage_hash)`
 - `cancel(session_id)`
+- `recover_expired(session_id)`
 - `extend_ttl(session_id)`
 
 The frozen interface evidence is stored in `artifacts/audit-readiness/interface-freeze.json`. It hashes the public contract files, generated XDR spec, and generated TypeScript binding.
@@ -67,7 +68,7 @@ Out of scope until later review:
 
 The current workspace test suite covers:
 
-- `upto-session`: 59 tests.
+- `upto-session`: 64 tests.
 - `policy-wallet-example`: 16 tests.
 - `test-token`: 5 tests.
 

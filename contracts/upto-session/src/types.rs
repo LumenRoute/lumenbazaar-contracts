@@ -6,6 +6,7 @@ pub enum SessionStatus {
     Open,
     Settled,
     Cancelled,
+    Expired,
 }
 
 #[contracttype]

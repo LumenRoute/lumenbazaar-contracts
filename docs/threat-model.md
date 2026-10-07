@@ -27,7 +27,8 @@ deployment evidence.
   hash, and an incrementing sequence into the session ID. Its nested token call
   transfers the cap into contract custody.
 - `settle` requires the stored seller's authorization and finalizes a session once.
-- `cancel` requires the stored buyer's authorization, refunds the escrow, and prevents later settlement.
+- Before expiry, `cancel` requires the stored buyer's authorization, refunds the escrow, and prevents later settlement.
+- At or after expiry, `recover_expired` requires no caller authorization and can refund only the stored buyer.
 - Repeated settlement and cancellation attempts fail against finalized state.
 
 ## Amount, expiry, and storage risks

@@ -22,6 +22,12 @@ seller, refunds the unused cap to the recorded buyer, clears
 Cancellation removes the same liability and returns the entire escrow to the
 recorded buyer.
 
+Cancellation is available only before expiry. At the exact expiry ledger and
+afterward, `recover_expired` is permissionless but has no recipient or amount
+arguments: it always refunds the complete escrow to the stored buyer and marks
+the session `Expired`. Settlement, cancellation, and recovery are mutually
+exclusive terminal paths.
+
 Before either terminal transfer, the contract checks that the stored open
 session still carries its complete cap and that the contract token balance
 covers the aggregate liability for that asset. A failed check returns

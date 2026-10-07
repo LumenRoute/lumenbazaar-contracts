@@ -6,7 +6,8 @@ These are local Soroban SDK native estimates from test invocations. They are use
 
 | Operation | Instructions | Memory bytes | Disk reads | Memory reads | Writes | Disk read bytes | Write bytes | Event bytes | Rent ledger bytes | Rent bumps | Estimated fee stroops |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| cancel | 354543 | 56059 | 0 | 8 | 5 | 0 | 1324 | 556 | 8000000 | 1 | 2298323 |
+| cancel | 354587 | 56059 | 0 | 8 | 5 | 0 | 1324 | 556 | 8000000 | 1 | 2298323 |
 | create_session | 380269 | 65966 | 1 | 8 | 6 | 92 | 1676 | 748 | 964121600 | 4 | 11534722 |
-| extend_ttl | 41561 | 6548 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 30 |
-| settle | 523545 | 81794 | 1 | 9 | 6 | 92 | 1580 | 892 | 156121600 | 2 | 3737151 |
+| extend_ttl | 53594 | 7615 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 38 |
+| recover_expired | 346562 | 52417 | 0 | 6 | 4 | 0 | 1248 | 628 | 3999800 | 1 | 61750 |
+| settle | 523589 | 81794 | 1 | 9 | 6 | 92 | 1580 | 892 | 156121600 | 2 | 3737151 |

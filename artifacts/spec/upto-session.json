@@ -126,6 +126,65 @@
       "data_format": "map",
       "doc": "",
       "lib": "",
+      "name": "SessionRecovered",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "buyer",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "refunded_amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "expired_at_ledger",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "recovered_at_ledger",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "session_recovered"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
       "name": "SessionSettled",
       "params": [
         {
@@ -379,6 +438,35 @@
               "n": 32
             }
           }
+        }
+      ],
+      "name": "recover_expired",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
         },
         {
           "doc": "",
@@ -512,6 +600,16 @@
           "doc": "",
           "name": "NotInitialized",
           "value": 20
+        },
+        {
+          "doc": "",
+          "name": "SessionExpired",
+          "value": 21
+        },
+        {
+          "doc": "",
+          "name": "SessionNotExpired",
+          "value": 22
         }
       ],
       "doc": "",
@@ -622,6 +720,12 @@
           "void_v0": {
             "doc": "",
             "name": "Cancelled"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Expired"
           }
         }
       ],

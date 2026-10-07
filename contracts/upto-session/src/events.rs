@@ -37,6 +37,18 @@ pub struct SessionCancelled {
     pub refunded_amount: i128,
 }
 
+#[contractevent]
+pub struct SessionRecovered {
+    #[topic]
+    pub session_id: BytesN<32>,
+    pub buyer: Address,
+    pub asset: Address,
+    pub event_version: u32,
+    pub refunded_amount: i128,
+    pub expired_at_ledger: u32,
+    pub recovered_at_ledger: u32,
+}
+
 pub fn publish_session_created(env: &Env, session: &Session) {
     SessionCreated {
         session_id: session.id.clone(),
@@ -86,6 +98,19 @@ pub fn publish_session_cancelled(
         asset: asset.clone(),
         event_version: 2,
         refunded_amount,
+    }
+    .publish(env);
+}
+
+pub fn publish_session_recovered(env: &Env, session: &Session, refunded_amount: i128) {
+    SessionRecovered {
+        session_id: session.id.clone(),
+        buyer: session.buyer.clone(),
+        asset: session.asset.clone(),
+        event_version: 2,
+        refunded_amount,
+        expired_at_ledger: session.expires_at_ledger,
+        recovered_at_ledger: env.ledger().sequence(),
     }
     .publish(env);
 }

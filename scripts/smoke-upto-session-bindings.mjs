@@ -12,6 +12,7 @@ const requiredMethods = [
   "get_session",
   "settle",
   "cancel",
+  "recover_expired",
   "extend_ttl",
 ];
 

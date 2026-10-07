@@ -213,6 +213,25 @@ fn resource_usage_extend_ttl() {
 }
 
 #[test]
+fn resource_usage_recover_expired() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
+    let resource_hash = BytesN::from_array(&env, &[57; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    env.ledger().set_sequence_number(50);
+
+    client.recover_expired(&session_id);
+
+    print_resource_usage("recover_expired", &env);
+}
+
+#[test]
 fn initialize_stores_admin_once() {
     let env = Env::default();
     env.mock_all_auths();
@@ -859,7 +878,7 @@ fn settle_rejects_invalid_amounts_and_expiry() {
 }
 
 #[test]
-fn expired_open_session_remains_observable_and_buyer_cancellable() {
+fn expired_open_session_remains_observable_and_permissionlessly_recoverable() {
     let env = Env::default();
     env.mock_all_auths();
     let contract_id = env.register(UptoSessionContract, ());
@@ -885,11 +904,165 @@ fn expired_open_session_remains_observable_and_buyer_cancellable() {
     assert_eq!(expired_session.settled_amount, 0);
     assert_eq!(expired_session.expires_at_ledger, 50);
 
-    client.cancel(&session_id);
+    assert_eq!(
+        client.try_cancel(&session_id),
+        Err(Ok(ContractError::ExpiredSession))
+    );
+    client.recover_expired(&session_id);
 
     assert_eq!(
         client.get_session(&session_id).status,
+        SessionStatus::Expired
+    );
+    assert_eq!(token::Client::new(&env, &asset).balance(&buyer), 500);
+}
+
+#[test]
+fn expiry_boundary_selects_exactly_one_terminal_path() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 1_500);
+    let resource_hash = BytesN::from_array(&env, &[53; 32]);
+    let usage_hash = BytesN::from_array(&env, &[54; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let settles_before = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let cancels_before = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let recovers_at = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    assert_eq!(
+        client.try_recover_expired(&recovers_at),
+        Err(Ok(ContractError::SessionNotExpired))
+    );
+    env.ledger().set_sequence_number(49);
+    client.settle(&settles_before, &250, &usage_hash);
+    client.cancel(&cancels_before);
+
+    env.ledger().set_sequence_number(50);
+    assert_eq!(
+        client.try_settle(&recovers_at, &250, &usage_hash),
+        Err(Ok(ContractError::ExpiredSession))
+    );
+    assert_eq!(
+        client.try_cancel(&recovers_at),
+        Err(Ok(ContractError::ExpiredSession))
+    );
+    client.recover_expired(&recovers_at);
+
+    assert_eq!(
+        client.get_session(&settles_before).status,
+        SessionStatus::Settled
+    );
+    assert_eq!(
+        client.get_session(&cancels_before).status,
         SessionStatus::Cancelled
+    );
+    assert_eq!(
+        client.get_session(&recovers_at).status,
+        SessionStatus::Expired
+    );
+}
+
+#[test]
+fn expiry_recovery_is_permissionless_fixed_recipient_and_single_use() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let third_party = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
+    let resource_hash = BytesN::from_array(&env, &[55; 32]);
+    let token_client = token::Client::new(&env, &asset);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    env.ledger().set_sequence_number(51);
+    client.recover_expired(&session_id);
+
+    let session = client.get_session(&session_id);
+    assert_eq!(session.status, SessionStatus::Expired);
+    assert_eq!(session.escrowed_amount, 0);
+    assert_eq!(token_client.balance(&buyer), 500);
+    assert_eq!(token_client.balance(&seller), 0);
+    assert_eq!(token_client.balance(&third_party), 0);
+    assert_eq!(token_client.balance(&contract_id), 0);
+    assert!(env.auths().is_empty());
+    assert_eq!(
+        client.try_recover_expired(&session_id),
+        Err(Ok(ContractError::SessionExpired))
+    );
+    assert_eq!(
+        client.try_cancel(&session_id),
+        Err(Ok(ContractError::SessionExpired))
+    );
+}
+
+#[test]
+fn expiry_recovery_rejects_missing_settled_and_cancelled_sessions() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 1_000);
+    let resource_hash = BytesN::from_array(&env, &[58; 32]);
+    let usage_hash = BytesN::from_array(&env, &[59; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+    let settled = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let cancelled = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    client.settle(&settled, &250, &usage_hash);
+    client.cancel(&cancelled);
+    env.ledger().set_sequence_number(50);
+
+    assert_eq!(
+        client.try_recover_expired(&BytesN::from_array(&env, &[60; 32])),
+        Err(Ok(ContractError::SessionNotFound))
+    );
+    assert_eq!(
+        client.try_recover_expired(&settled),
+        Err(Ok(ContractError::SessionAlreadySettled))
+    );
+    assert_eq!(
+        client.try_recover_expired(&cancelled),
+        Err(Ok(ContractError::SessionCancelled))
+    );
+}
+
+#[test]
+fn expiry_recovery_emits_versioned_receipt() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
+    let resource_hash = BytesN::from_array(&env, &[56; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    env.ledger().set_sequence_number(50);
+    client.recover_expired(&session_id);
+
+    assert_eq!(
+        env.events().all().filter_by_contract(&contract_id),
+        std::vec![events::SessionRecovered {
+            session_id,
+            buyer,
+            asset,
+            event_version: 2,
+            refunded_amount: 500,
+            expired_at_ledger: 50,
+            recovered_at_ledger: 50,
+        }
+        .to_xdr(&env, &contract_id),]
     );
 }
 

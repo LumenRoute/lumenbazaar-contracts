@@ -32,8 +32,8 @@ const rows = output
   .filter(Boolean)
   .map((match) => JSON.parse(match[1]));
 
-if (rows.length !== 4) {
-  throw new Error(`Expected 4 resource rows, received ${rows.length}`);
+if (rows.length !== 5) {
+  throw new Error(`Expected 5 resource rows, received ${rows.length}`);
 }
 
 mkdirSync(outDir, { recursive: true });

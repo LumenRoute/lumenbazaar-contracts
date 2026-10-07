@@ -124,6 +124,7 @@ impl UptoSessionContract {
             SessionStatus::Open => {}
             SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
             SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
+            SessionStatus::Expired => return Err(ContractError::SessionExpired),
         }
 
         validation::validate_settlement_amount(&env, &session, actual_amount)?;
@@ -169,8 +170,12 @@ impl UptoSessionContract {
             SessionStatus::Open => {}
             SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
             SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
+            SessionStatus::Expired => return Err(ContractError::SessionExpired),
         }
 
+        if env.ledger().sequence() >= session.expires_at_ledger {
+            return Err(ContractError::ExpiredSession);
+        }
         session.buyer.require_auth();
         let refunded_amount = session.escrowed_amount;
         let asset = token::Client::new(&env, &session.asset);
@@ -196,6 +201,38 @@ impl UptoSessionContract {
         Ok(())
     }
 
+    pub fn recover_expired(env: Env, session_id: BytesN<32>) -> Result<(), ContractError> {
+        let mut session =
+            storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
+
+        match &session.status {
+            SessionStatus::Open => {}
+            SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
+            SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
+            SessionStatus::Expired => return Err(ContractError::SessionExpired),
+        }
+        if env.ledger().sequence() < session.expires_at_ledger {
+            return Err(ContractError::SessionNotExpired);
+        }
+
+        let refunded_amount = session.escrowed_amount;
+        let asset = token::Client::new(&env, &session.asset);
+        let contract = env.current_contract_address();
+        if refunded_amount != session.max_amount
+            || asset.balance(&contract) < storage::read_liability(&env, &session.asset)
+        {
+            return Err(ContractError::EscrowUnderfunded);
+        }
+        storage::decrease_liability(&env, &session.asset, refunded_amount)?;
+        asset.transfer(&contract, &session.buyer, &refunded_amount);
+        session.escrowed_amount = 0;
+        session.status = SessionStatus::Expired;
+        storage::write_session(&env, &session);
+        events::publish_session_recovered(&env, &session, refunded_amount);
+
+        Ok(())
+    }
+
     pub fn get_session(env: Env, session_id: BytesN<32>) -> Result<Session, ContractError> {
         storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)
     }
@@ -206,10 +243,10 @@ impl UptoSessionContract {
 
         match session.status {
             SessionStatus::Open => {
-                storage::extend_session_ttl(&env, &session_id);
+                storage::extend_session_and_liability_ttl(&env, &session);
                 Ok(())
             }
-            SessionStatus::Settled | SessionStatus::Cancelled => {
+            SessionStatus::Settled | SessionStatus::Cancelled | SessionStatus::Expired => {
                 Err(ContractError::TtlExtensionFailed)
             }
         }

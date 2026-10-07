@@ -104,6 +104,10 @@ pub fn write_session(env: &Env, session: &Session) {
     env.storage()
         .persistent()
         .set(&DataKey::Session(session.id.clone()), session);
+    extend_session_and_liability_ttl(env, session);
+}
+
+pub fn extend_session_and_liability_ttl(env: &Env, session: &Session) {
     extend_session_ttl(env, &session.id);
     let liability_key = DataKey::Liability(session.asset.clone());
     if env.storage().persistent().has(&liability_key) {
