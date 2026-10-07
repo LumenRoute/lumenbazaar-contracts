@@ -4,6 +4,10 @@ mod authorization_harness {
     include!("auth_test.rs");
 }
 
+mod property_harness {
+    include!("property_test.rs");
+}
+
 // Global auth mocks in the legacy tests below isolate validation, state,
 // event, and resource-accounting behavior. They are not authorization
 // evidence. Release-gating authorization paths belong in
@@ -351,6 +355,33 @@ fn liability_arithmetic_is_checked() {
             Err(ContractError::LiabilityUnderflow)
         );
     });
+}
+
+#[test]
+fn maximum_value_session_conserves_escrow() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, i128::MAX);
+    let resource_hash = BytesN::from_array(&env, &[63; 32]);
+    let usage_hash = BytesN::from_array(&env, &[64; 32]);
+    let token_client = token::Client::new(&env, &asset);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let session_id =
+        client.create_session(&buyer, &seller, &asset, &i128::MAX, &50, &resource_hash);
+    client.settle(&session_id, &1, &usage_hash);
+
+    assert_eq!(token_client.balance(&buyer), i128::MAX - 1);
+    assert_eq!(token_client.balance(&seller), 1);
+    assert_eq!(token_client.balance(&contract_id), 0);
+    assert_eq!(
+        client.get_session(&session_id).status,
+        SessionStatus::Settled
+    );
 }
 
 #[test]

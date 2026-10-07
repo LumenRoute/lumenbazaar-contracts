@@ -33,6 +33,8 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: Run tests
+        env:
+          LUMENBAZAAR_PROPERTY_CASES: "128"
         run: cargo test --workspace --all-features
 
       - name: Build WASM contracts

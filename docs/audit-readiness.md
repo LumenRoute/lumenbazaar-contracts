@@ -68,7 +68,7 @@ Out of scope until later review:
 
 The current workspace test suite covers:
 
-- `upto-session`: 64 tests.
+- `upto-session`: 66 tests, including a 128-case deterministic property campaign.
 - `policy-wallet-example`: 16 tests.
 - `test-token`: 5 tests.
 

@@ -12,6 +12,7 @@ This checklist records the contract controls that are ready for audit review.
 | Event correctness | Complete | `create_session_emits_stable_event`, `settle_emits_stable_event`, `cancel_emits_stable_event` | Event assertions compare typed event XDR for stable topics and payloads. |
 | Escrow collateralization | Complete | `production_escrow_funds_and_settles_with_exact_authorization_trees`, `insufficient_funding_prevents_session_creation`, `liability_arithmetic_is_checked` | Open caps are held by the contract and tracked as checked per-asset liabilities. |
 | Settlement atomicity and isolation | Complete | `settle_accepts_exact_cap_without_refund`, `settlement_isolates_concurrent_sessions_sharing_an_asset`, `undercollateralized_settlement_fails_without_state_transition` | A settlement consumes only its session escrow; collateral failure leaves state and liability open. |
+| Generated state-machine invariants | Complete | `generated_sequences_preserve_value_caps_and_isolation`, `docs/property-testing.md` | Fixed-seed generated actions assert value conservation, caps, terminal immutability, wrong-signer rejection, and cross-session/cross-asset isolation. |
 
 ## Remaining Review Notes
 
