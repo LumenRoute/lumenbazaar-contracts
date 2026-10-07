@@ -1,7 +1,7 @@
-use crate::Session;
+use crate::{ContractError, Session};
 use soroban_sdk::{contracttype, Address, BytesN, Env};
 
-pub const STORAGE_LAYOUT_VERSION: u32 = 1;
+pub const STORAGE_LAYOUT_VERSION: u32 = 2;
 pub const DEFAULT_TTL_THRESHOLD: u32 = 100_000;
 pub const TTL_EXTENSION_AMOUNT: u32 = 1_000_000;
 
@@ -12,6 +12,8 @@ pub enum DataKey {
     NextSessionSequence,
     Session(BytesN<32>),
     StorageLayoutVersion,
+    SupportedAsset(Address),
+    Liability(Address),
 }
 
 pub fn write_storage_layout_version(env: &Env) {
@@ -26,6 +28,53 @@ pub fn has_admin(env: &Env) -> bool {
 
 pub fn write_admin(env: &Env, admin: &Address) {
     env.storage().instance().set(&DataKey::Admin, admin);
+}
+
+pub fn extend_instance_ttl(env: &Env) {
+    env.storage()
+        .instance()
+        .extend_ttl(DEFAULT_TTL_THRESHOLD, TTL_EXTENSION_AMOUNT);
+}
+
+pub fn write_supported_asset(env: &Env, asset: &Address) {
+    env.storage()
+        .instance()
+        .set(&DataKey::SupportedAsset(asset.clone()), &true);
+}
+
+pub fn is_supported_asset(env: &Env, asset: &Address) -> bool {
+    env.storage()
+        .instance()
+        .get(&DataKey::SupportedAsset(asset.clone()))
+        .unwrap_or(false)
+}
+
+pub fn read_liability(env: &Env, asset: &Address) -> i128 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::Liability(asset.clone()))
+        .unwrap_or(0)
+}
+
+pub fn increase_liability(env: &Env, asset: &Address, amount: i128) -> Result<i128, ContractError> {
+    let updated = read_liability(env, asset)
+        .checked_add(amount)
+        .ok_or(ContractError::LiabilityOverflow)?;
+    env.storage()
+        .persistent()
+        .set(&DataKey::Liability(asset.clone()), &updated);
+    Ok(updated)
+}
+
+pub fn decrease_liability(env: &Env, asset: &Address, amount: i128) -> Result<i128, ContractError> {
+    let updated = read_liability(env, asset)
+        .checked_sub(amount)
+        .filter(|value| *value >= 0)
+        .ok_or(ContractError::LiabilityUnderflow)?;
+    env.storage()
+        .persistent()
+        .set(&DataKey::Liability(asset.clone()), &updated);
+    Ok(updated)
 }
 
 pub fn read_admin(env: &Env) -> Option<Address> {
@@ -55,6 +104,15 @@ pub fn write_session(env: &Env, session: &Session) {
     env.storage()
         .persistent()
         .set(&DataKey::Session(session.id.clone()), session);
+    extend_session_ttl(env, &session.id);
+    let liability_key = DataKey::Liability(session.asset.clone());
+    if env.storage().persistent().has(&liability_key) {
+        env.storage().persistent().extend_ttl(
+            &liability_key,
+            DEFAULT_TTL_THRESHOLD,
+            TTL_EXTENSION_AMOUNT,
+        );
+    }
 }
 
 pub fn read_session(env: &Env, session_id: &BytesN<32>) -> Option<Session> {
@@ -93,6 +151,7 @@ mod tests {
             seller: Address::generate(env),
             asset: Address::generate(env),
             max_amount: 100,
+            escrowed_amount: 100,
             settled_amount: 0,
             expires_at_ledger: 50,
             resource_hash: BytesN::from_array(env, &[2; 32]),

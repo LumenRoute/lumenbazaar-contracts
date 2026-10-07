@@ -1,6 +1,8 @@
 use crate::{ContractError, Session};
 use soroban_sdk::{Address, BytesN, Env};
 
+pub const MAX_SESSION_DURATION_LEDGERS: u32 = 518_400;
+
 pub fn validate_create_session(
     env: &Env,
     buyer: &Address,
@@ -24,6 +26,10 @@ pub fn validate_create_session(
 
     if expires_at_ledger <= env.ledger().sequence() {
         return Err(ContractError::ExpiredSession);
+    }
+
+    if expires_at_ledger - env.ledger().sequence() > MAX_SESSION_DURATION_LEDGERS {
+        return Err(ContractError::SessionDurationTooLong);
     }
 
     if resource_hash == &BytesN::from_array(env, &[0; 32]) {
@@ -158,6 +164,7 @@ mod tests {
             seller,
             asset,
             max_amount: 100,
+            escrowed_amount: 100,
             settled_amount: 0,
             expires_at_ledger: 50,
             resource_hash,
@@ -190,6 +197,7 @@ mod tests {
             seller,
             asset,
             max_amount: 100,
+            escrowed_amount: 100,
             settled_amount: 0,
             expires_at_ledger: 50,
             resource_hash,

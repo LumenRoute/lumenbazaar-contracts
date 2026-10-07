@@ -5,14 +5,15 @@ This document covers the `upto-session` contract and the example-only policy wal
 
 The accepted funding design is
 [ADR 0001: Escrow-Funded Upto Sessions](adr/0001-escrow-funded-upto-sessions.md).
-The current source and published deployment still use the audited unfunded
-behavior until the subsequent implementation, test, versioning, and deployment
-gates complete. Planned escrow behavior must not be represented as deployed
-evidence.
+The current source implements the selected escrow model. The published testnet
+deployment still uses the audited unfunded release until the later versioning
+and deployment gates complete; source behavior must not be represented as live
+deployment evidence.
 
 ## Assets and trust boundaries
 
-- Buyers authorize session creation and cancellation for their own funds.
+- Buyers authorize full-cap escrow at session creation and cancellation for
+  their own funds.
 - Sellers authorize settlement and cannot settle more than the buyer's cap.
 - The configured token contract is trusted to implement the expected transfer interface correctly.
 - The `resource_hash` and `usage_hash` values are commitments only. The contract does not validate
@@ -23,9 +24,10 @@ evidence.
 ## Authorization and replay
 
 - `create_session` requires buyer authorization and binds buyer, seller, asset, cap, expiry, resource
-  hash, and an incrementing sequence into the session ID.
+  hash, and an incrementing sequence into the session ID. Its nested token call
+  transfers the cap into contract custody.
 - `settle` requires the stored seller's authorization and finalizes a session once.
-- `cancel` requires the stored buyer's authorization and prevents later settlement.
+- `cancel` requires the stored buyer's authorization, refunds the escrow, and prevents later settlement.
 - Repeated settlement and cancellation attempts fail against finalized state.
 
 ## Amount, expiry, and storage risks

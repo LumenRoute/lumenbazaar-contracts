@@ -10,6 +10,7 @@ This checklist records the contract controls that are ready for audit review.
 | Expiry handling | Complete | `validation::tests::rejects_expired_sessions`, `validation::tests::rejects_settlement_at_or_after_expiry`, `expired_open_session_remains_observable_and_buyer_cancellable` | New sessions and settlements reject expired ledger windows; expired open sessions remain readable and cancellable. |
 | Asset and seller binding | Complete | `validation::tests::rejects_invalid_seller_or_asset_bindings`, `invalid_create_inputs_do_not_consume_sequence` | Seller cannot equal buyer and payment asset cannot equal buyer or seller. |
 | Event correctness | Complete | `create_session_emits_stable_event`, `settle_emits_stable_event`, `cancel_emits_stable_event` | Event assertions compare typed event XDR for stable topics and payloads. |
+| Escrow collateralization | Complete | `production_escrow_funds_and_settles_with_exact_authorization_trees`, `insufficient_funding_prevents_session_creation`, `liability_arithmetic_is_checked` | Open caps are held by the contract and tracked as checked per-asset liabilities. |
 
 ## Remaining Review Notes
 

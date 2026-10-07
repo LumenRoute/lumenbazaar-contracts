@@ -6,7 +6,7 @@ This package describes the current review boundary for LumenBazaar contracts.
 
 The review target is the `upto-session` contract public interface:
 
-- `initialize(admin)`
+- `initialize(admin, supported_assets)`
 - `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash)`
 - `get_session(session_id)`
 - `settle(session_id, actual_amount, usage_hash)`
@@ -67,7 +67,7 @@ Out of scope until later review:
 
 The current workspace test suite covers:
 
-- `upto-session`: 49 tests.
+- `upto-session`: 56 tests.
 - `policy-wallet-example`: 16 tests.
 - `test-token`: 5 tests.
 

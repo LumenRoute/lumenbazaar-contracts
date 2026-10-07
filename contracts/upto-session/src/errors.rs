@@ -17,6 +17,13 @@ pub enum ContractError {
     TtlExtensionFailed = 11,
     InvalidResourceHash = 12,
     InvalidUsageHash = 13,
+    UnsupportedAsset = 14,
+    InvalidSupportedAssets = 15,
+    SessionDurationTooLong = 16,
+    LiabilityOverflow = 17,
+    LiabilityUnderflow = 18,
+    EscrowUnderfunded = 19,
+    NotInitialized = 20,
 }
 
 #[cfg(test)]
@@ -38,5 +45,12 @@ mod tests {
         assert_eq!(ContractError::TtlExtensionFailed as u32, 11);
         assert_eq!(ContractError::InvalidResourceHash as u32, 12);
         assert_eq!(ContractError::InvalidUsageHash as u32, 13);
+        assert_eq!(ContractError::UnsupportedAsset as u32, 14);
+        assert_eq!(ContractError::InvalidSupportedAssets as u32, 15);
+        assert_eq!(ContractError::SessionDurationTooLong as u32, 16);
+        assert_eq!(ContractError::LiabilityOverflow as u32, 17);
+        assert_eq!(ContractError::LiabilityUnderflow as u32, 18);
+        assert_eq!(ContractError::EscrowUnderfunded as u32, 19);
+        assert_eq!(ContractError::NotInitialized as u32, 20);
     }
 }

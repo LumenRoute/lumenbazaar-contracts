@@ -36,6 +36,15 @@ fn create_local_test_token(env: &Env, buyer: &Address, amount: i128) -> Address 
     token_id
 }
 
+fn initialize_for_asset(
+    env: &Env,
+    client: &UptoSessionContractClient<'_>,
+    admin: &Address,
+    asset: &Address,
+) {
+    client.initialize(admin, &soroban_sdk::vec![env, asset.clone()]);
+}
+
 fn print_resource_usage(operation: &str, env: &Env) {
     let resources = env.cost_estimate().resources();
     let fee = env.cost_estimate().fee();
@@ -85,10 +94,10 @@ fn public_interface_is_callable() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = create_test_asset(&env, &buyer, 100);
+    let asset = create_test_asset(&env, &buyer, 300);
     let resource_hash = BytesN::from_array(&env, &[7; 32]);
 
-    client.initialize(&buyer);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let expected_id = ids::derive_session_id(
         &env,
@@ -139,8 +148,9 @@ fn resource_usage_create_session() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[31; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
 
@@ -158,6 +168,7 @@ fn resource_usage_settle() {
     let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[32; 32]);
     let usage_hash = BytesN::from_array(&env, &[33; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
 
     client.settle(&session_id, &125, &usage_hash);
@@ -173,8 +184,9 @@ fn resource_usage_cancel() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[34; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
 
     client.cancel(&session_id);
@@ -190,8 +202,9 @@ fn resource_usage_extend_ttl() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[35; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
 
     client.extend_ttl(&session_id);
@@ -207,7 +220,9 @@ fn initialize_stores_admin_once() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
 
-    client.initialize(&admin);
+    let asset = Address::generate(&env);
+    let supported_assets = soroban_sdk::vec![&env, asset.clone()];
+    client.initialize(&admin, &supported_assets);
 
     env.as_contract(&contract_id, || {
         assert_eq!(storage::read_admin(&env), Some(admin.clone()));
@@ -218,9 +233,105 @@ fn initialize_stores_admin_once() {
     });
 
     assert_eq!(
-        client.try_initialize(&admin),
+        client.try_initialize(&admin, &supported_assets),
         Err(Ok(ContractError::AlreadyInitialized))
     );
+}
+
+#[test]
+fn initialize_rejects_empty_or_duplicate_supported_assets() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+
+    let empty_id = env.register(UptoSessionContract, ());
+    let empty_client = UptoSessionContractClient::new(&env, &empty_id);
+    assert_eq!(
+        empty_client.try_initialize(&admin, &soroban_sdk::vec![&env]),
+        Err(Ok(ContractError::InvalidSupportedAssets))
+    );
+
+    let duplicate_id = env.register(UptoSessionContract, ());
+    let duplicate_client = UptoSessionContractClient::new(&env, &duplicate_id);
+    let asset = Address::generate(&env);
+    assert_eq!(
+        duplicate_client.try_initialize(&admin, &soroban_sdk::vec![&env, asset.clone(), asset]),
+        Err(Ok(ContractError::InvalidSupportedAssets))
+    );
+}
+
+#[test]
+fn create_rejects_uninitialized_unsupported_and_excessive_duration() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let supported_asset = create_test_asset(&env, &buyer, 500);
+    let unsupported_asset = create_test_asset(&env, &buyer, 500);
+    let resource_hash = BytesN::from_array(&env, &[44; 32]);
+
+    let uninitialized_id = env.register(UptoSessionContract, ());
+    let uninitialized = UptoSessionContractClient::new(&env, &uninitialized_id);
+    assert_eq!(
+        uninitialized.try_create_session(
+            &buyer,
+            &seller,
+            &supported_asset,
+            &500,
+            &50,
+            &resource_hash
+        ),
+        Err(Ok(ContractError::NotInitialized))
+    );
+
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    initialize_for_asset(&env, &client, &buyer, &supported_asset);
+    assert_eq!(
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &unsupported_asset,
+            &500,
+            &50,
+            &resource_hash
+        ),
+        Err(Ok(ContractError::UnsupportedAsset))
+    );
+    assert_eq!(
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &supported_asset,
+            &500,
+            &(validation::MAX_SESSION_DURATION_LEDGERS + 1),
+            &resource_hash
+        ),
+        Err(Ok(ContractError::SessionDurationTooLong))
+    );
+}
+
+#[test]
+fn liability_arithmetic_is_checked() {
+    let env = Env::default();
+    let contract_id = env.register(UptoSessionContract, ());
+    let asset = Address::generate(&env);
+
+    env.as_contract(&contract_id, || {
+        assert_eq!(
+            storage::increase_liability(&env, &asset, i128::MAX),
+            Ok(i128::MAX)
+        );
+        assert_eq!(
+            storage::increase_liability(&env, &asset, 1),
+            Err(ContractError::LiabilityOverflow)
+        );
+        assert_eq!(storage::decrease_liability(&env, &asset, i128::MAX), Ok(0));
+        assert_eq!(
+            storage::decrease_liability(&env, &asset, 1),
+            Err(ContractError::LiabilityUnderflow)
+        );
+    });
 }
 
 #[test]
@@ -274,8 +385,9 @@ fn create_session_stores_open_session() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[5; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &25, &resource_hash);
 
@@ -287,6 +399,8 @@ fn create_session_stores_open_session() {
         assert_eq!(session.seller, seller);
         assert_eq!(session.asset, asset);
         assert_eq!(session.max_amount, 500);
+        assert_eq!(session.escrowed_amount, 500);
+        assert_eq!(storage::read_liability(&env, &asset), 500);
         assert_eq!(session.settled_amount, 0);
         assert_eq!(session.expires_at_ledger, 25);
         assert_eq!(session.resource_hash, resource_hash);
@@ -303,8 +417,9 @@ fn create_session_emits_stable_event() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[5; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &25, &resource_hash);
 
@@ -318,6 +433,8 @@ fn create_session_emits_stable_event() {
             max_amount: 500,
             expires_at_ledger: 25,
             resource_hash,
+            event_version: 2,
+            escrowed_amount: 500,
         }
         .to_xdr(&env, &contract_id)]
     );
@@ -328,10 +445,23 @@ fn create_session_requires_buyer_auth() {
     let env = Env::default();
     let contract_id = env.register(UptoSessionContract, ());
     let client = UptoSessionContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
     let asset = Address::generate(&env);
     let resource_hash = BytesN::from_array(&env, &[5; 32]);
+    let supported_assets = soroban_sdk::vec![&env, asset.clone()];
+    client
+        .mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "initialize",
+                args: (admin.clone(), supported_assets.clone()).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .initialize(&admin, &supported_assets);
 
     let result = client.try_create_session(&buyer, &seller, &asset, &500, &25, &resource_hash);
 
@@ -349,8 +479,9 @@ fn get_session_returns_full_state() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 900);
     let resource_hash = BytesN::from_array(&env, &[6; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &900, &30, &resource_hash);
     let session = client.get_session(&session_id);
@@ -360,6 +491,7 @@ fn get_session_returns_full_state() {
     assert_eq!(session.seller, seller);
     assert_eq!(session.asset, asset);
     assert_eq!(session.max_amount, 900);
+    assert_eq!(session.escrowed_amount, 900);
     assert_eq!(session.settled_amount, 0);
     assert_eq!(session.expires_at_ledger, 30);
     assert_eq!(session.resource_hash, resource_hash);
@@ -415,6 +547,7 @@ fn settle_requires_seller_auth() {
                 seller,
                 asset,
                 max_amount: 100,
+                escrowed_amount: 100,
                 settled_amount: 0,
                 expires_at_ledger: 50,
                 resource_hash,
@@ -449,6 +582,7 @@ fn settle_rejects_wrong_seller_auth() {
                 seller,
                 asset,
                 max_amount: 100,
+                escrowed_amount: 100,
                 settled_amount: 0,
                 expires_at_ledger: 50,
                 resource_hash,
@@ -501,6 +635,7 @@ fn settle_rejects_finalized_sessions() {
                 seller: seller.clone(),
                 asset: asset.clone(),
                 max_amount: 100,
+                escrowed_amount: 0,
                 settled_amount: 25,
                 expires_at_ledger: 50,
                 resource_hash: resource_hash.clone(),
@@ -516,6 +651,7 @@ fn settle_rejects_finalized_sessions() {
                 seller,
                 asset,
                 max_amount: 100,
+                escrowed_amount: 0,
                 settled_amount: 0,
                 expires_at_ledger: 50,
                 resource_hash,
@@ -547,6 +683,7 @@ fn settle_stores_actual_amount_and_status() {
     let resource_hash = BytesN::from_array(&env, &[12; 32]);
     let usage_hash = BytesN::from_array(&env, &[13; 32]);
     let token_client = token::Client::new(&env, &asset);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
     client.settle(&session_id, &125, &usage_hash);
@@ -555,8 +692,10 @@ fn settle_stores_actual_amount_and_status() {
     assert_eq!(session.settled_amount, 125);
     assert_eq!(session.usage_hash, Some(usage_hash));
     assert_eq!(session.status, SessionStatus::Settled);
+    assert_eq!(session.escrowed_amount, 0);
     assert_eq!(token_client.balance(&buyer), 375);
     assert_eq!(token_client.balance(&seller), 125);
+    assert_eq!(token_client.balance(&contract_id), 0);
 }
 
 #[test]
@@ -571,6 +710,7 @@ fn settle_accepts_local_test_token_contract() {
     let resource_hash = BytesN::from_array(&env, &[34; 32]);
     let usage_hash = BytesN::from_array(&env, &[35; 32]);
     let token_client = token::Client::new(&env, &asset);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
     client.settle(&session_id, &125, &usage_hash);
@@ -591,9 +731,10 @@ fn settle_rejects_invalid_amounts_and_expiry() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 1_500);
     let resource_hash = BytesN::from_array(&env, &[12; 32]);
     let usage_hash = BytesN::from_array(&env, &[13; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let zero_amount_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
     let over_cap_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
@@ -626,9 +767,10 @@ fn expired_open_session_remains_observable_and_buyer_cancellable() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[32; 32]);
     let usage_hash = BytesN::from_array(&env, &[33; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
 
@@ -653,7 +795,7 @@ fn expired_open_session_remains_observable_and_buyer_cancellable() {
 }
 
 #[test]
-fn settle_surfaces_asset_transfer_failure_without_finalizing_session() {
+fn insufficient_funding_prevents_session_creation() {
     let env = Env::default();
     env.mock_all_auths_allowing_non_root_auth();
     let contract_id = env.register(UptoSessionContract, ());
@@ -663,14 +805,16 @@ fn settle_surfaces_asset_transfer_failure_without_finalizing_session() {
     let asset = create_test_asset(&env, &buyer, 10);
     let resource_hash = BytesN::from_array(&env, &[12; 32]);
     let usage_hash = BytesN::from_array(&env, &[13; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
-
-    assert!(client.try_settle(&session_id, &125, &usage_hash).is_err());
-    let session = client.get_session(&session_id);
-
-    assert_eq!(session.settled_amount, 0);
-    assert_eq!(session.status, SessionStatus::Open);
+    assert!(client
+        .try_create_session(&buyer, &seller, &asset, &500, &50, &resource_hash)
+        .is_err());
+    let _ = usage_hash;
+    env.as_contract(&contract_id, || {
+        assert_eq!(storage::read_next_session_sequence(&env), 0);
+        assert_eq!(storage::read_liability(&env, &asset), 0);
+    });
 }
 
 #[test]
@@ -685,6 +829,7 @@ fn settle_rejects_empty_usage_hash_before_transfer() {
     let token_client = token::Client::new(&env, &asset);
     let resource_hash = BytesN::from_array(&env, &[12; 32]);
     let usage_hash = BytesN::from_array(&env, &[0; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
 
@@ -697,8 +842,9 @@ fn settle_rejects_empty_usage_hash_before_transfer() {
     assert_eq!(session.usage_hash, None);
     assert_eq!(session.settled_amount, 0);
     assert_eq!(session.status, SessionStatus::Open);
-    assert_eq!(token_client.balance(&buyer), 500);
+    assert_eq!(token_client.balance(&buyer), 0);
     assert_eq!(token_client.balance(&seller), 0);
+    assert_eq!(token_client.balance(&contract_id), 500);
 }
 
 #[test]
@@ -713,6 +859,7 @@ fn settle_prevents_double_settlement() {
     let token_client = token::Client::new(&env, &asset);
     let resource_hash = BytesN::from_array(&env, &[14; 32]);
     let usage_hash = BytesN::from_array(&env, &[15; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
 
@@ -754,6 +901,7 @@ fn settle_emits_stable_event() {
     let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[16; 32]);
     let usage_hash = BytesN::from_array(&env, &[17; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
 
@@ -767,6 +915,8 @@ fn settle_emits_stable_event() {
             asset,
             actual_amount: 125,
             usage_hash,
+            event_version: 2,
+            refunded_amount: 375,
         }
         .to_xdr(&env, &contract_id)]
     );
@@ -780,8 +930,9 @@ fn cancel_allows_buyer_cancellation_before_settlement() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[18; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
     let session_before = client.get_session(&session_id);
@@ -813,6 +964,7 @@ fn cancel_requires_buyer_auth() {
                 seller,
                 asset,
                 max_amount: 100,
+                escrowed_amount: 100,
                 settled_amount: 0,
                 expires_at_ledger: 50,
                 resource_hash,
@@ -860,6 +1012,7 @@ fn cancel_rejects_already_settled_session() {
                 seller,
                 asset,
                 max_amount: 100,
+                escrowed_amount: 0,
                 settled_amount: 50,
                 expires_at_ledger: 50,
                 resource_hash,
@@ -896,6 +1049,7 @@ fn cancel_rejects_already_cancelled_session() {
                 seller,
                 asset,
                 max_amount: 100,
+                escrowed_amount: 0,
                 settled_amount: 0,
                 expires_at_ledger: 50,
                 resource_hash,
@@ -919,8 +1073,9 @@ fn cancel_emits_stable_event() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[24; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
 
@@ -936,6 +1091,9 @@ fn cancel_emits_stable_event() {
         std::vec![events::SessionCancelled {
             session_id: session_id.clone(),
             buyer: buyer.clone(),
+            asset: asset.clone(),
+            event_version: 2,
+            refunded_amount: 500,
         }
         .to_xdr(&env, &contract_id)]
     );
@@ -953,8 +1111,9 @@ fn extend_ttl_succeeds_for_open_sessions() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
-    let asset = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[25; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
 
     let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
 
@@ -982,6 +1141,7 @@ fn extend_ttl_rejects_cancelled_sessions() {
                 seller,
                 asset,
                 max_amount: 100,
+                escrowed_amount: 0,
                 settled_amount: 0,
                 expires_at_ledger: 50,
                 resource_hash,
@@ -1018,6 +1178,7 @@ fn extend_ttl_rejects_settled_sessions() {
                 seller,
                 asset,
                 max_amount: 100,
+                escrowed_amount: 0,
                 settled_amount: 50,
                 expires_at_ledger: 50,
                 resource_hash,

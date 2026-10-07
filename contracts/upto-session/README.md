@@ -36,6 +36,8 @@ Data:
 - `max_amount`
 - `expires_at_ledger`
 - `resource_hash`
+- `event_version` (`2`)
+- `escrowed_amount`
 
 ### `SessionSettled`
 
@@ -49,6 +51,8 @@ Data:
 - `asset`
 - `actual_amount`
 - `usage_hash`
+- `event_version` (`2`)
+- `refunded_amount`
 
 Settlement is single-use. Once a session reaches `Settled`, any repeated
 `settle` call returns `SessionAlreadySettled` and cannot move additional funds.
@@ -62,6 +66,9 @@ Topics:
 Data:
 
 - `buyer`
+- `asset`
+- `event_version` (`2`)
+- `refunded_amount`
 
 Only the buyer can cancel an open session. Cancellation is rejected for missing
 sessions, settled sessions, and already cancelled sessions.
@@ -112,6 +119,6 @@ rewrite stored session state by itself: the session remains observable through
 and resource hash.
 
 The buyer may still call `cancel(session_id)` after expiry while the session is
-open. That gives wallets and backend indexers an explicit terminal cancellation
-event without allowing any funds to move. Settled and already cancelled sessions
+open. That returns the complete escrow and gives wallets and backend indexers an
+explicit terminal cancellation event. Settled and already cancelled sessions
 continue to reject cancellation with their stable lifecycle errors.

@@ -37,6 +37,13 @@ const requiredErrors = [
   "TtlExtensionFailed",
   "InvalidResourceHash",
   "InvalidUsageHash",
+  "UnsupportedAsset",
+  "InvalidSupportedAssets",
+  "SessionDurationTooLong",
+  "LiabilityOverflow",
+  "LiabilityUnderflow",
+  "EscrowUnderfunded",
+  "NotInitialized",
 ];
 
 for (const item of [...requiredFunctions, ...requiredErrors]) {

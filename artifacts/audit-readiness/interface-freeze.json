@@ -4,27 +4,27 @@
   "files": [
     {
       "path": "contracts/upto-session/src/lib.rs",
-      "sha256": "b63fe1a000a6a1c4f77da4482a0a3ee4ebe422c71c68bb12ce751554b9ee406f"
+      "sha256": "e040035d7e4c17f84a1dad48d863fd8761931cecd10e40e7e95f58ac4466bceb"
     },
     {
       "path": "contracts/upto-session/src/types.rs",
-      "sha256": "7251a6282d1ee8cc9eca6fd3fd7002627ab3fb63f3c8f6ce57df21b2891751d0"
+      "sha256": "baaa06824b8203620fb8548b2623f2ec8f47e60304e2db0bad591a4d642906a7"
     },
     {
       "path": "contracts/upto-session/src/errors.rs",
-      "sha256": "568e23c888c51c58269fd2836c7910dae6c66763633a8579186207f41993ddcc"
+      "sha256": "3933fdc33aac627c043fab0920a96d1e7b5b8adbcb805d08f80a8d13352d3751"
     },
     {
       "path": "contracts/upto-session/src/events.rs",
-      "sha256": "3079a570bd9a3dcd74deaf81977a7b055695a5f32046177c040776b5d6794918"
+      "sha256": "06195ee4f9c6ab87f00007a527d281b84218eb92eb4db159af4a54fe57d3da8d"
     },
     {
       "path": "artifacts/spec/upto-session.json",
-      "sha256": "f87ff7972662f5bb69d87167bbef9ad884a64133bcd9e105613fe625acc53592"
+      "sha256": "104fb0ec8a18e067d0bdd88bc1c1eaedb08e4c460f82b4f27b3c306f265e30ae"
     },
     {
       "path": "bindings/upto-session/src/index.ts",
-      "sha256": "c25571eb0a991ef1aa42407aed0e42d21a4d990f976fc1329d37774a3a5b34a2"
+      "sha256": "cacfea784f73dea29a1cab8eed0ffcb5a4a7a3e732b1e79e66615ef1c515dc24"
     }
   ]
 }

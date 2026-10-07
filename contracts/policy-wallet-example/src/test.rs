@@ -138,6 +138,7 @@ fn policy_wallet_storage_is_isolated_from_upto_session() {
     let upto_session_id = env.register(UptoSessionContract, ());
     let upto_client = UptoSessionContractClient::new(&env, &upto_session_id);
     let owner = Address::generate(&env);
+    let asset = Address::generate(&env);
     let missing_session_id = BytesN::from_array(&env, &[9; 32]);
 
     wallet_client.initialize(&owner, &upto_session_id);
@@ -146,7 +147,9 @@ fn policy_wallet_storage_is_isolated_from_upto_session() {
         upto_client.try_get_session(&missing_session_id),
         Err(Ok(ContractError::SessionNotFound))
     );
-    assert!(upto_client.try_initialize(&owner).is_ok());
+    assert!(upto_client
+        .try_initialize(&owner, &soroban_sdk::vec![&env, asset])
+        .is_ok());
 }
 
 #[test]

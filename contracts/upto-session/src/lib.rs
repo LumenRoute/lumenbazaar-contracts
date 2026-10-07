@@ -10,21 +10,35 @@ pub mod validation;
 pub use errors::ContractError;
 pub use types::{Session, SessionStatus};
 
-use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env};
+use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
 
 #[contract]
 pub struct UptoSessionContract;
 
 #[contractimpl]
 impl UptoSessionContract {
-    pub fn initialize(env: Env, admin: Address) -> Result<(), ContractError> {
+    pub fn initialize(
+        env: Env,
+        admin: Address,
+        supported_assets: Vec<Address>,
+    ) -> Result<(), ContractError> {
         if storage::has_admin(&env) {
             return Err(ContractError::AlreadyInitialized);
         }
 
         admin.require_auth();
+        if supported_assets.is_empty() {
+            return Err(ContractError::InvalidSupportedAssets);
+        }
+        for asset in supported_assets.iter() {
+            if storage::is_supported_asset(&env, &asset) {
+                return Err(ContractError::InvalidSupportedAssets);
+            }
+            storage::write_supported_asset(&env, &asset);
+        }
         storage::write_admin(&env, &admin);
         storage::write_storage_layout_version(&env);
+        storage::extend_instance_ttl(&env);
 
         Ok(())
     }
@@ -47,6 +61,12 @@ impl UptoSessionContract {
             expires_at_ledger,
             &resource_hash,
         )?;
+        if !storage::has_admin(&env) {
+            return Err(ContractError::NotInitialized);
+        }
+        if !storage::is_supported_asset(&env, &asset) {
+            return Err(ContractError::UnsupportedAsset);
+        }
 
         buyer.require_auth();
         let sequence = storage::take_next_session_sequence(&env);
@@ -63,12 +83,21 @@ impl UptoSessionContract {
             },
         );
 
+        let escrow = token::Client::new(&env, &asset);
+        let contract = env.current_contract_address();
+        escrow.transfer(&buyer, &contract, &max_amount);
+        let liability = storage::increase_liability(&env, &asset, max_amount)?;
+        if escrow.balance(&contract) < liability {
+            return Err(ContractError::EscrowUnderfunded);
+        }
+
         let session = Session {
             id: session_id.clone(),
             buyer,
             seller,
             asset,
             max_amount,
+            escrowed_amount: max_amount,
             settled_amount: 0,
             expires_at_ledger,
             resource_hash,
@@ -100,12 +129,17 @@ impl UptoSessionContract {
         validation::validate_settlement_amount(&env, &session, actual_amount)?;
         validation::validate_usage_hash(&env, &usage_hash)?;
         session.seller.require_auth();
-        token::Client::new(&env, &session.asset).transfer(
-            &session.buyer,
-            &session.seller,
-            &actual_amount,
-        );
+        let escrowed_amount = session.escrowed_amount;
+        let refunded_amount = escrowed_amount - actual_amount;
+        storage::decrease_liability(&env, &session.asset, escrowed_amount)?;
+        let contract = env.current_contract_address();
+        let asset = token::Client::new(&env, &session.asset);
+        asset.transfer(&contract, &session.seller, &actual_amount);
+        if refunded_amount > 0 {
+            asset.transfer(&contract, &session.buyer, &refunded_amount);
+        }
         session.settled_amount = actual_amount;
+        session.escrowed_amount = 0;
         session.usage_hash = Some(usage_hash.clone());
         session.status = SessionStatus::Settled;
         storage::write_session(&env, &session);
@@ -115,6 +149,7 @@ impl UptoSessionContract {
             &session.seller,
             &session.asset,
             actual_amount,
+            refunded_amount,
             &usage_hash,
         );
 
@@ -132,9 +167,23 @@ impl UptoSessionContract {
         }
 
         session.buyer.require_auth();
+        let refunded_amount = session.escrowed_amount;
+        storage::decrease_liability(&env, &session.asset, refunded_amount)?;
+        token::Client::new(&env, &session.asset).transfer(
+            &env.current_contract_address(),
+            &session.buyer,
+            &refunded_amount,
+        );
+        session.escrowed_amount = 0;
         session.status = SessionStatus::Cancelled;
         storage::write_session(&env, &session);
-        events::publish_session_cancelled(&env, &session_id, &session.buyer);
+        events::publish_session_cancelled(
+            &env,
+            &session_id,
+            &session.buyer,
+            &session.asset,
+            refunded_amount,
+        );
 
         Ok(())
     }

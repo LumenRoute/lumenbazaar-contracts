@@ -33,8 +33,8 @@ Backend services should prefer the generated TypeScript package for transaction 
 
 | Function | Backend use |
 | --- | --- |
-| `initialize(admin)` | One-time deployment setup. Do not call from request handlers. |
-| `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash)` | Create a buyer-authorized spending cap for a resource. |
+| `initialize(admin, supported_assets)` | One-time deployment setup with an immutable non-empty token allowlist. Do not call from request handlers. |
+| `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash)` | Create a buyer-authorized spending cap and escrow the full cap for a resource. |
 | `get_session(session_id)` | Read current session state for API responses, reconciliation, and settlement guards. |
 | `settle(session_id, actual_amount, usage_hash)` | Seller-authorized settlement for actual usage. |
 | `cancel(session_id)` | Buyer-authorized cancellation before settlement. |
@@ -57,6 +57,13 @@ Backend services should prefer the generated TypeScript package for transaction 
 | 11 | `TtlExtensionFailed` | Do not retry for finalized sessions. |
 | 12 | `InvalidResourceHash` | Reject empty or malformed resource hash input. |
 | 13 | `InvalidUsageHash` | Reject empty or malformed usage hash input. |
+| 14 | `UnsupportedAsset` | Reject assets outside the immutable deployment allowlist. |
+| 15 | `InvalidSupportedAssets` | Reject an empty or duplicate initialization allowlist. |
+| 16 | `SessionDurationTooLong` | Reject an expiry more than 518,400 ledgers ahead. |
+| 17 | `LiabilityOverflow` | Stop and investigate liability arithmetic or corrupted state. |
+| 18 | `LiabilityUnderflow` | Stop and investigate liability arithmetic or corrupted state. |
+| 19 | `EscrowUnderfunded` | Reject creation if token custody does not cover aggregate liability. |
+| 20 | `NotInitialized` | Initialize a new deployment before creating sessions. |
 
 ## Hash Inputs
 

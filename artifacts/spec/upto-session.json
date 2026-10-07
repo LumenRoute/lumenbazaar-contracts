@@ -21,6 +21,24 @@
           "location": "data",
           "name": "buyer",
           "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "refunded_amount",
+          "type": "i128"
         }
       ],
       "prefix_topics": [
@@ -84,6 +102,18 @@
               "n": 32
             }
           }
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "escrowed_amount",
+          "type": "i128"
         }
       ],
       "prefix_topics": [
@@ -135,6 +165,18 @@
               "n": 32
             }
           }
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "refunded_amount",
+          "type": "i128"
         }
       ],
       "prefix_topics": [
@@ -299,6 +341,15 @@
           "doc": "",
           "name": "admin",
           "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "supported_assets",
+          "type": {
+            "vec": {
+              "element_type": "address"
+            }
+          }
         }
       ],
       "name": "initialize",
@@ -426,6 +477,41 @@
           "doc": "",
           "name": "InvalidUsageHash",
           "value": 13
+        },
+        {
+          "doc": "",
+          "name": "UnsupportedAsset",
+          "value": 14
+        },
+        {
+          "doc": "",
+          "name": "InvalidSupportedAssets",
+          "value": 15
+        },
+        {
+          "doc": "",
+          "name": "SessionDurationTooLong",
+          "value": 16
+        },
+        {
+          "doc": "",
+          "name": "LiabilityOverflow",
+          "value": 17
+        },
+        {
+          "doc": "",
+          "name": "LiabilityUnderflow",
+          "value": 18
+        },
+        {
+          "doc": "",
+          "name": "EscrowUnderfunded",
+          "value": 19
+        },
+        {
+          "doc": "",
+          "name": "NotInitialized",
+          "value": 20
         }
       ],
       "doc": "",
@@ -446,6 +532,11 @@
           "doc": "",
           "name": "buyer",
           "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "escrowed_amount",
+          "type": "i128"
         },
         {
           "doc": "",

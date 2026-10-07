@@ -16,6 +16,7 @@ pub struct Session {
     pub seller: Address,
     pub asset: Address,
     pub max_amount: i128,
+    pub escrowed_amount: i128,
     pub settled_amount: i128,
     pub expires_at_ledger: u32,
     pub resource_hash: BytesN<32>,

@@ -252,7 +252,7 @@ fn escrow_payout_needs_only_the_seller_authorization() {
 }
 
 #[test]
-fn audited_unfunded_settlement_fails_with_seller_only_authorization() {
+fn production_escrow_funds_and_settles_with_exact_authorization_trees() {
     let env = Env::default();
     let identities = TestIdentities::generate(&env);
     let contract_id = env.register(UptoSessionContract, ());
@@ -260,6 +260,19 @@ fn audited_unfunded_settlement_fails_with_seller_only_authorization() {
     let asset = create_test_asset(&env, &identities.buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[41; 32]);
     let usage_hash = BytesN::from_array(&env, &[42; 32]);
+    let supported_assets = soroban_sdk::vec![&env, asset.clone()];
+
+    client
+        .mock_auths(&[MockAuth {
+            address: &identities.admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "initialize",
+                args: (identities.admin.clone(), supported_assets.clone()).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .initialize(&identities.admin, &supported_assets);
 
     let session_id = client
         .mock_auths(&[MockAuth {
@@ -276,7 +289,17 @@ fn audited_unfunded_settlement_fails_with_seller_only_authorization() {
                     resource_hash.clone(),
                 )
                     .into_val(&env),
-                sub_invokes: &[],
+                sub_invokes: &[MockAuthInvoke {
+                    contract: &asset,
+                    fn_name: "transfer",
+                    args: (
+                        identities.buyer.clone(),
+                        contract_id.clone(),
+                        500_i128,
+                    )
+                        .into_val(&env),
+                    sub_invokes: &[],
+                }],
             },
         }])
         .create_session(
@@ -288,7 +311,7 @@ fn audited_unfunded_settlement_fails_with_seller_only_authorization() {
             &resource_hash,
         );
 
-    let result = client
+    client
         .mock_auths(&[MockAuth {
             address: &identities.seller,
             invoke: &MockAuthInvoke {
@@ -298,15 +321,16 @@ fn audited_unfunded_settlement_fails_with_seller_only_authorization() {
                 sub_invokes: &[],
             },
         }])
-        .try_settle(&session_id, &125, &usage_hash);
+        .settle(&session_id, &125, &usage_hash);
 
-    assert!(result.is_err());
     let session = client.get_session(&session_id);
-    assert_eq!(session.status, SessionStatus::Open);
-    assert_eq!(session.settled_amount, 0);
+    assert_eq!(session.status, SessionStatus::Settled);
+    assert_eq!(session.settled_amount, 125);
+    assert_eq!(session.escrowed_amount, 0);
     let token = token::Client::new(&env, &asset);
-    assert_eq!(token.balance(&identities.buyer), 500);
-    assert_eq!(token.balance(&identities.seller), 0);
+    assert_eq!(token.balance(&identities.buyer), 375);
+    assert_eq!(token.balance(&identities.seller), 125);
+    assert_eq!(token.balance(&contract_id), 0);
 }
 
 #[test]
