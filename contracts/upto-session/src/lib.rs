@@ -130,10 +130,15 @@ impl UptoSessionContract {
         validation::validate_usage_hash(&env, &usage_hash)?;
         session.seller.require_auth();
         let escrowed_amount = session.escrowed_amount;
-        let refunded_amount = escrowed_amount - actual_amount;
-        storage::decrease_liability(&env, &session.asset, escrowed_amount)?;
         let contract = env.current_contract_address();
         let asset = token::Client::new(&env, &session.asset);
+        if escrowed_amount != session.max_amount
+            || asset.balance(&contract) < storage::read_liability(&env, &session.asset)
+        {
+            return Err(ContractError::EscrowUnderfunded);
+        }
+        let refunded_amount = escrowed_amount - actual_amount;
+        storage::decrease_liability(&env, &session.asset, escrowed_amount)?;
         asset.transfer(&contract, &session.seller, &actual_amount);
         if refunded_amount > 0 {
             asset.transfer(&contract, &session.buyer, &refunded_amount);
@@ -168,12 +173,15 @@ impl UptoSessionContract {
 
         session.buyer.require_auth();
         let refunded_amount = session.escrowed_amount;
+        let asset = token::Client::new(&env, &session.asset);
+        let contract = env.current_contract_address();
+        if refunded_amount != session.max_amount
+            || asset.balance(&contract) < storage::read_liability(&env, &session.asset)
+        {
+            return Err(ContractError::EscrowUnderfunded);
+        }
         storage::decrease_liability(&env, &session.asset, refunded_amount)?;
-        token::Client::new(&env, &session.asset).transfer(
-            &env.current_contract_address(),
-            &session.buyer,
-            &refunded_amount,
-        );
+        asset.transfer(&contract, &session.buyer, &refunded_amount);
         session.escrowed_amount = 0;
         session.status = SessionStatus::Cancelled;
         storage::write_session(&env, &session);

@@ -11,6 +11,7 @@ This checklist records the contract controls that are ready for audit review.
 | Asset and seller binding | Complete | `validation::tests::rejects_invalid_seller_or_asset_bindings`, `invalid_create_inputs_do_not_consume_sequence` | Seller cannot equal buyer and payment asset cannot equal buyer or seller. |
 | Event correctness | Complete | `create_session_emits_stable_event`, `settle_emits_stable_event`, `cancel_emits_stable_event` | Event assertions compare typed event XDR for stable topics and payloads. |
 | Escrow collateralization | Complete | `production_escrow_funds_and_settles_with_exact_authorization_trees`, `insufficient_funding_prevents_session_creation`, `liability_arithmetic_is_checked` | Open caps are held by the contract and tracked as checked per-asset liabilities. |
+| Settlement atomicity and isolation | Complete | `settle_accepts_exact_cap_without_refund`, `settlement_isolates_concurrent_sessions_sharing_an_asset`, `undercollateralized_settlement_fails_without_state_transition` | A settlement consumes only its session escrow; collateral failure leaves state and liability open. |
 
 ## Remaining Review Notes
 

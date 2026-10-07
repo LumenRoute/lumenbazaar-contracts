@@ -22,6 +22,11 @@ seller, refunds the unused cap to the recorded buyer, clears
 Cancellation removes the same liability and returns the entire escrow to the
 recorded buyer.
 
+Before either terminal transfer, the contract checks that the stored open
+session still carries its complete cap and that the contract token balance
+covers the aggregate liability for that asset. A failed check returns
+`EscrowUnderfunded` before liability or session state changes.
+
 The asset allowlist is immutable after initialization. Each session ID commits
 to buyer, seller, asset, cap, expiry, resource hash, and the contract sequence.
 No caller supplies a payout source or destination at settlement, so the

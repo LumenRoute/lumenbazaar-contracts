@@ -699,6 +699,105 @@ fn settle_stores_actual_amount_and_status() {
 }
 
 #[test]
+fn settle_accepts_exact_cap_without_refund() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
+    let resource_hash = BytesN::from_array(&env, &[45; 32]);
+    let usage_hash = BytesN::from_array(&env, &[46; 32]);
+    let token_client = token::Client::new(&env, &asset);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    client.settle(&session_id, &500, &usage_hash);
+
+    let session = client.get_session(&session_id);
+    assert_eq!(session.status, SessionStatus::Settled);
+    assert_eq!(session.settled_amount, 500);
+    assert_eq!(session.escrowed_amount, 0);
+    assert_eq!(token_client.balance(&buyer), 0);
+    assert_eq!(token_client.balance(&seller), 500);
+    assert_eq!(token_client.balance(&contract_id), 0);
+    env.as_contract(&contract_id, || {
+        assert_eq!(storage::read_liability(&env, &asset), 0);
+    });
+}
+
+#[test]
+fn settlement_isolates_concurrent_sessions_sharing_an_asset() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 1_000);
+    let resource_one = BytesN::from_array(&env, &[47; 32]);
+    let resource_two = BytesN::from_array(&env, &[48; 32]);
+    let usage_one = BytesN::from_array(&env, &[49; 32]);
+    let usage_two = BytesN::from_array(&env, &[50; 32]);
+    let token_client = token::Client::new(&env, &asset);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let first = client.create_session(&buyer, &seller, &asset, &400, &50, &resource_one);
+    let second = client.create_session(&buyer, &seller, &asset, &600, &50, &resource_two);
+    client.settle(&first, &150, &usage_one);
+
+    assert_eq!(client.get_session(&first).settled_amount, 150);
+    assert_eq!(client.get_session(&second).escrowed_amount, 600);
+    assert_eq!(token_client.balance(&buyer), 250);
+    assert_eq!(token_client.balance(&seller), 150);
+    assert_eq!(token_client.balance(&contract_id), 600);
+    env.as_contract(&contract_id, || {
+        assert_eq!(storage::read_liability(&env, &asset), 600);
+    });
+
+    client.settle(&second, &600, &usage_two);
+    assert_eq!(token_client.balance(&buyer), 250);
+    assert_eq!(token_client.balance(&seller), 750);
+    assert_eq!(token_client.balance(&contract_id), 0);
+}
+
+#[test]
+fn undercollateralized_settlement_fails_without_state_transition() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let sink = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
+    let resource_hash = BytesN::from_array(&env, &[51; 32]);
+    let usage_hash = BytesN::from_array(&env, &[52; 32]);
+    let token_client = token::Client::new(&env, &asset);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    env.as_contract(&contract_id, || {
+        token_client.transfer(&contract_id, &sink, &1);
+    });
+
+    assert_eq!(
+        client.try_settle(&session_id, &125, &usage_hash),
+        Err(Ok(ContractError::EscrowUnderfunded))
+    );
+    let session = client.get_session(&session_id);
+    assert_eq!(session.status, SessionStatus::Open);
+    assert_eq!(session.settled_amount, 0);
+    assert_eq!(session.usage_hash, None);
+    assert_eq!(session.escrowed_amount, 500);
+    assert_eq!(token_client.balance(&seller), 0);
+    env.as_contract(&contract_id, || {
+        assert_eq!(storage::read_liability(&env, &asset), 500);
+    });
+}
+
+#[test]
 fn settle_accepts_local_test_token_contract() {
     let env = Env::default();
     env.mock_all_auths_allowing_non_root_auth();

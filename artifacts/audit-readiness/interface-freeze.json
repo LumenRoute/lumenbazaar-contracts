@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "contracts/upto-session/src/lib.rs",
-      "sha256": "e040035d7e4c17f84a1dad48d863fd8761931cecd10e40e7e95f58ac4466bceb"
+      "sha256": "0ab52d9fed23a17357e2f074e953bda067b9b2e3b77c93e0979632a5bebf1e24"
     },
     {
       "path": "contracts/upto-session/src/types.rs",
