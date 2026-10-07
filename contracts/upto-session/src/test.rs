@@ -1,5 +1,14 @@
 extern crate std;
 
+mod authorization_harness {
+    include!("auth_test.rs");
+}
+
+// Global auth mocks in the legacy tests below isolate validation, state,
+// event, and resource-accounting behavior. They are not authorization
+// evidence. Release-gating authorization paths belong in
+// `authorization_harness` and must use explicit trees.
+
 use super::*;
 use soroban_sdk::{
     testutils::{Address as _, Events as _, Ledger as _, MockAuth, MockAuthInvoke},
