@@ -23,7 +23,10 @@ actual usage amount.
 
 ## Local Verification
 
-Contract WASM builds require `stellar-cli` 25.2.0 or newer.
+Reproducible contract WASM builds require the exact versions in
+`docs/release-toolchain.md`, including Stellar CLI 28.0.0. Newer or older CLI
+optimizers can produce a different WASM hash from the reviewed release even
+when the Rust source is unchanged.
 
 ```bash
 cargo fmt --all -- --check
