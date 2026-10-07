@@ -79,20 +79,25 @@ Primary evidence:
 - `docs/security-checklist.md`
 - `artifacts/resource-usage/upto-session.md`
 - `docs/backend-integration-handoff.md`
+- `docs/release-toolchain.md`
 
 ## Deployment Procedure
 
 Before deployment:
 
-1. Run `cargo fmt --all -- --check`.
-2. Run `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
-3. Run `cargo test --workspace --all-features`.
-4. Run `stellar contract build --locked`.
-5. Run `node scripts/generate-specs.mjs --skip-build` and check no spec drift.
-6. Run `node scripts/generate-bindings.mjs --skip-build` and check no binding drift.
-7. Run `node scripts/check-backend-handoff.mjs`.
-8. Run `node scripts/check-security-checklist.mjs`.
-9. Run `node scripts/check-audit-readiness.mjs`.
+1. Confirm every version in `docs/release-toolchain.md`.
+2. Run `node scripts/check-dependency-exceptions.mjs`.
+3. Run `cargo audit --deny warnings --ignore RUSTSEC-2024-0436`.
+4. Run `cargo fmt --all -- --check`.
+5. Run `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
+6. Run `cargo test --workspace --all-features`.
+7. Run `stellar contract build --locked`.
+8. Run `node scripts/generate-specs.mjs --skip-build` and check no spec drift.
+9. Run `node scripts/generate-bindings.mjs --skip-build` and check no binding drift.
+10. Run `npm --prefix bindings/upto-session audit --omit=dev`.
+11. Run `node scripts/check-backend-handoff.mjs`.
+12. Run `node scripts/check-security-checklist.mjs`.
+13. Run `node scripts/check-audit-readiness.mjs`.
 
 Local deployment:
 

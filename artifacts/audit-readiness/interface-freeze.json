@@ -28,7 +28,7 @@
     },
     {
       "path": "bindings/upto-session/package.json",
-      "sha256": "a53ff8a42664c81f70eb4871f69ccd6f0256e54d3149d5810307e7d1dce998df"
+      "sha256": "40745cda572cb781bdbff1300a3c5259aa82d89fd6e5256031fb920d69d6adfa"
     },
     {
       "path": "artifacts/interface/upto-session-v2.json",

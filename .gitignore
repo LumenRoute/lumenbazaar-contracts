@@ -2,7 +2,6 @@
 **/test_snapshots/
 **/*.wasm
 bindings/*/dist/
-bindings/*/package-lock.json
 .env
 .env.local
 .env.testnet
