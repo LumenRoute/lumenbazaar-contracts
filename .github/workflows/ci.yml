@@ -62,6 +62,20 @@ jobs:
       - name: Build WASM contracts
         run: stellar contract build --locked
 
+      - name: Generate dependency SBOM and build provenance
+        run: |
+          node --test scripts/lib/provenance.test.mjs
+          node scripts/generate-provenance.mjs
+          node scripts/check-provenance.mjs
+
+      - name: Upload SBOM and build provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-build-provenance
+          path: artifacts/provenance
+          if-no-files-found: error
+
       - name: Check WASM size budgets
         run: node scripts/check-wasm-size-budget.mjs --report "${{ runner.temp }}/wasm-size-report.json"
 
