@@ -3046,3 +3046,188 @@ fn extend_ttl_rejects_missing_session() {
         Err(Ok(ContractError::SessionNotFound))
     );
 }
+
+fn last_contract_event(env: &Env, contract_id: &Address) -> soroban_sdk::xdr::ContractEvent {
+    env.events()
+        .all()
+        .filter_by_contract(contract_id)
+        .events()
+        .last()
+        .expect("an event should be emitted")
+        .clone()
+}
+
+// Asserts the raw XDR layout an indexer consumes: a stable prefix topic, one
+// bounded indexed topic, and an `event_version` entry in the data map. Returns the
+// indexed topic so callers can prove the session id is reused across events.
+fn assert_indexable_event(
+    env: &Env,
+    contract_id: &Address,
+    expected_prefix: &str,
+    expect_session_topic: bool,
+    expected_version: u32,
+) -> soroban_sdk::xdr::ScVal {
+    use soroban_sdk::xdr::{ContractEventBody, ScVal};
+
+    let event = last_contract_event(env, contract_id);
+    let ContractEventBody::V0(body) = &event.body;
+
+    assert_eq!(
+        body.topics.len(),
+        2,
+        "each event exposes one prefix topic and one indexed topic"
+    );
+    assert!(
+        body.topics.len() <= 4,
+        "event topics must stay within the Soroban limit of four"
+    );
+
+    match body.topics.first() {
+        Some(ScVal::Symbol(symbol)) => assert_eq!(
+            std::str::from_utf8(&symbol.0[..]),
+            Ok(expected_prefix),
+            "event prefix topic changed"
+        ),
+        other => panic!("event prefix topic must be a symbol, found: {:?}", other),
+    }
+
+    let topic = body
+        .topics
+        .get(1)
+        .expect("event must carry an indexed topic")
+        .clone();
+    match &topic {
+        ScVal::Bytes(bytes) => {
+            assert!(
+                expect_session_topic,
+                "only session events carry a session id topic"
+            );
+            assert_eq!(
+                bytes.len(),
+                32,
+                "session id topics must be exactly 32 bytes"
+            );
+        }
+        ScVal::Address(_) => {
+            assert!(
+                !expect_session_topic,
+                "admin and asset events carry an address topic"
+            );
+        }
+        other => panic!("unexpected topic value: {:?}", other),
+    }
+
+    let data = match &body.data {
+        ScVal::Map(Some(map)) => map,
+        other => panic!("event data must be a map, found: {:?}", other),
+    };
+    let version = data.iter().find_map(|entry| {
+        let symbol = match &entry.key {
+            ScVal::Symbol(symbol) => symbol,
+            _ => return None,
+        };
+        let value = match &entry.val {
+            ScVal::U32(value) => value,
+            _ => return None,
+        };
+        if std::str::from_utf8(&symbol.0[..]) == Ok("event_version") {
+            Some(*value)
+        } else {
+            None
+        }
+    });
+    assert_eq!(
+        version,
+        Some(expected_version),
+        "event data must expose event_version for indexers"
+    );
+
+    topic
+}
+
+#[test]
+fn lifecycle_events_expose_indexable_topics_and_versions() {
+    let env = Env::default();
+    let contract_id = env.register(UptoSessionContract, ());
+    let admin = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let session_id = BytesN::from_array(&env, &[7; 32]);
+    let resource_hash = BytesN::from_array(&env, &[8; 32]);
+    let usage_hash = BytesN::from_array(&env, &[9; 32]);
+    let session = Session {
+        id: session_id.clone(),
+        buyer: buyer.clone(),
+        seller: seller.clone(),
+        asset: asset.clone(),
+        max_amount: 100,
+        escrowed_amount: 100,
+        settled_amount: 0,
+        expires_at_ledger: 42,
+        resource_hash,
+        usage_hash: None,
+        status: SessionStatus::Open,
+    };
+
+    // Session lifecycle events share one event version and expose the session id as
+    // their indexed topic, so an indexer can group every state change by session.
+    env.as_contract(&contract_id, || {
+        events::publish_session_created(&env, &session);
+    });
+    let created_topic = assert_indexable_event(&env, &contract_id, "session_created", true, 2);
+
+    env.as_contract(&contract_id, || {
+        events::publish_session_settled(&env, &session_id, &seller, &asset, 90, 10, &usage_hash);
+    });
+    let settled_topic = assert_indexable_event(&env, &contract_id, "session_settled", true, 2);
+    assert_eq!(created_topic, settled_topic);
+
+    env.as_contract(&contract_id, || {
+        events::publish_session_cancelled(&env, &session_id, &buyer, &asset, 100);
+    });
+    let cancelled_topic = assert_indexable_event(&env, &contract_id, "session_cancelled", true, 2);
+    assert_eq!(created_topic, cancelled_topic);
+
+    env.as_contract(&contract_id, || {
+        events::publish_session_recovered(&env, &session, 100);
+    });
+    let recovered_topic = assert_indexable_event(&env, &contract_id, "session_recovered", true, 2);
+    assert_eq!(created_topic, recovered_topic);
+
+    // Administrative and asset events keep one address topic and use version 3.
+    env.as_contract(&contract_id, || {
+        events::publish_asset_activated(&env, &asset, 7);
+    });
+    assert_indexable_event(&env, &contract_id, "asset_activated", false, 3);
+
+    env.as_contract(&contract_id, || {
+        events::publish_asset_session_cap_updated(&env, &asset, &admin, 100, 50);
+    });
+    assert_indexable_event(&env, &contract_id, "asset_session_cap_updated", false, 3);
+
+    env.as_contract(&contract_id, || {
+        events::publish_asset_deprecated(&env, &asset, &admin);
+    });
+    assert_indexable_event(&env, &contract_id, "asset_deprecated", false, 3);
+
+    env.as_contract(&contract_id, || {
+        events::publish_asset_removed(&env, &asset, &admin);
+    });
+    assert_indexable_event(&env, &contract_id, "asset_removed", false, 3);
+
+    env.as_contract(&contract_id, || {
+        events::publish_admin_rotation_proposed(&env, &admin, &buyer, 100);
+    });
+    assert_indexable_event(&env, &contract_id, "admin_rotation_proposed", false, 3);
+
+    env.as_contract(&contract_id, || {
+        events::publish_admin_rotation_accepted(&env, &admin, &buyer);
+    });
+    assert_indexable_event(&env, &contract_id, "admin_rotation_accepted", false, 3);
+
+    env.as_contract(&contract_id, || {
+        events::publish_admin_rotation_cancelled(&env, &admin, &buyer);
+    });
+    assert_indexable_event(&env, &contract_id, "admin_rotation_cancelled", false, 3);
+}

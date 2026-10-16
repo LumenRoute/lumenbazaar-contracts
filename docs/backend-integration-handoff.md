@@ -68,6 +68,40 @@ administrator-rotation events use version `3`.
 | `recover_expired_batch(session_ids)` | Recover up to eight caller-supplied IDs with ordered per-item results. Missing, premature, terminal, and repeated IDs do not block eligible recoveries. |
 | `extend_ttl(session_id)` | Extend storage TTL for still-open sessions. |
 
+## Indexed Event Topics
+
+Every public event carries exactly one indexed topic so an indexer can subscribe on
+a stable prefix plus a bounded value, then branch on the `event_version` field in the
+data map. Session lifecycle events use the session id (a 32-byte `BytesN<32>`) as the
+topic and event version `2`; asset, cap, and administrator events use the relevant
+32-byte address and event version `3`.
+
+| Event | Prefix topic | Indexed topic | Topic bound | Event version |
+| --- | --- | --- | --- | --- |
+| `SessionCreated` | `session_created` | `session_id` | 32 bytes | 2 |
+| `SessionSettled` | `session_settled` | `session_id` | 32 bytes | 2 |
+| `SessionCancelled` | `session_cancelled` | `session_id` | 32 bytes | 2 |
+| `SessionRecovered` | `session_recovered` | `session_id` | 32 bytes | 2 |
+| `AssetActivated` | `asset_activated` | `asset` | 32-byte address | 3 |
+| `AssetDeprecated` | `asset_deprecated` | `asset` | 32-byte address | 3 |
+| `AssetRemoved` | `asset_removed` | `asset` | 32-byte address | 3 |
+| `AssetSessionCapUpdated` | `asset_session_cap_updated` | `asset` | 32-byte address | 3 |
+| `AdminRotationProposed` | `admin_rotation_proposed` | `pending_admin` | 32-byte address | 3 |
+| `AdminRotationAccepted` | `admin_rotation_accepted` | `new_admin` | 32-byte address | 3 |
+| `AdminRotationCancelled` | `admin_rotation_cancelled` | `pending_admin` | 32-byte address | 3 |
+
+The layout is bounded: at most four topics per event, each topic a 32-byte session
+id or address key, and the `event_version` field is always `u32`. No unbounded or
+private usage data is placed in a topic; buyer, seller, amounts, and hashes stay in
+the data map.
+
+Compatibility is enforced in three places. `contracts/upto-session/src/test.rs`
+publishes every event and asserts the raw XDR topic count, topic kind, and
+`event_version` value. `scripts/check-event-topics.mjs` re-derives the layout from
+`artifacts/spec/upto-session.json` and `artifacts/interface/upto-session-v3.json`,
+decodes both, and fails when the reviewed topic or payload layout changes. Asking the
+indexer to consume the v3 fixture keeps the decode path covered end to end.
+
 ## V2 To V3 Compatibility
 
 Version 3 is a new deployment, not an in-place upgrade. It replaces the v2

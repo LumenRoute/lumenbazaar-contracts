@@ -93,6 +93,11 @@ jobs:
       - name: Check interface fixtures
         run: node scripts/generate-interface-fixtures.mjs --check
 
+      - name: Check indexed event topics
+        run: |
+          node --test scripts/lib/event-topics.test.mjs
+          node scripts/check-event-topics.mjs
+
       - name: Check cross-release ABI compatibility
         run: |
           node scripts/test-abi-compatibility.mjs
