@@ -48,6 +48,12 @@ jobs:
           LUMENBAZAAR_PROPERTY_CASES: "128"
         run: cargo test --workspace --all-features
 
+      - name: Check resource and rent budgets
+        run: |
+          node scripts/report-resource-usage.mjs
+          node --test scripts/lib/resource-budgets.test.mjs
+          node scripts/check-resource-budgets.mjs
+
       - name: Model-check escrow state machine
         run: cargo test -p escrow-model -- --nocapture
 
