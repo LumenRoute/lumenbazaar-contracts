@@ -3046,3 +3046,221 @@ fn extend_ttl_rejects_missing_session() {
         Err(Ok(ContractError::SessionNotFound))
     );
 }
+
+#[test]
+fn creation_pause_requires_admin_and_fails_closed_before_transfer() {
+    let env = Env::default();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let attacker = Address::generate(&env);
+    let asset = create_test_asset(&env, &admin, 1);
+    let asset_policies = soroban_sdk::vec![&env, asset_policy(&asset, 500)];
+
+    client
+        .mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "initialize",
+                args: (admin.clone(), asset_policies.clone()).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .initialize(&admin, &asset_policies);
+
+    // An unauthorized administrator cannot pause creation.
+    assert!(client
+        .mock_auths(&[MockAuth {
+            address: &attacker,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "pause_creation",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_pause_creation()
+        .is_err());
+    env.as_contract(&contract_id, || {
+        assert_eq!(
+            storage::read_operational_state(&env),
+            OperationalState::Active
+        );
+    });
+
+    // The stored administrator pauses creation and emits one stable event.
+    client
+        .mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "pause_creation",
+                args: ().into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .pause_creation();
+    assert_eq!(
+        env.events().all().filter_by_contract(&contract_id),
+        std::vec![events::CreationPaused {
+            admin: admin.clone(),
+            event_version: 3,
+        }
+        .to_xdr(&env, &contract_id)]
+    );
+    assert_eq!(
+        client.get_configuration().operational_state,
+        OperationalState::Paused
+    );
+
+    // Creation fails before buyer authorization or any token transfer.
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[71; 32]);
+    assert_eq!(
+        client.try_create_session(&buyer, &seller, &asset, &100, &50, &resource_hash),
+        Err(Ok(ContractError::CreationPaused))
+    );
+    env.as_contract(&contract_id, || {
+        assert_eq!(storage::read_next_session_sequence(&env), 0);
+        assert_eq!(storage::read_liability(&env, &asset), 0);
+    });
+    assert_eq!(token::Client::new(&env, &asset).balance(&buyer), 0);
+}
+
+#[test]
+fn creation_pause_rejects_repeated_calls_and_resume_restores_creation() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 1_000);
+    let resource_hash = BytesN::from_array(&env, &[72; 32]);
+    initialize_for_asset(&env, &client, &admin, &asset);
+
+    // Resuming while already active is rejected rather than silently accepted.
+    assert_eq!(
+        client.try_resume_creation(),
+        Err(Ok(ContractError::OperationalStateUnchanged))
+    );
+
+    client.pause_creation();
+    assert_eq!(
+        env.events().all().filter_by_contract(&contract_id),
+        std::vec![events::CreationPaused {
+            admin: admin.clone(),
+            event_version: 3,
+        }
+        .to_xdr(&env, &contract_id)]
+    );
+    assert_eq!(
+        client.get_configuration().operational_state,
+        OperationalState::Paused
+    );
+
+    // A repeated pause is rejected and does not clear the pause.
+    assert_eq!(
+        client.try_pause_creation(),
+        Err(Ok(ContractError::OperationalStateUnchanged))
+    );
+    assert_eq!(
+        client.try_create_session(&buyer, &seller, &asset, &100, &50, &resource_hash),
+        Err(Ok(ContractError::CreationPaused))
+    );
+
+    client.resume_creation();
+    assert_eq!(
+        env.events().all().filter_by_contract(&contract_id),
+        std::vec![events::CreationResumed {
+            admin: admin.clone(),
+            event_version: 3,
+        }
+        .to_xdr(&env, &contract_id)]
+    );
+    assert_eq!(
+        client.get_configuration().operational_state,
+        OperationalState::Active
+    );
+    assert_eq!(
+        client.try_resume_creation(),
+        Err(Ok(ContractError::OperationalStateUnchanged))
+    );
+
+    // Creation is available again after an authorized resume.
+    let session_id = client.create_session(&buyer, &seller, &asset, &100, &50, &resource_hash);
+    assert_eq!(client.get_session(&session_id).status, SessionStatus::Open);
+}
+
+#[test]
+fn paused_creation_preserves_all_exit_paths() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 3_000);
+    let resource_hash = BytesN::from_array(&env, &[73; 32]);
+    let usage_hash = BytesN::from_array(&env, &[74; 32]);
+    initialize_for_asset(&env, &client, &admin, &asset);
+
+    let to_settle = client.create_session(&buyer, &seller, &asset, &500, &100, &resource_hash);
+    let to_cancel = client.create_session(&buyer, &seller, &asset, &500, &100, &resource_hash);
+    let to_extend = client.create_session(&buyer, &seller, &asset, &500, &100, &resource_hash);
+    let to_recover = client.create_session(&buyer, &seller, &asset, &500, &100, &resource_hash);
+
+    client.pause_creation();
+    assert_eq!(
+        client.get_configuration().operational_state,
+        OperationalState::Paused
+    );
+
+    // Settlement, cancellation, TTL extension, and expiry recovery stay available.
+    client.settle(&to_settle, &300, &usage_hash);
+    assert_eq!(
+        client.get_session(&to_settle).status,
+        SessionStatus::Settled
+    );
+
+    client.cancel(&to_cancel);
+    assert_eq!(
+        client.get_session(&to_cancel).status,
+        SessionStatus::Cancelled
+    );
+
+    client.extend_ttl(&to_extend);
+
+    env.ledger().set_sequence_number(100);
+    client.recover_expired(&to_recover);
+    client.recover_expired(&to_extend);
+    assert_eq!(
+        client.get_session(&to_recover).status,
+        SessionStatus::Expired
+    );
+
+    // Read-only queries remain available even while paused.
+    assert_eq!(client.get_escrow_liability(&asset), 0);
+    assert_eq!(client.get_admin(), admin);
+}
+
+#[test]
+fn creation_pause_and_resume_require_initialization() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+
+    assert_eq!(
+        client.try_pause_creation(),
+        Err(Ok(ContractError::NotInitialized))
+    );
+    assert_eq!(
+        client.try_resume_creation(),
+        Err(Ok(ContractError::NotInitialized))
+    );
+}

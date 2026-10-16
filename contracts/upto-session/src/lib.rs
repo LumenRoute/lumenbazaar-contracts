@@ -206,6 +206,9 @@ impl UptoSessionContract {
         if !storage::has_admin(&env) {
             return Err(ContractError::NotInitialized);
         }
+        if storage::read_operational_state(&env) != OperationalState::Active {
+            return Err(ContractError::CreationPaused);
+        }
         if !storage::is_supported_asset(&env, &asset) {
             return Err(ContractError::UnsupportedAsset);
         }
@@ -291,6 +294,34 @@ impl UptoSessionContract {
         storage::remove_asset_status(&env, &asset);
         storage::extend_instance_ttl(&env);
         events::publish_asset_removed(&env, &asset, &admin);
+        Ok(())
+    }
+
+    pub fn pause_creation(env: Env) -> Result<(), ContractError> {
+        let admin = require_admin(&env)?;
+        match storage::read_operational_state(&env) {
+            OperationalState::Active => {}
+            OperationalState::Paused | OperationalState::Deprecated => {
+                return Err(ContractError::OperationalStateUnchanged);
+            }
+        }
+        storage::write_operational_state(&env, &OperationalState::Paused);
+        storage::extend_instance_ttl(&env);
+        events::publish_creation_paused(&env, &admin);
+        Ok(())
+    }
+
+    pub fn resume_creation(env: Env) -> Result<(), ContractError> {
+        let admin = require_admin(&env)?;
+        match storage::read_operational_state(&env) {
+            OperationalState::Paused => {}
+            OperationalState::Active | OperationalState::Deprecated => {
+                return Err(ContractError::OperationalStateUnchanged);
+            }
+        }
+        storage::write_operational_state(&env, &OperationalState::Active);
+        storage::extend_instance_ttl(&env);
+        events::publish_creation_resumed(&env, &admin);
         Ok(())
     }
 

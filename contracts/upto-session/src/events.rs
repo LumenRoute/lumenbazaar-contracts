@@ -61,6 +61,20 @@ pub struct AssetRemoved {
 }
 
 #[contractevent]
+pub struct CreationPaused {
+    #[topic]
+    pub admin: Address,
+    pub event_version: u32,
+}
+
+#[contractevent]
+pub struct CreationResumed {
+    #[topic]
+    pub admin: Address,
+    pub event_version: u32,
+}
+
+#[contractevent]
 pub struct SessionCreated {
     #[topic]
     pub session_id: BytesN<32>,
@@ -198,6 +212,22 @@ pub fn publish_asset_activated(env: &Env, asset: &Address, decimals: u32) {
 pub fn publish_asset_removed(env: &Env, asset: &Address, admin: &Address) {
     AssetRemoved {
         asset: asset.clone(),
+        admin: admin.clone(),
+        event_version: 3,
+    }
+    .publish(env);
+}
+
+pub fn publish_creation_paused(env: &Env, admin: &Address) {
+    CreationPaused {
+        admin: admin.clone(),
+        event_version: 3,
+    }
+    .publish(env);
+}
+
+pub fn publish_creation_resumed(env: &Env, admin: &Address) {
+    CreationResumed {
         admin: admin.clone(),
         event_version: 3,
     }

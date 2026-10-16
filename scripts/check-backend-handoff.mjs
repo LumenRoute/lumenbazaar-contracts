@@ -40,6 +40,8 @@ const requiredFunctions = [
   "recover_expired",
   "recover_expired_batch",
   "extend_ttl",
+  "pause_creation",
+  "resume_creation",
 ];
 const requiredErrors = [
   "AlreadyInitialized",
@@ -77,6 +79,8 @@ const requiredErrors = [
   "AssetNotActive",
   "AssetNotDeprecated",
   "AssetLiabilityOutstanding",
+  "CreationPaused",
+  "OperationalStateUnchanged",
 ];
 
 for (const item of [...requiredFunctions, ...requiredErrors]) {

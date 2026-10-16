@@ -40,8 +40,8 @@ Backend services should prefer the generated TypeScript package for transaction 
 
 The domain-separated, asset-lifecycle escrow contract and generated package are version `0.3.0`.
 The public `interface_version()` result is `3`; session lifecycle events retain
-event version `2`, while asset activation, asset lifecycle, asset-cap, and
-administrator-rotation events use version `3`.
+event version `2`, while asset activation, asset lifecycle, asset-cap,
+administrator-rotation, and creation pause/resume events use version `3`.
 
 ## Upto Session Functions
 
@@ -67,6 +67,8 @@ administrator-rotation events use version `3`.
 | `recover_expired(session_id)` | Permissionless full refund to the stored buyer at or after expiry. |
 | `recover_expired_batch(session_ids)` | Recover up to eight caller-supplied IDs with ordered per-item results. Missing, premature, terminal, and repeated IDs do not block eligible recoveries. |
 | `extend_ttl(session_id)` | Extend storage TTL for still-open sessions. |
+| `pause_creation()` | Admin-authorized transition to `Paused`; rejects new sessions before buyer authorization or token transfer without affecting existing session exits. |
+| `resume_creation()` | Admin-authorized transition back to `Active`; re-enables new session creation. |
 
 ## V2 To V3 Compatibility
 
@@ -81,11 +83,16 @@ The configuration response has its own `response_version` field, currently `1`,
 so backend decoders can fail closed on future schema revisions.
 
 `operational_state` can decode `Active`, `Paused`, or `Deprecated`. This release
-initializes new contracts as `Active` and exposes no public state-transition
-method; pause and deprecation authority remain outside this query-only change.
-Backends must select the v3 fixture before invoking either new method. Version 3
-also emits one `AssetActivated` event per accepted asset. Existing error codes
-1 through 22 retain their names and values; codes 23 through 32 are additive.
+initializes new contracts as `Active`. The stored administrator can move the
+state between `Active` and `Paused` with `pause_creation` and `resume_creation`;
+while `Paused`, `create_session` returns `CreationPaused` before buyer
+authorization or any escrow transfer, and settlement, cancellation, expiry
+recovery, TTL extension, and read-only queries remain available. `Deprecated`
+is reserved and is not reachable through this interface, so pause and deprecation
+authority remain distinct. Backends must select the v3 fixture before invoking
+either new method. Version 3 also emits one `AssetActivated` event per accepted
+asset. Existing error codes 1 through 22 retain their names and values; codes 23
+through 37 are additive.
 Published v2 deployment records remain historical evidence and do not represent
 a deployed v3 contract.
 
@@ -179,6 +186,8 @@ codes 23 through 32 without changing the earlier mappings.
 | 33 | `AssetNotActive` | Do not deprecate an unknown or already deprecated asset. |
 | 34 | `AssetNotDeprecated` | Deprecate the asset before requesting final removal. |
 | 35 | `AssetLiabilityOutstanding` | Settle, cancel, or recover every open session before removal. |
+| 36 | `CreationPaused` | New sessions are paused by the administrator; surface the operational state and stop submitting `create_session`. |
+| 37 | `OperationalStateUnchanged` | The requested pause or resume already matches the current operational state; refresh `get_configuration` instead of retrying. |
 
 ## Hash Inputs
 
