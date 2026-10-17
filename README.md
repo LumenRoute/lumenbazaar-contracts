@@ -67,7 +67,8 @@ node scripts/testnet/verify-testnet.mjs
 
 The scripts write an ignored `deployments/testnet.json`. Sanitized public deployment evidence is in
 `deployments/testnet-2026-09-06.json`; it records the test-only LBT asset accurately and does not
-claim that deployment alone proves a live payment.
+claim that deployment alone proves a live payment. To produce fresh create, settle, cancel, and
+replay evidence on testnet, see `docs/testnet-lifecycle-smoke.md`.
 
 ## Related Repositories
 

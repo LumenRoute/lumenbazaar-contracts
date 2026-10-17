@@ -9,6 +9,9 @@
 - Preserve the current administrator's exclusive privileges until explicit acceptance.
 - Add a supported-asset escrow liability query for custody reconciliation.
 - Add branch, review, ownership, release, and emergency-change governance.
+- Add deterministic ledger-boundary tests for config, sequence, session, and liability TTL and document the boundary semantics.
+- Add state-transition and cap-invariant property tests with documented reproducible seeds.
+- Add an opt-in live testnet lifecycle smoke runner that emits a sanitized JSON report, plus an offline test suite and report checker.
 
 ## v0.2.0-testnet.20261007
 

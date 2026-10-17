@@ -8,6 +8,18 @@ mod property_harness {
     include!("property_test.rs");
 }
 
+mod cap_harness {
+    include!("cap_property_test.rs");
+}
+
+mod transition_harness {
+    include!("transition_test.rs");
+}
+
+mod ttl_harness {
+    include!("ttl_test.rs");
+}
+
 // Global auth mocks in the legacy tests below isolate validation, state,
 // event, and resource-accounting behavior. They are not authorization
 // evidence. Release-gating authorization paths belong in

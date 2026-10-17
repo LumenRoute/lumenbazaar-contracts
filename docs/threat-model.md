@@ -50,9 +50,45 @@ testnet deployment and lifecycle evidence are published in
 - Settlement at or after the expiry ledger is rejected.
 - Contract storage TTL can outlive or expire independently of off-chain records. Operators must not
   treat a missing off-chain record as proof that an on-chain session is absent.
-- TTL extension is limited to open sessions. Tests cover missing, settled, and cancelled session
-  rejection. The public lifecycle evidence also covers settlement rejection at the live expiry
-  boundary and permissionless recovery seven ledgers after expiry.
+- TTL extension is limited to open sessions. Tests cover missing, settled, cancelled, and expired
+  session rejection. The public lifecycle evidence also covers settlement rejection at the live
+  expiry boundary and permissionless recovery seven ledgers after expiry.
+
+### Storage TTL boundary semantics
+
+`contracts/upto-session/src/ttl_test.rs` pins these semantics with deterministic ledger tests.
+Constants: threshold `DEFAULT_TTL_THRESHOLD = 100_000`, extension `TTL_EXTENSION_AMOUNT = 1_000_000`.
+An entry's remaining TTL is `live_until_ledger - current_ledger`; `extend_ttl` raises it to the full
+extension only when the remaining TTL is at or below the threshold.
+
+| Storage | Keys | Extended by | Boundary behavior (entry written at ledger 0) |
+| --- | --- | --- | --- |
+| Instance (one shared TTL) | `Admin`, `AdminRotation`, `StorageLayoutVersion`, `SupportedAsset`, `AssetMaxSessionAmount`, `SupportedAssets`, `OperationalState`, `NextSessionSequence` | Admin entry points only (`initialize`, cap, rotation, asset lifecycle) | Ledger 899,999 (TTL 100,001): not extended. Ledger 900,000 (TTL 100,000): extended to 1,000,000. |
+| Persistent | `Session(id)` | `create_session`, every finalizing write, and `extend_ttl` on open sessions | Same boundary as above. |
+| Persistent | `Liability(asset)` | Alongside the session in the same calls | Same boundary as above. |
+
+- `create_session`, `settle`, `cancel`, and `recover_expired` do not extend the instance entry, so
+  the config and the session sequence rely on operators calling an admin entry point (for example
+  re-setting the existing cap) before the instance TTL runs out.
+- A session cannot logically expire later than `MAX_SESSION_DURATION_LEDGERS` (518,400) after
+  creation, which is below the 900,000-ledger extension boundary. An open session therefore never
+  needs `extend_ttl` before its logical expiry; extension only matters for keeping an expired,
+  unrecovered session readable until recovery.
+- `extend_ttl` is not gated by logical expiry: an open session at or after its expiry ledger can
+  still be extended and then recovered. Settlement and cancellation at or after the expiry ledger
+  fail with `ExpiredSession`; recovery before it fails with `SessionNotExpired`.
+- Finalized sessions (settled, cancelled, expired) are never revived or reopened: `extend_ttl`
+  fails with `TtlExtensionFailed`, leaves the TTL, state, balances, liability, and events unchanged.
+  The only extension a finalized session sees happens inside its own finalizing write (for example
+  recovery at the boundary ledger), which does not change its terminal status.
+- Lapsed state fails closed. The unit-test host does not archive persistent entries, so tests model
+  a lapsed entry by removing it. A missing session returns `SessionNotFound` from every entry point
+  with no transfer or event. A missing `Liability` entry makes settlement, cancellation, and recovery
+  fail with `LiabilityUnderflow` and leaves the escrow in the contract; it never pays out. Missing
+  instance config returns `NotInitialized` for admin and new-session paths, while the stored buyer
+  can still cancel an existing open session.
+- Restoring archived entries is a network-level operation. This contract neither implements nor
+  relies on it, and no restoration behavior is promised here.
 
 ## Administration and upgrades
 
