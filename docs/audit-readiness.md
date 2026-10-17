@@ -20,6 +20,7 @@ The review target is the `upto-session` contract public interface:
 - `deprecate_asset(asset)`
 - `remove_asset(asset)`
 - `get_session(session_id)`
+- `get_session_batch(session_ids)`
 - `get_escrow_liability(asset)`
 - `settle(session_id, actual_amount, usage_hash)`
 - `cancel(session_id)`

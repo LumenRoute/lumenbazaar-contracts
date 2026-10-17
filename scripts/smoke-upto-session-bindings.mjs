@@ -24,6 +24,7 @@ const requiredMethods = [
   "deprecate_asset",
   "remove_asset",
   "get_session",
+  "get_session_batch",
   "get_escrow_liability",
   "settle",
   "cancel",
@@ -64,6 +65,21 @@ if (packageJson.version !== "3.0.0") {
 for (const method of requiredMethods) {
   if (!distSource.includes(method)) {
     throw new Error(`Expected generated binding to include ${method}`);
+  }
+}
+
+const dtsSource = await readFile(
+  new URL("../bindings/upto-session/dist/index.d.ts", import.meta.url),
+  "utf8",
+);
+for (const typeSymbol of [
+  "export interface BatchSessionResult",
+  "export type BatchSessionStatus",
+  "session_ids: Array<Buffer>;",
+  "Result<Array<BatchSessionResult>>",
+]) {
+  if (!dtsSource.includes(typeSymbol)) {
+    throw new Error(`Expected generated TypeScript declarations to include ${typeSymbol}`);
   }
 }
 
