@@ -51,15 +51,17 @@ administrator-rotation events use version `3`.
 | `initialize(admin, asset_policies)` | One-time deployment setup with one to 16 unique assets and positive explicit session caps. Every asset must pass the bounded read-only probe. Do not call from request handlers. |
 | `get_asset_max_session_amount(asset)` | Read the active creation cap for a supported asset. |
 | `set_asset_max_session_amount(asset, max_session_amount)` | Authenticated administrator update for future sessions only. |
+| `activate_asset(policy)` | Current-admin-authorized onboarding of one reviewed asset after initialization. Requires a positive cap, the same read-only SEP-41 probe as `initialize`, and a free slot under the 16-asset limit (active and deprecated assets both count). Rejects an already active asset (`AssetAlreadyActive`), a deprecated asset (`AssetDeprecated`; it is never reactivated implicitly), the contract or admin address (`InvalidAsset`), and a full asset set (`AssetLimitReached`), all before any write. Emits one `AssetActivated` event (version `3`) and appends the asset to the configured order. A fully removed asset may be activated again with a new cap. |
+| `get_asset_policy(asset)` | Read one asset's lifecycle without authorization or writes. Returns `AssetPolicyResponse { response_version: 1, asset, lifecycle, max_session_amount, accepts_new_sessions }`. `Active` carries its cap and accepts new sessions; `Deprecated` has no cap and accepts none; unknown and removed assets both return `NotConfigured` with no cap. Fails only with `NotInitialized`, or `AssetCapNotConfigured` if an active asset's cap record is missing. |
 | `get_admin()` | Read the active administrator. |
 | `get_admin_rotation()` | Read the optional pending administrator and expiry ledger. |
 | `propose_admin(pending_admin, expires_at_ledger)` | Current-admin-authorized proposal; does not transfer privileges. |
 | `accept_admin()` | Pending-admin-authorized acceptance before expiry. |
 | `cancel_admin_rotation()` | Current-admin-authorized removal of a pending or expired proposal. |
-| `get_configuration()` | Read response/interface/storage versions, administrator, bounded supported assets, operational state, and instance TTL policy without authorization. |
+| `get_configuration()` | Read response/interface/storage versions, administrator, bounded supported assets, operational state, and instance TTL policy without authorization. `supported_assets` lists active and deprecated assets in activation order; removed assets never appear. |
 | `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash)` | Create a buyer-authorized spending cap and escrow the full cap for a resource. |
 | `deprecate_asset(asset)` | Admin-authorized transition from active to deprecated; blocks new sessions without changing existing sessions. |
-| `remove_asset(asset)` | Admin-authorized final removal after deprecation and only when recorded liability is exactly zero. |
+| `remove_asset(asset)` | Admin-authorized final removal after deprecation and only when recorded liability is exactly zero. Deletes the lifecycle record, the session cap, the zero liability record, and the entry in the configured asset order; the remaining assets keep their relative order. Session history is untouched. |
 | `get_session(session_id)` | Read current session state for API responses, reconciliation, and settlement guards. |
 | `get_escrow_liability(asset)` | Read aggregate open-session escrow accounting for a supported asset and compare it with contract token custody. |
 | `settle(session_id, actual_amount, usage_hash)` | Seller-authorized settlement for actual usage. |
@@ -121,8 +123,13 @@ existing v2 session routed to its original contract.
 Deprecation changes only admission: `create_session` returns `UnsupportedAsset`
 for a deprecated asset. Settlement, cancellation, and expiry recovery use the
 asset recorded in each existing session and remain available. Removal deletes
-only the activation state and is rejected until aggregate liability is zero;
-it never transfers escrow or redirects a refund.
+every policy record for the asset (lifecycle state, session cap, the zero
+liability record, and its place in `supported_assets`) and is rejected until
+aggregate liability is zero; it never transfers escrow, redirects a refund, or
+deletes session records. Entries left in `supported_assets` by the earlier
+removal path, which cleared only the lifecycle state, are hidden from
+`get_configuration`, do not count toward the asset limit, and are compacted by
+the next removal.
 
 Existing v2 session IDs remain valid only at their original v2 contract ID.
 Backends must route them there and must not recompute, migrate, or reinterpret
@@ -138,7 +145,7 @@ Version 2 is a new deployment, not an in-place upgrade. It changes
 payloads. A backend must reject a contract whose `interface_version()` is not
 `2`; decoding it with v2 types is not supported. Error codes 1 through 13 retain
 their names and values, while codes 14 through 22 are additive. Version 3 adds
-codes 23 through 32 without changing the earlier mappings.
+codes 23 through 38 without changing the earlier mappings.
 
 ## Stable Errors
 
@@ -157,7 +164,7 @@ codes 23 through 32 without changing the earlier mappings.
 | 11 | `TtlExtensionFailed` | Do not retry for finalized sessions. |
 | 12 | `InvalidResourceHash` | Reject empty or malformed resource hash input. |
 | 13 | `InvalidUsageHash` | Reject empty or malformed usage hash input. |
-| 14 | `UnsupportedAsset` | Reject assets outside the immutable deployment allowlist. |
+| 14 | `UnsupportedAsset` | Reject assets that are not active in this deployment; check `get_asset_policy(asset)`. |
 | 15 | `InvalidSupportedAssets` | Reject an empty or duplicate initialization allowlist. |
 | 16 | `SessionDurationTooLong` | Reject an expiry more than 518,400 ledgers ahead. |
 | 17 | `LiabilityOverflow` | Stop and investigate liability arithmetic or corrupted state. |
@@ -179,6 +186,32 @@ codes 23 through 32 without changing the earlier mappings.
 | 33 | `AssetNotActive` | Do not deprecate an unknown or already deprecated asset. |
 | 34 | `AssetNotDeprecated` | Deprecate the asset before requesting final removal. |
 | 35 | `AssetLiabilityOutstanding` | Settle, cancel, or recover every open session before removal. |
+| 36 | `AssetAlreadyActive` | The asset is already active; update its cap with `set_asset_max_session_amount` instead. |
+| 37 | `AssetDeprecated` | A deprecated asset cannot be activated again; remove it first once liability is zero, then activate it as a new asset. |
+| 38 | `AssetLimitReached` | All 16 asset slots are in use by active or deprecated assets; remove a deprecated asset to free a slot. |
+
+### Decoding Errors In TypeScript
+
+The generated package exports `CONTRACT_ERROR_CODES` (name to code for every
+stable error above), `CONTRACT_ERROR_NAMES` (code to name), and
+`decodeContractError(error)`. The decoder accepts a thrown error, a simulation
+error string such as `HostError: Error(Contract, #5)`, an RPC simulation
+response, or a binding `Result` error, and returns one of:
+
+| `kind` | Meaning |
+| --- | --- |
+| `contract` | A known upto-session error, with typed `code` and `name`. |
+| `unknown_contract` | A well-formed contract error code this package does not know, such as one from a newer contract. |
+| `malformed_contract` | Text shaped like a contract error whose code is not a valid u32. |
+| `host` | A non-contract host failure such as `Error(Auth, InvalidAction)` or `Error(Budget, ExceededLimit)`. |
+| `other` | Transport, JSON-RPC, timeout, and any other failure. |
+
+Every result keeps the original value in `cause`. `isContractError(error,
+name)` is a shorthand for one known error. The map is maintained in
+`scripts/templates/contractErrors.ts`; `node scripts/generate-bindings.mjs`
+fails if it drifts from `artifacts/interface/upto-session-v3.json`, and
+`node --test scripts/test-contract-errors.mjs` covers representative RPC and
+simulation error shapes.
 
 ## Hash Inputs
 

@@ -503,6 +503,35 @@
       "inputs": [
         {
           "doc": "",
+          "name": "policy",
+          "type": {
+            "udt": {
+              "name": "AssetPolicy"
+            }
+          }
+        }
+      ],
+      "name": "activate_asset",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
           "name": "session_id",
           "type": {
             "bytes_n": {
@@ -714,6 +743,35 @@
               }
             },
             "ok_type": "i128"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
+      "name": "get_asset_policy",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": {
+              "udt": {
+                "name": "AssetPolicyResponse"
+              }
+            }
           }
         }
       ]
@@ -1223,6 +1281,21 @@
           "doc": "",
           "name": "AssetLiabilityOutstanding",
           "value": 35
+        },
+        {
+          "doc": "",
+          "name": "AssetAlreadyActive",
+          "value": 36
+        },
+        {
+          "doc": "",
+          "name": "AssetDeprecated",
+          "value": 37
+        },
+        {
+          "doc": "",
+          "name": "AssetLimitReached",
+          "value": 38
         }
       ],
       "doc": "",
@@ -1266,6 +1339,48 @@
       ],
       "lib": "",
       "name": "AssetPolicy"
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "",
+      "fields": [
+        {
+          "doc": "",
+          "name": "accepts_new_sessions",
+          "type": "bool"
+        },
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "lifecycle",
+          "type": {
+            "udt": {
+              "name": "AssetLifecycle"
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "max_session_amount",
+          "type": {
+            "option": {
+              "value_type": "i128"
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "response_version",
+          "type": "u32"
+        }
+      ],
+      "lib": "",
+      "name": "AssetPolicyResponse"
     }
   },
   {
@@ -1444,6 +1559,33 @@
       ],
       "lib": "",
       "name": "Session"
+    }
+  },
+  {
+    "udt_union_v0": {
+      "cases": [
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Active"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Deprecated"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "NotConfigured"
+          }
+        }
+      ],
+      "doc": "",
+      "lib": "",
+      "name": "AssetLifecycle"
     }
   },
   {

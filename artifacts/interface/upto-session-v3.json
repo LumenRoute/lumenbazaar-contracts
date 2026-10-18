@@ -1,9 +1,10 @@
 {
   "contractVersion": "0.3.0",
   "interfaceVersion": 3,
-  "sourceSpecSha256": "1958bdd8f4654d58a215d8b4a597a053aae8eadeb9c04de848c075ba963d703d",
+  "sourceSpecSha256": "55222a412e5a5d937ee16847916886666bcbca2f0d0fcb48241dc26ffa210283",
   "methods": [
     "accept_admin",
+    "activate_asset",
     "cancel",
     "cancel_admin_rotation",
     "create_session",
@@ -12,6 +13,7 @@
     "get_admin",
     "get_admin_rotation",
     "get_asset_max_session_amount",
+    "get_asset_policy",
     "get_configuration",
     "get_escrow_liability",
     "get_session",
@@ -538,6 +540,18 @@
     {
       "name": "AssetLiabilityOutstanding",
       "value": 35
+    },
+    {
+      "name": "AssetAlreadyActive",
+      "value": 36
+    },
+    {
+      "name": "AssetDeprecated",
+      "value": 37
+    },
+    {
+      "name": "AssetLimitReached",
+      "value": 38
     }
   ]
 }

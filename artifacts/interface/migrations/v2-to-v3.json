@@ -13,6 +13,8 @@
     "Route every existing v2 session to its original v2 contract ID.",
     "Do not recompute or reinterpret v2 identifiers using the v3 domain rules.",
     "Create all new domain-separated sessions on a v3 replacement deployment initialized with the reviewed active asset set.",
-    "Do not copy a deprecated asset into v3 unless an administrator explicitly reactivates it during deployment review."
+    "Do not copy a deprecated asset into v3 unless an administrator explicitly reactivates it during deployment review.",
+    "After initialization, reviewed assets are onboarded with activate_asset(policy) instead of a replacement deployment; deprecated assets are never reactivated by it.",
+    "remove_asset deletes the asset's lifecycle state, session cap, zero liability record, and supported_assets entry; read get_asset_policy for one asset's lifecycle."
   ]
 }

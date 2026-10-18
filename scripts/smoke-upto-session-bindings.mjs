@@ -14,6 +14,8 @@ const requiredMethods = [
   "initialize",
   "get_asset_max_session_amount",
   "set_asset_max_session_amount",
+  "activate_asset",
+  "get_asset_policy",
   "get_admin",
   "get_admin_rotation",
   "propose_admin",
@@ -56,6 +58,24 @@ if (bindings.ContractError?.[32]?.message !== "InvalidAssetInterface") {
 }
 if (bindings.ContractError?.[35]?.message !== "AssetLiabilityOutstanding") {
   throw new Error("Expected complete asset lifecycle error mapping");
+}
+if (bindings.ContractError?.[38]?.message !== "AssetLimitReached") {
+  throw new Error("Expected complete runtime asset activation error mapping");
+}
+if (bindings.CONTRACT_ERROR_CODES?.AssetLimitReached !== 38) {
+  throw new Error("Expected typed CONTRACT_ERROR_CODES export");
+}
+const decoded = bindings.decodeContractError?.("HostError: Error(Contract, #24)");
+if (decoded?.kind !== "contract" || decoded.name !== "AssetCapNotConfigured") {
+  throw new Error("Expected decodeContractError to decode simulation contract errors");
+}
+if (bindings.decodeContractError(new TypeError("fetch failed")).kind !== "other") {
+  throw new Error("Expected transport failures to stay distinguishable");
+}
+for (const lifecycle of ["Active", "Deprecated", "NotConfigured"]) {
+  if (!distSource.includes(lifecycle)) {
+    throw new Error(`Expected AssetLifecycle variant ${lifecycle} in the binding spec`);
+  }
 }
 if (packageJson.version !== "3.0.0") {
   throw new Error("Expected generated binding package version 3.0.0");

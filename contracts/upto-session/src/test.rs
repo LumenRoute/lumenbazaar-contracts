@@ -3046,3 +3046,510 @@ fn extend_ttl_rejects_missing_session() {
         Err(Ok(ContractError::SessionNotFound))
     );
 }
+
+// ---------------------------------------------------------------------------
+// Runtime asset activation (#61), removal cleanup (#62), and the lifecycle
+// policy query (#63).
+// ---------------------------------------------------------------------------
+
+struct LifecycleFixture {
+    env: Env,
+    contract_id: Address,
+    admin: Address,
+}
+
+impl LifecycleFixture {
+    /// Initializes with `count` fresh local tokens, each capped at 1_000.
+    fn new(count: u32) -> (Self, std::vec::Vec<Address>) {
+        let env = Env::default();
+        env.mock_all_auths_allowing_non_root_auth();
+        // Probing up to MAX_SUPPORTED_ASSETS tokens in one call exceeds the
+        // default test budget; resource limits are covered elsewhere.
+        env.cost_estimate().budget().reset_unlimited();
+        let contract_id = env.register(UptoSessionContract, ());
+        let admin = Address::generate(&env);
+        let mut policies = soroban_sdk::Vec::new(&env);
+        let mut assets = std::vec::Vec::new();
+        for _ in 0..count {
+            let asset = create_local_test_token(&env, &admin, 10_000);
+            policies.push_back(asset_policy(&asset, 1_000));
+            assets.push(asset);
+        }
+        UptoSessionContractClient::new(&env, &contract_id).initialize(&admin, &policies);
+        (
+            Self {
+                env,
+                contract_id,
+                admin,
+            },
+            assets,
+        )
+    }
+
+    fn client(&self) -> UptoSessionContractClient<'_> {
+        UptoSessionContractClient::new(&self.env, &self.contract_id)
+    }
+
+    fn new_token(&self) -> Address {
+        create_local_test_token(&self.env, &self.admin, 10_000)
+    }
+
+    fn configured(&self) -> std::vec::Vec<Address> {
+        self.client()
+            .get_configuration()
+            .supported_assets
+            .iter()
+            .collect()
+    }
+
+    fn event_count(&self) -> usize {
+        contract_event_count(&self.env, &self.contract_id)
+    }
+
+    fn retire(&self, asset: &Address) {
+        self.client().deprecate_asset(asset);
+        self.client().remove_asset(asset);
+    }
+}
+
+#[test]
+fn activate_asset_stores_policy_appends_in_order_and_emits_one_event() {
+    let (fx, assets) = LifecycleFixture::new(1);
+    let client = fx.client();
+    let added = fx.new_token();
+
+    client.activate_asset(&asset_policy(&added, 250));
+
+    assert_eq!(
+        fx.env.events().all().filter_by_contract(&fx.contract_id),
+        std::vec![events::AssetActivated {
+            asset: added.clone(),
+            decimals: 7,
+            event_version: 3,
+        }
+        .to_xdr(&fx.env, &fx.contract_id)]
+    );
+    assert_eq!(client.get_asset_max_session_amount(&added), 250);
+    assert_eq!(fx.configured(), std::vec![assets[0].clone(), added.clone()]);
+    assert_eq!(
+        client.get_asset_policy(&added),
+        AssetPolicyResponse {
+            response_version: ASSET_POLICY_RESPONSE_VERSION,
+            asset: added.clone(),
+            lifecycle: AssetLifecycle::Active,
+            max_session_amount: Some(250),
+            accepts_new_sessions: true,
+        }
+    );
+
+    // The asset is immediately usable, under its own cap.
+    let buyer = Address::generate(&fx.env);
+    let seller = Address::generate(&fx.env);
+    TestTokenContractClient::new(&fx.env, &added).mint(&buyer, &500);
+    let hash = BytesN::from_array(&fx.env, &[91; 32]);
+    assert_eq!(
+        client.try_create_session(&buyer, &seller, &added, &251, &50, &hash),
+        Err(Ok(ContractError::AmountExceedsCap))
+    );
+    client.create_session(&buyer, &seller, &added, &250, &50, &hash);
+}
+
+#[test]
+fn activate_asset_requires_the_current_admin() {
+    let env = Env::default();
+    // Token setup only; every escrow call below uses an explicit auth tree.
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let attacker = Address::generate(&env);
+    let initial = create_local_test_token(&env, &admin, 100);
+    let added = create_local_test_token(&env, &admin, 100);
+    let policies = soroban_sdk::vec![&env, asset_policy(&initial, 100)];
+    client
+        .mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "initialize",
+                args: (admin.clone(), policies.clone()).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .initialize(&admin, &policies);
+
+    let policy = asset_policy(&added, 100);
+    let attempt = client
+        .mock_auths(&[MockAuth {
+            address: &attacker,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "activate_asset",
+                args: (policy.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_activate_asset(&policy);
+    assert!(attempt.is_err());
+    assert_eq!(contract_event_count(&env, &contract_id), 0);
+    env.as_contract(&contract_id, || {
+        assert_eq!(storage::read_asset_status(&env, &added), None);
+        assert_eq!(storage::read_asset_max_session_amount(&env, &added), None);
+    });
+
+    client
+        .mock_auths(&[MockAuth {
+            address: &admin,
+            invoke: &MockAuthInvoke {
+                contract: &contract_id,
+                fn_name: "activate_asset",
+                args: (policy.clone(),).into_val(&env),
+                sub_invokes: &[],
+            },
+        }])
+        .activate_asset(&policy);
+    assert_eq!(
+        client.get_asset_policy(&added).lifecycle,
+        AssetLifecycle::Active
+    );
+}
+
+#[test]
+fn activate_asset_before_initialization_is_rejected() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let asset = create_local_test_token(&env, &Address::generate(&env), 1);
+    assert_eq!(
+        client.try_activate_asset(&asset_policy(&asset, 1)),
+        Err(Ok(ContractError::NotInitialized))
+    );
+    assert_eq!(
+        client.try_get_asset_policy(&asset),
+        Err(Ok(ContractError::NotInitialized))
+    );
+}
+
+#[test]
+fn activate_asset_rejects_duplicate_deprecated_malformed_and_over_capacity_without_writes() {
+    let (fx, assets) = LifecycleFixture::new(MAX_SUPPORTED_ASSETS - 1);
+    let client = fx.client();
+
+    // Each rejected call must emit nothing and leave the asset list as it was.
+    let expect_rejected = |policy: AssetPolicy, error: Option<ContractError>| {
+        let before = fx.configured();
+        let result = client.try_activate_asset(&policy);
+        match error {
+            Some(error) => assert_eq!(result, Err(Ok(error))),
+            None => assert!(result.is_err()),
+        }
+        assert_eq!(fx.event_count(), 0);
+        assert_eq!(fx.configured(), before);
+    };
+
+    // Duplicate of an active asset; its existing cap is untouched.
+    expect_rejected(
+        asset_policy(&assets[0], 5),
+        Some(ContractError::AssetAlreadyActive),
+    );
+    assert_eq!(client.get_asset_max_session_amount(&assets[0]), 1_000);
+
+    // A deprecated asset is never reactivated implicitly.
+    client.deprecate_asset(&assets[1]);
+    expect_rejected(
+        asset_policy(&assets[1], 5),
+        Some(ContractError::AssetDeprecated),
+    );
+    assert_eq!(
+        client.get_asset_policy(&assets[1]).lifecycle,
+        AssetLifecycle::Deprecated
+    );
+
+    // Malformed policies: bad caps, the contract itself, the admin, and
+    // tokens that fail the SEP-41 probe.
+    let fresh = fx.new_token();
+    for cap in [0, -1, i128::MIN] {
+        expect_rejected(
+            asset_policy(&fresh, cap),
+            Some(ContractError::InvalidAssetCap),
+        );
+    }
+    for address in [fx.contract_id.clone(), fx.admin.clone()] {
+        expect_rejected(asset_policy(&address, 1), Some(ContractError::InvalidAsset));
+    }
+    let malformed = fx.env.register(ProbeTokenContract, ());
+    ProbeTokenContractClient::new(&fx.env, &malformed).initialize(&ProbeBehavior::Malformed);
+    expect_rejected(
+        asset_policy(&malformed, 1),
+        Some(ContractError::InvalidAssetInterface),
+    );
+    let incompatible = fx.env.register(IncompatibleContract, ());
+    expect_rejected(asset_policy(&incompatible, 1), None);
+    fx.env.as_contract(&fx.contract_id, || {
+        for address in [&fresh, &malformed, &incompatible] {
+            assert_eq!(storage::read_asset_status(&fx.env, address), None);
+            assert_eq!(
+                storage::read_asset_max_session_amount(&fx.env, address),
+                None
+            );
+        }
+    });
+
+    // Filling the last slot succeeds; the next one exceeds the limit. The
+    // deprecated asset still occupies its slot.
+    client.activate_asset(&asset_policy(&fresh, 1));
+    assert_eq!(fx.configured().len() as u32, MAX_SUPPORTED_ASSETS);
+    let overflow = fx.new_token();
+    expect_rejected(
+        asset_policy(&overflow, 1),
+        Some(ContractError::AssetLimitReached),
+    );
+
+    // Removing an asset frees its slot.
+    client.remove_asset(&assets[1]);
+    client.activate_asset(&asset_policy(&overflow, 1));
+    assert_eq!(fx.configured().len() as u32, MAX_SUPPORTED_ASSETS);
+}
+
+#[test]
+fn a_removed_asset_can_be_activated_again_with_a_new_cap() {
+    let (fx, assets) = LifecycleFixture::new(2);
+    let client = fx.client();
+    fx.retire(&assets[0]);
+
+    client.activate_asset(&asset_policy(&assets[0], 42));
+
+    assert_eq!(
+        fx.configured(),
+        std::vec![assets[1].clone(), assets[0].clone()]
+    );
+    assert_eq!(client.get_asset_max_session_amount(&assets[0]), 42);
+}
+
+#[test]
+fn removal_cleans_list_cap_status_and_liability_for_first_middle_and_last() {
+    for (index, label) in [(0usize, "first"), (2, "middle"), (4, "last")] {
+        let (fx, assets) = LifecycleFixture::new(5);
+        let client = fx.client();
+        let target = assets[index].clone();
+        // Leave a zero-liability record behind by opening and cancelling.
+        let buyer = Address::generate(&fx.env);
+        TestTokenContractClient::new(&fx.env, &target).mint(&buyer, &10);
+        let id = client.create_session(
+            &buyer,
+            &Address::generate(&fx.env),
+            &target,
+            &10,
+            &50,
+            &BytesN::from_array(&fx.env, &[93; 32]),
+        );
+        client.cancel(&id);
+
+        fx.retire(&target);
+
+        let expected: std::vec::Vec<Address> = assets
+            .iter()
+            .filter(|asset| **asset != target)
+            .cloned()
+            .collect();
+        assert_eq!(fx.configured(), expected, "{label}: remaining order");
+        assert_eq!(
+            client.try_get_asset_max_session_amount(&target),
+            Err(Ok(ContractError::UnsupportedAsset)),
+            "{label}"
+        );
+        assert_eq!(
+            client.get_asset_policy(&target),
+            AssetPolicyResponse {
+                response_version: ASSET_POLICY_RESPONSE_VERSION,
+                asset: target.clone(),
+                lifecycle: AssetLifecycle::NotConfigured,
+                max_session_amount: None,
+                accepts_new_sessions: false,
+            },
+            "{label}"
+        );
+        fx.env.as_contract(&fx.contract_id, || {
+            assert_eq!(storage::read_asset_status(&fx.env, &target), None);
+            assert_eq!(
+                storage::read_asset_max_session_amount(&fx.env, &target),
+                None
+            );
+            assert!(!fx
+                .env
+                .storage()
+                .persistent()
+                .has(&storage::DataKey::Liability(target.clone())));
+            // Session history is kept.
+            assert!(storage::has_session(&fx.env, &id));
+        });
+        assert_eq!(client.get_session(&id).status, SessionStatus::Cancelled);
+        // Remaining assets keep their own policy.
+        for asset in &expected {
+            assert_eq!(client.get_asset_max_session_amount(asset), 1_000);
+        }
+    }
+}
+
+#[test]
+fn repeated_removal_and_removing_everything_stay_deterministic() {
+    let (fx, assets) = LifecycleFixture::new(3);
+    let client = fx.client();
+
+    fx.retire(&assets[1]);
+    assert_eq!(
+        client.try_remove_asset(&assets[1]),
+        Err(Ok(ContractError::AssetNotDeprecated))
+    );
+    assert_eq!(
+        client.try_deprecate_asset(&assets[1]),
+        Err(Ok(ContractError::AssetNotActive))
+    );
+    assert_eq!(
+        fx.configured(),
+        std::vec![assets[0].clone(), assets[2].clone()]
+    );
+
+    fx.retire(&assets[2]);
+    fx.retire(&assets[0]);
+    assert!(fx.configured().is_empty());
+    assert_eq!(
+        client.get_configuration().max_supported_assets,
+        MAX_SUPPORTED_ASSETS
+    );
+}
+
+#[test]
+fn removal_is_blocked_while_liability_is_outstanding() {
+    let (fx, assets) = LifecycleFixture::new(2);
+    let client = fx.client();
+    let asset = assets[0].clone();
+    let buyer = Address::generate(&fx.env);
+    TestTokenContractClient::new(&fx.env, &asset).mint(&buyer, &100);
+    client.create_session(
+        &buyer,
+        &Address::generate(&fx.env),
+        &asset,
+        &100,
+        &50,
+        &BytesN::from_array(&fx.env, &[94; 32]),
+    );
+    client.deprecate_asset(&asset);
+
+    assert_eq!(
+        client.try_remove_asset(&asset),
+        Err(Ok(ContractError::AssetLiabilityOutstanding))
+    );
+    assert_eq!(fx.configured(), assets);
+    fx.env.as_contract(&fx.contract_id, || {
+        assert_eq!(
+            storage::read_asset_status(&fx.env, &asset),
+            Some(AssetStatus::Deprecated)
+        );
+        assert_eq!(
+            storage::read_asset_max_session_amount(&fx.env, &asset),
+            Some(1_000)
+        );
+        assert_eq!(storage::read_liability(&fx.env, &asset), 100);
+    });
+}
+
+#[test]
+fn configuration_hides_stale_entries_left_by_earlier_removals() {
+    let (fx, assets) = LifecycleFixture::new(3);
+    let client = fx.client();
+    // Simulate state written by the previous removal path, which cleared only
+    // the lifecycle record and left the list entry and cap behind.
+    client.deprecate_asset(&assets[1]);
+    fx.env.as_contract(&fx.contract_id, || {
+        storage::remove_asset_status(&fx.env, &assets[1]);
+    });
+
+    assert_eq!(
+        fx.configured(),
+        std::vec![assets[0].clone(), assets[2].clone()]
+    );
+    assert_eq!(
+        client.get_asset_policy(&assets[1]).lifecycle,
+        AssetLifecycle::NotConfigured
+    );
+    assert_eq!(client.get_asset_policy(&assets[1]).max_session_amount, None);
+    // The stale slot does not count against the limit, and the next removal
+    // compacts the stored list.
+    fx.retire(&assets[0]);
+    fx.env.as_contract(&fx.contract_id, || {
+        assert_eq!(
+            storage::read_supported_assets(&fx.env),
+            soroban_sdk::vec![&fx.env, assets[2].clone()]
+        );
+    });
+}
+
+#[test]
+fn asset_policy_query_reports_each_lifecycle_without_auth_or_writes() {
+    let (fx, assets) = LifecycleFixture::new(2);
+    let client = fx.client();
+    client.deprecate_asset(&assets[1]);
+    let unknown = Address::generate(&fx.env);
+
+    // No authorization is required, and no query writes or emits anything.
+    fx.env.set_auths(&[]);
+    let configuration = client.get_configuration();
+    let active = client.get_asset_policy(&assets[0]);
+    assert!(fx.env.auths().is_empty());
+    assert_eq!(fx.event_count(), 0);
+    let deprecated = client.get_asset_policy(&assets[1]);
+    assert_eq!(fx.event_count(), 0);
+    let not_configured = client.get_asset_policy(&unknown);
+    assert_eq!(fx.event_count(), 0);
+    assert_eq!(client.get_configuration(), configuration);
+
+    assert_eq!(
+        active,
+        AssetPolicyResponse {
+            response_version: 1,
+            asset: assets[0].clone(),
+            lifecycle: AssetLifecycle::Active,
+            max_session_amount: Some(1_000),
+            accepts_new_sessions: true,
+        }
+    );
+    assert_eq!(
+        deprecated,
+        AssetPolicyResponse {
+            response_version: 1,
+            asset: assets[1].clone(),
+            lifecycle: AssetLifecycle::Deprecated,
+            max_session_amount: None,
+            accepts_new_sessions: false,
+        }
+    );
+    assert_eq!(
+        not_configured,
+        AssetPolicyResponse {
+            response_version: 1,
+            asset: unknown,
+            lifecycle: AssetLifecycle::NotConfigured,
+            max_session_amount: None,
+            accepts_new_sessions: false,
+        }
+    );
+    // Reading twice gives the same answer.
+    assert_eq!(client.get_asset_policy(&assets[0]), active);
+}
+
+#[test]
+fn asset_policy_query_surfaces_a_missing_cap_on_an_active_asset() {
+    let (fx, assets) = LifecycleFixture::new(1);
+    fx.env.as_contract(&fx.contract_id, || {
+        fx.env
+            .storage()
+            .instance()
+            .remove(&storage::DataKey::AssetMaxSessionAmount(assets[0].clone()));
+    });
+    assert_eq!(
+        fx.client().try_get_asset_policy(&assets[0]),
+        Err(Ok(ContractError::AssetCapNotConfigured))
+    );
+}

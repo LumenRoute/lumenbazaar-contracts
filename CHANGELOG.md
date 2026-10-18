@@ -9,6 +9,10 @@
 - Preserve the current administrator's exclusive privileges until explicit acceptance.
 - Add a supported-asset escrow liability query for custody reconciliation.
 - Add branch, review, ownership, release, and emergency-change governance.
+- Add admin-authorized `activate_asset` for onboarding a reviewed asset after initialization, with errors 36 to 38 for duplicate, deprecated, and over-limit assets.
+- Make `remove_asset` delete the asset's cap, zero liability record, and entry in the configured asset order; hide stale entries from earlier removals.
+- Add the read-only, versioned `get_asset_policy` lifecycle query.
+- Add typed TypeScript contract error decoding (`decodeContractError`, `CONTRACT_ERROR_CODES`) with a generation-time drift check against the interface fixture.
 
 ## v0.2.0-testnet.20261007
 

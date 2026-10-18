@@ -95,6 +95,45 @@ pub fn read_asset_max_session_amount(env: &Env, asset: &Address) -> Option<i128>
         .get(&DataKey::AssetMaxSessionAmount(asset.clone()))
 }
 
+pub fn remove_asset_max_session_amount(env: &Env, asset: &Address) {
+    env.storage()
+        .instance()
+        .remove(&DataKey::AssetMaxSessionAmount(asset.clone()));
+}
+
+/// Deletes the zero-liability record of a removed asset. Callers must have
+/// checked that the recorded liability is exactly zero.
+pub fn remove_liability(env: &Env, asset: &Address) {
+    env.storage()
+        .persistent()
+        .remove(&DataKey::Liability(asset.clone()));
+}
+
+/// Configured assets (active or deprecated) in activation order. Entries whose
+/// lifecycle record no longer exists, such as assets removed before removal
+/// cleaned the list, are skipped so they never read as supported.
+pub fn read_configured_assets(env: &Env) -> Vec<Address> {
+    let mut configured = Vec::new(env);
+    for asset in read_supported_assets(env).iter() {
+        if read_asset_status(env, &asset).is_some() {
+            configured.push_back(asset);
+        }
+    }
+    configured
+}
+
+/// Drops `asset` from the ordered asset list, keeping the order of the others.
+/// Stale entries left by earlier removals are dropped in the same pass.
+pub fn remove_from_supported_assets(env: &Env, asset: &Address) {
+    let mut remaining = Vec::new(env);
+    for configured in read_supported_assets(env).iter() {
+        if &configured != asset && read_asset_status(env, &configured).is_some() {
+            remaining.push_back(configured);
+        }
+    }
+    write_supported_assets(env, &remaining);
+}
+
 pub fn write_supported_assets(env: &Env, assets: &Vec<Address>) {
     env.storage()
         .instance()
