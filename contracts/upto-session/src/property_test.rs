@@ -110,6 +110,7 @@ struct CreateInput<'a> {
     asset: &'a Address,
     cap: i128,
     resource_hash: &'a BytesN<32>,
+    idempotency_key: &'a BytesN<32>,
 }
 
 fn create_session(
@@ -131,6 +132,7 @@ fn create_session(
                     input.cap,
                     EXPIRY_LEDGER,
                     input.resource_hash.clone(),
+                    input.idempotency_key.clone(),
                 )
                     .into_val(env),
                 sub_invokes: &[MockAuthInvoke {
@@ -153,6 +155,7 @@ fn create_session(
             &input.cap,
             &EXPIRY_LEDGER,
             input.resource_hash,
+            input.idempotency_key,
         )
 }
 
@@ -276,6 +279,10 @@ proptest! {
             BytesN::from_array(&env, &[61; 32]),
             BytesN::from_array(&env, &[62; 32]),
         ];
+        let idempotency_keys = [
+            BytesN::from_array(&env, &[71; 32]),
+            BytesN::from_array(&env, &[72; 32]),
+        ];
         let session_ids = [
             create_session(
                 &env,
@@ -287,6 +294,7 @@ proptest! {
                     asset: &assets[0],
                     cap: caps[0],
                     resource_hash: &resource_hashes[0],
+                    idempotency_key: &idempotency_keys[0],
                 },
             ),
             create_session(
@@ -299,6 +307,7 @@ proptest! {
                     asset: &assets[1],
                     cap: caps[1],
                     resource_hash: &resource_hashes[1],
+                    idempotency_key: &idempotency_keys[1],
                 },
             ),
         ];

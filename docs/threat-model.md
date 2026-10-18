@@ -23,6 +23,11 @@ testnet deployment and lifecycle evidence are published in
   and rolls back on failed, under-reporting, or partial behavior, but a token
   that consistently fabricates every observed balance can defeat local
   reconciliation. Asset review and allowlisting remain mandatory.
+- Tokens sent directly to the contract outside `create_session` become surplus.
+  The administrator can recover caller-specified amounts via `recover_surplus`,
+  provided the post-transfer balance strictly equals or exceeds tracked liability.
+  Zero, negative, excessive, unreviewed asset, and undercollateralized calls
+  fail before transfer.
 - The `resource_hash` and `usage_hash` values are commitments only. The contract does not validate
   off-chain resource contents or metering calculations.
 - RPC nodes, Horizon, indexers, backend services, and user interfaces are outside the on-chain trust
@@ -31,8 +36,14 @@ testnet deployment and lifecycle evidence are published in
 ## Authorization and replay
 
 - `create_session` requires buyer authorization and binds buyer, seller, asset, cap, expiry, resource
-  hash, and an incrementing sequence into the session ID. Its nested token call
+  hash, sequence, and a buyer-scoped `idempotency_key` into the session ID. Its nested token call
   transfers the cap into contract custody.
+- An exact replay of `create_session` with identical buyer, seller, asset, cap, expiry, resource hash,
+  and `idempotency_key` returns the existing session ID without advancing the sequence or moving funds.
+  Conflicting parameter reuse fails deterministically with `IdempotencyConflict`. Idempotency keys
+  are scoped per buyer so one buyer cannot block another.
+- Checked sequence progression guarantees that reaching sequence capacity (`u64::MAX`) returns
+  `SequenceExhausted` before buyer authorization, token transfer, or storage writes.
 - `settle` requires the stored seller's authorization and finalizes a session once.
 - Before expiry, `cancel` requires the stored buyer's authorization, refunds the escrow, and prevents later settlement.
 - At or after expiry, `recover_expired` requires no caller authorization and can refund only the stored buyer.
@@ -47,6 +58,8 @@ testnet deployment and lifecycle evidence are published in
 ## Amount, expiry, and storage risks
 
 - Caps and settlement amounts must be positive, and settlement cannot exceed the stored cap.
+- Session expiry must be in the future, and session duration cannot exceed `max_session_duration_ledgers`
+  (518,400 ledgers, ~30 days). Comparisons use overflow-safe checked arithmetic to guard against near-limit ledgers.
 - Settlement at or after the expiry ledger is rejected.
 - Contract storage TTL can outlive or expire independently of off-chain records. Operators must not
   treat a missing off-chain record as proof that an on-chain session is absent.

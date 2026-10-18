@@ -61,6 +61,15 @@ pub struct AssetRemoved {
 }
 
 #[contractevent]
+pub struct SurplusRecovered {
+    #[topic]
+    pub asset: Address,
+    pub recipient: Address,
+    pub amount: i128,
+    pub event_version: u32,
+}
+
+#[contractevent]
 pub struct SessionCreated {
     #[topic]
     pub session_id: BytesN<32>,
@@ -251,6 +260,16 @@ pub fn publish_session_recovered(env: &Env, session: &Session, refunded_amount: 
         refunded_amount,
         expired_at_ledger: session.expires_at_ledger,
         recovered_at_ledger: env.ledger().sequence(),
+    }
+    .publish(env);
+}
+
+pub fn publish_surplus_recovered(env: &Env, asset: &Address, recipient: &Address, amount: i128) {
+    SurplusRecovered {
+        asset: asset.clone(),
+        recipient: recipient.clone(),
+        amount,
+        event_version: 3,
     }
     .publish(env);
 }

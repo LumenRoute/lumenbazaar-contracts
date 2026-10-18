@@ -479,6 +479,43 @@
     }
   },
   {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
+      "name": "SurplusRecovered",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "recipient",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "surplus_recovered"
+      ]
+    }
+  },
+  {
     "function_v0": {
       "doc": "",
       "inputs": [],
@@ -577,6 +614,15 @@
         {
           "doc": "",
           "name": "resource_hash",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "idempotency_key",
           "type": {
             "bytes_n": {
               "n": 32
@@ -851,6 +897,16 @@
   {
     "function_v0": {
       "doc": "",
+      "inputs": [],
+      "name": "max_session_duration_ledgers",
+      "outputs": [
+        "u32"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
       "inputs": [
         {
           "doc": "",
@@ -943,6 +999,41 @@
                 }
               }
             }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "recipient",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "amount",
+          "type": "i128"
+        }
+      ],
+      "name": "recover_surplus",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -1223,6 +1314,16 @@
           "doc": "",
           "name": "AssetLiabilityOutstanding",
           "value": 35
+        },
+        {
+          "doc": "",
+          "name": "SequenceExhausted",
+          "value": 36
+        },
+        {
+          "doc": "",
+          "name": "IdempotencyConflict",
+          "value": 37
         }
       ],
       "doc": "",
@@ -1322,6 +1423,11 @@
         {
           "doc": "",
           "name": "interface_version",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "name": "max_session_duration_ledgers",
           "type": "u32"
         },
         {

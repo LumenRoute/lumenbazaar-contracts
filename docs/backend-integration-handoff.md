@@ -57,7 +57,9 @@ administrator-rotation events use version `3`.
 | `accept_admin()` | Pending-admin-authorized acceptance before expiry. |
 | `cancel_admin_rotation()` | Current-admin-authorized removal of a pending or expired proposal. |
 | `get_configuration()` | Read response/interface/storage versions, administrator, bounded supported assets, operational state, and instance TTL policy without authorization. |
-| `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash)` | Create a buyer-authorized spending cap and escrow the full cap for a resource. |
+| `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash, idempotency_key)` | Create a buyer-authorized spending cap and escrow the full cap for a resource. Replaying exact parameters returns the original session ID without double escrow. |
+| `max_session_duration_ledgers()` | Read the documented maximum session lifetime horizon (518,400 ledgers). |
+| `recover_surplus(asset, recipient, amount)` | Admin-authorized surplus recovery transferring tokens above aggregate liability without moving escrow backing. |
 | `deprecate_asset(asset)` | Admin-authorized transition from active to deprecated; blocks new sessions without changing existing sessions. |
 | `remove_asset(asset)` | Admin-authorized final removal after deprecation and only when recorded liability is exactly zero. |
 | `get_session(session_id)` | Read current session state for API responses, reconciliation, and settlement guards. |

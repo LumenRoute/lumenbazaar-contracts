@@ -39,6 +39,8 @@ pub enum ContractError {
     AssetNotActive = 33,
     AssetNotDeprecated = 34,
     AssetLiabilityOutstanding = 35,
+    SequenceExhausted = 36,
+    IdempotencyConflict = 37,
 }
 
 #[cfg(test)]
@@ -82,5 +84,7 @@ mod tests {
         assert_eq!(ContractError::AssetNotActive as u32, 33);
         assert_eq!(ContractError::AssetNotDeprecated as u32, 34);
         assert_eq!(ContractError::AssetLiabilityOutstanding as u32, 35);
+        assert_eq!(ContractError::SequenceExhausted as u32, 36);
+        assert_eq!(ContractError::IdempotencyConflict as u32, 37);
     }
 }
