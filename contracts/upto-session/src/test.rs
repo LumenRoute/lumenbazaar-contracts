@@ -61,6 +61,8 @@ fn asset_policy(asset: &Address, max_session_amount: i128) -> AssetPolicy {
     AssetPolicy {
         asset: asset.clone(),
         max_session_amount,
+        max_asset_exposure: i128::MAX,
+        max_buyer_exposure: i128::MAX,
     }
 }
 

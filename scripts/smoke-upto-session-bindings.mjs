@@ -30,6 +30,12 @@ const requiredMethods = [
   "recover_expired",
   "recover_expired_batch",
   "extend_ttl",
+  "set_asset_exposure_ceiling",
+  "get_asset_exposure_ceiling",
+  "set_buyer_exposure_ceiling",
+  "get_buyer_exposure_ceiling",
+  "get_buyer_exposure",
+  "get_asset_solvency",
 ];
 
 if (typeof bindings.Client !== "function") {

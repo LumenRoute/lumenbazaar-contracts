@@ -89,6 +89,8 @@ fn initialize(
         policies.push_back(AssetPolicy {
             asset,
             max_session_amount: i128::MAX,
+            max_asset_exposure: i128::MAX,
+            max_buyer_exposure: i128::MAX,
         });
     }
     client

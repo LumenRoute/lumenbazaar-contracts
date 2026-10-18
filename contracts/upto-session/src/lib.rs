@@ -9,8 +9,9 @@ pub mod validation;
 
 pub use errors::ContractError;
 pub use types::{
-    AdminRotation, AssetPolicy, AssetStatus, BatchRecoveryResult, BatchRecoveryStatus,
-    ContractConfiguration, OperationalState, Session, SessionStatus,
+    AdminRotation, AssetPolicy, AssetSolvencySnapshot, AssetStatus, BatchRecoveryResult,
+    BatchRecoveryStatus, ContractConfiguration, OperationalState, Session, SessionStatus,
+    SolvencyStatus,
 };
 
 use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
@@ -22,6 +23,7 @@ pub const INTERFACE_VERSION: u32 = 3;
 pub const CONFIGURATION_RESPONSE_VERSION: u32 = 1;
 pub const MAX_SUPPORTED_ASSETS: u32 = 16;
 pub const MAX_RECOVERY_BATCH_SIZE: u32 = 8;
+pub const SOLVENCY_RESPONSE_VERSION: u32 = 1;
 
 #[contractimpl]
 impl UptoSessionContract {
@@ -45,6 +47,8 @@ impl UptoSessionContract {
         let mut supported_assets = Vec::new(&env);
         for policy in asset_policies.iter() {
             validation::validate_asset_cap(policy.max_session_amount)?;
+            validation::validate_exposure_ceiling(policy.max_asset_exposure)?;
+            validation::validate_exposure_ceiling(policy.max_buyer_exposure)?;
             if supported_assets.iter().any(|asset| asset == policy.asset) {
                 return Err(ContractError::InvalidSupportedAssets);
             }
@@ -54,6 +58,8 @@ impl UptoSessionContract {
             let probe = validation::validate_supported_asset(&env, &policy.asset, &admin)?;
             storage::write_supported_asset(&env, &policy.asset);
             storage::write_asset_max_session_amount(&env, &policy.asset, policy.max_session_amount);
+            storage::write_asset_exposure_ceiling(&env, &policy.asset, policy.max_asset_exposure);
+            storage::write_buyer_exposure_ceiling(&env, &policy.asset, policy.max_buyer_exposure);
             events::publish_asset_activated(&env, &policy.asset, probe.decimals);
         }
         storage::write_supported_assets(&env, &supported_assets);
@@ -97,6 +103,97 @@ impl UptoSessionContract {
         }
         storage::read_asset_max_session_amount(&env, &asset)
             .ok_or(ContractError::AssetCapNotConfigured)
+    }
+
+    /// Admin-only: sets the ceiling on aggregate open escrow for `asset`.
+    /// Lowering it below the current liability is allowed; existing sessions
+    /// are unaffected and new sessions are rejected until capacity returns.
+    pub fn set_asset_exposure_ceiling(
+        env: Env,
+        asset: Address,
+        ceiling: i128,
+    ) -> Result<(), ContractError> {
+        let admin = storage::read_admin(&env).ok_or(ContractError::NotInitialized)?;
+        if !storage::is_supported_asset(&env, &asset) {
+            return Err(ContractError::UnsupportedAsset);
+        }
+        validation::validate_exposure_ceiling(ceiling)?;
+        admin.require_auth();
+
+        let previous_ceiling = storage::read_asset_exposure_ceiling(&env, &asset)
+            .ok_or(ContractError::ExposureCeilingNotConfigured)?;
+        storage::write_asset_exposure_ceiling(&env, &asset, ceiling);
+        storage::extend_instance_ttl(&env);
+        events::publish_asset_exposure_ceiling_updated(
+            &env,
+            &asset,
+            &admin,
+            previous_ceiling,
+            ceiling,
+            storage::read_liability(&env, &asset),
+        );
+        Ok(())
+    }
+
+    pub fn get_asset_exposure_ceiling(env: Env, asset: Address) -> Result<i128, ContractError> {
+        if !storage::is_supported_asset(&env, &asset) {
+            return Err(ContractError::UnsupportedAsset);
+        }
+        storage::read_asset_exposure_ceiling(&env, &asset)
+            .ok_or(ContractError::ExposureCeilingNotConfigured)
+    }
+
+    /// Admin-only: sets the ceiling on open escrow any single buyer may hold
+    /// for `asset`. Each buyer has an independent counter.
+    pub fn set_buyer_exposure_ceiling(
+        env: Env,
+        asset: Address,
+        ceiling: i128,
+    ) -> Result<(), ContractError> {
+        let admin = storage::read_admin(&env).ok_or(ContractError::NotInitialized)?;
+        if !storage::is_supported_asset(&env, &asset) {
+            return Err(ContractError::UnsupportedAsset);
+        }
+        validation::validate_exposure_ceiling(ceiling)?;
+        admin.require_auth();
+
+        let previous_ceiling = storage::read_buyer_exposure_ceiling(&env, &asset)
+            .ok_or(ContractError::ExposureCeilingNotConfigured)?;
+        storage::write_buyer_exposure_ceiling(&env, &asset, ceiling);
+        storage::extend_instance_ttl(&env);
+        events::publish_buyer_exposure_ceiling_updated(
+            &env,
+            &asset,
+            &admin,
+            previous_ceiling,
+            ceiling,
+        );
+        Ok(())
+    }
+
+    pub fn get_buyer_exposure_ceiling(env: Env, asset: Address) -> Result<i128, ContractError> {
+        if !storage::is_supported_asset(&env, &asset) {
+            return Err(ContractError::UnsupportedAsset);
+        }
+        storage::read_buyer_exposure_ceiling(&env, &asset)
+            .ok_or(ContractError::ExposureCeilingNotConfigured)
+    }
+
+    /// Open escrow currently held by `buyer` for `asset`.
+    pub fn get_buyer_exposure(
+        env: Env,
+        buyer: Address,
+        asset: Address,
+    ) -> Result<i128, ContractError> {
+        if !storage::has_admin(&env) {
+            return Err(ContractError::NotInitialized);
+        }
+        match storage::read_asset_status(&env, &asset) {
+            Some(AssetStatus::Active) | Some(AssetStatus::Deprecated) => {
+                Ok(storage::read_buyer_exposure(&env, &buyer, &asset))
+            }
+            None => Err(ContractError::UnsupportedAsset),
+        }
     }
 
     pub fn propose_admin(
@@ -214,6 +311,21 @@ impl UptoSessionContract {
         if max_amount > asset_cap {
             return Err(ContractError::AmountExceedsCap);
         }
+        let asset_ceiling = storage::read_asset_exposure_ceiling(&env, &asset)
+            .ok_or(ContractError::ExposureCeilingNotConfigured)?;
+        let next_liability = storage::read_liability(&env, &asset)
+            .checked_add(max_amount)
+            .ok_or(ContractError::LiabilityOverflow)?;
+        if next_liability > asset_ceiling {
+            return Err(ContractError::AssetExposureCeilingExceeded);
+        }
+        let buyer_ceiling = storage::read_buyer_exposure_ceiling(&env, &asset)
+            .ok_or(ContractError::ExposureCeilingNotConfigured)?;
+        let next_buyer_exposure =
+            storage::checked_buyer_exposure_increase(&env, &buyer, &asset, max_amount)?;
+        if next_buyer_exposure > buyer_ceiling {
+            return Err(ContractError::BuyerExposureCeilingExceeded);
+        }
 
         buyer.require_auth();
         let sequence = storage::take_next_session_sequence(&env);
@@ -245,6 +357,17 @@ impl UptoSessionContract {
         if escrow.balance(&contract) < liability {
             return Err(ContractError::EscrowUnderfunded);
         }
+        // Re-derived after the transfer so a token callback cannot have raced
+        // the counter past the ceiling.
+        let buyer_exposure =
+            storage::checked_buyer_exposure_increase(&env, &buyer, &asset, max_amount)?;
+        if liability > asset_ceiling {
+            return Err(ContractError::AssetExposureCeilingExceeded);
+        }
+        if buyer_exposure > buyer_ceiling {
+            return Err(ContractError::BuyerExposureCeilingExceeded);
+        }
+        storage::write_buyer_exposure(&env, &buyer, &asset, buyer_exposure);
 
         let session = Session {
             id: session_id.clone(),
@@ -322,10 +445,17 @@ impl UptoSessionContract {
             return Err(ContractError::EscrowUnderfunded);
         }
         let refunded_amount = escrowed_amount - actual_amount;
+        let buyer_exposure = storage::checked_buyer_exposure_decrease(
+            &env,
+            &session.buyer,
+            &session.asset,
+            escrowed_amount,
+        )?;
         let contract_balance_before = asset.balance(&contract);
         let seller_balance_before = asset.balance(&session.seller);
         let buyer_balance_before = asset.balance(&session.buyer);
         storage::decrease_liability(&env, &session.asset, escrowed_amount)?;
+        storage::write_buyer_exposure(&env, &session.buyer, &session.asset, buyer_exposure);
         asset.transfer(&contract, &session.seller, &actual_amount);
         if refunded_amount > 0 {
             asset.transfer(&contract, &session.buyer, &refunded_amount);
@@ -386,9 +516,16 @@ impl UptoSessionContract {
         {
             return Err(ContractError::EscrowUnderfunded);
         }
+        let buyer_exposure = storage::checked_buyer_exposure_decrease(
+            &env,
+            &session.buyer,
+            &session.asset,
+            refunded_amount,
+        )?;
         let contract_balance_before = asset.balance(&contract);
         let buyer_balance_before = asset.balance(&session.buyer);
         storage::decrease_liability(&env, &session.asset, refunded_amount)?;
+        storage::write_buyer_exposure(&env, &session.buyer, &session.asset, buyer_exposure);
         asset.transfer(&contract, &session.buyer, &refunded_amount);
         verify_debit(
             contract_balance_before,
@@ -473,7 +610,9 @@ impl UptoSessionContract {
                             continue;
                         }
                         Err(
-                            ContractError::EscrowUnderfunded | ContractError::LiabilityUnderflow,
+                            ContractError::EscrowUnderfunded
+                            | ContractError::LiabilityUnderflow
+                            | ContractError::BuyerExposureUnderflow,
                         ) => BatchRecoveryStatus::EscrowUnavailable,
                         Err(error) => return Err(error),
                     }
@@ -497,6 +636,35 @@ impl UptoSessionContract {
             return Err(ContractError::UnsupportedAsset);
         }
         Ok(storage::read_liability(&env, &asset))
+    }
+
+    /// Read-only, authorization-free solvency view for an active or
+    /// deprecated asset. It never writes state or extends TTLs.
+    pub fn get_asset_solvency(
+        env: Env,
+        asset: Address,
+    ) -> Result<AssetSolvencySnapshot, ContractError> {
+        if !storage::has_admin(&env) {
+            return Err(ContractError::NotInitialized);
+        }
+        let asset_status =
+            storage::read_asset_status(&env, &asset).ok_or(ContractError::UnsupportedAsset)?;
+        let liability = storage::read_liability(&env, &asset);
+        let token_balance = token::Client::new(&env, &asset)
+            .try_balance(&env.current_contract_address())
+            .ok()
+            .and_then(|balance| balance.ok());
+        let (surplus, deficit, status) = solvency_of(token_balance, liability);
+        Ok(AssetSolvencySnapshot {
+            response_version: SOLVENCY_RESPONSE_VERSION,
+            asset,
+            asset_status,
+            token_balance,
+            liability,
+            surplus,
+            deficit,
+            status,
+        })
     }
 
     pub fn extend_ttl(env: Env, session_id: BytesN<32>) -> Result<(), ContractError> {
@@ -536,9 +704,16 @@ fn recover_open_session(env: &Env, session: &mut Session) -> Result<(), Contract
     {
         return Err(ContractError::EscrowUnderfunded);
     }
+    let buyer_exposure = storage::checked_buyer_exposure_decrease(
+        env,
+        &session.buyer,
+        &session.asset,
+        refunded_amount,
+    )?;
     let contract_balance_before = asset.balance(&contract);
     let buyer_balance_before = asset.balance(&session.buyer);
     storage::decrease_liability(env, &session.asset, refunded_amount)?;
+    storage::write_buyer_exposure(env, &session.buyer, &session.asset, buyer_exposure);
     asset.transfer(&contract, &session.buyer, &refunded_amount);
     verify_debit(
         contract_balance_before,
@@ -555,6 +730,27 @@ fn recover_open_session(env: &Env, session: &mut Session) -> Result<(), Contract
     storage::write_session(env, session);
     events::publish_session_recovered(env, session, refunded_amount);
     Ok(())
+}
+
+/// Classifies a balance against a liability with checked arithmetic. A
+/// missing, negative, or unrepresentable balance is `BalanceUnavailable`, and
+/// a shortfall is never reported as surplus.
+fn solvency_of(token_balance: Option<i128>, liability: i128) -> (i128, i128, SolvencyStatus) {
+    let Some(balance) = token_balance.filter(|balance| *balance >= 0) else {
+        return (0, 0, SolvencyStatus::BalanceUnavailable);
+    };
+    if liability < 0 {
+        return (0, 0, SolvencyStatus::BalanceUnavailable);
+    }
+    match balance.checked_sub(liability) {
+        Some(0) => (0, 0, SolvencyStatus::Collateralized),
+        Some(surplus) if surplus > 0 => (surplus, 0, SolvencyStatus::Surplus),
+        Some(shortfall) => match shortfall.checked_neg() {
+            Some(deficit) => (0, deficit, SolvencyStatus::Underfunded),
+            None => (0, 0, SolvencyStatus::BalanceUnavailable),
+        },
+        None => (0, 0, SolvencyStatus::BalanceUnavailable),
+    }
 }
 
 fn verify_debit(before: i128, after: i128, amount: i128) -> Result<(), ContractError> {
@@ -577,6 +773,8 @@ fn require_admin(env: &Env) -> Result<Address, ContractError> {
     Ok(admin)
 }
 
+#[cfg(test)]
+mod exposure_test;
 #[cfg(test)]
 mod receipt_test;
 #[cfg(test)]

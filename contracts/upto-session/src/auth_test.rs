@@ -265,6 +265,8 @@ fn production_escrow_funds_and_settles_with_exact_authorization_trees() {
         AssetPolicy {
             asset: asset.clone(),
             max_session_amount: 500,
+            max_asset_exposure: 500,
+            max_buyer_exposure: 500,
         }
     ];
 

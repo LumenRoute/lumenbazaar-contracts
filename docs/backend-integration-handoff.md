@@ -48,9 +48,14 @@ administrator-rotation events use version `3`.
 | Function | Backend use |
 | --- | --- |
 | `interface_version()` | Require result `3` before encoding v3 initialization, configuration, cap-policy, administrator-rotation, liability, or batch-recovery calls. |
-| `initialize(admin, asset_policies)` | One-time deployment setup with one to 16 unique assets and positive explicit session caps. Every asset must pass the bounded read-only probe. Do not call from request handlers. |
+| `initialize(admin, asset_policies)` | One-time deployment setup with one to 16 unique assets, each with positive `max_session_amount`, `max_asset_exposure`, and `max_buyer_exposure`. Every asset must pass the bounded read-only probe. Do not call from request handlers. |
 | `get_asset_max_session_amount(asset)` | Read the active creation cap for a supported asset. |
 | `set_asset_max_session_amount(asset, max_session_amount)` | Authenticated administrator update for future sessions only. |
+| `get_asset_exposure_ceiling(asset)` | Read the ceiling on aggregate open escrow for an active asset. |
+| `set_asset_exposure_ceiling(asset, ceiling)` | Authenticated administrator update of the aggregate ceiling; gates future sessions only. |
+| `get_buyer_exposure_ceiling(asset)` | Read the per-buyer ceiling for an active asset. |
+| `set_buyer_exposure_ceiling(asset, ceiling)` | Authenticated administrator update of the per-buyer ceiling; gates future sessions only. |
+| `get_buyer_exposure(buyer, asset)` | Read the open escrow a buyer holds for an active or deprecated asset. Check it before offering a new session to avoid `BuyerExposureCeilingExceeded`. |
 | `get_admin()` | Read the active administrator. |
 | `get_admin_rotation()` | Read the optional pending administrator and expiry ledger. |
 | `propose_admin(pending_admin, expires_at_ledger)` | Current-admin-authorized proposal; does not transfer privileges. |
@@ -62,6 +67,7 @@ administrator-rotation events use version `3`.
 | `remove_asset(asset)` | Admin-authorized final removal after deprecation and only when recorded liability is exactly zero. |
 | `get_session(session_id)` | Read current session state for API responses, reconciliation, and settlement guards. |
 | `get_escrow_liability(asset)` | Read aggregate open-session escrow accounting for a supported asset and compare it with contract token custody. |
+| `get_asset_solvency(asset)` | Read-only, authorization-free solvency snapshot for an active or deprecated asset. See [Solvency Snapshot](#solvency-snapshot). |
 | `settle(session_id, actual_amount, usage_hash)` | Seller-authorized settlement for actual usage. |
 | `cancel(session_id)` | Buyer-authorized cancellation before settlement. |
 | `recover_expired(session_id)` | Permissionless full refund to the stored buyer at or after expiry. |
@@ -179,6 +185,32 @@ codes 23 through 32 without changing the earlier mappings.
 | 33 | `AssetNotActive` | Do not deprecate an unknown or already deprecated asset. |
 | 34 | `AssetNotDeprecated` | Deprecate the asset before requesting final removal. |
 | 35 | `AssetLiabilityOutstanding` | Settle, cancel, or recover every open session before removal. |
+| 36 | `AssetExposureCeilingExceeded` | The asset's aggregate open escrow would exceed its ceiling. Retry after sessions close or the ceiling is raised. |
+| 37 | `InvalidExposureCeiling` | Supply a positive exposure ceiling. |
+| 38 | `ExposureCeilingNotConfigured` | Fail closed; the active asset has no stored ceiling. Escalate to the operator. |
+| 39 | `BuyerExposureCeilingExceeded` | The buyer's open escrow for this asset would exceed the per-buyer ceiling. Close sessions or wait for settlement. |
+| 40 | `BuyerExposureUnderflow` | Stop processing and quarantine the asset; the buyer's tracked exposure does not cover the session. |
+
+## Solvency Snapshot
+
+`get_asset_solvency(asset)` returns `AssetSolvencySnapshot` with
+`response_version = 1`:
+
+| Field | Meaning |
+| --- | --- |
+| `asset`, `asset_status` | The queried asset and its lifecycle state (`Active` or `Deprecated`). Removed and unknown assets return `UnsupportedAsset`. |
+| `token_balance` | The token's reported balance for the contract, or `None` when the balance call failed. |
+| `liability` | Tracked open escrow, as returned by `get_escrow_liability`. |
+| `surplus` | `token_balance - liability` when positive, otherwise `0`. |
+| `deficit` | `liability - token_balance` when positive, otherwise `0`. |
+| `status` | `Collateralized`, `Surplus`, `Underfunded`, or `BalanceUnavailable`. |
+
+All arithmetic is checked. A failed or negative balance, or a difference that
+cannot be represented, is `BalanceUnavailable` with zero surplus and deficit,
+never a healthy status. The query requires no authorization, writes no state,
+emits no events, and does not extend TTLs. It does not repair insolvency or
+trust any off-chain balance; treat `Underfunded` and `BalanceUnavailable` as
+reasons to stop routing new sessions to the asset.
 
 ## Hash Inputs
 

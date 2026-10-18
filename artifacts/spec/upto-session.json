@@ -165,6 +165,55 @@
       "data_format": "map",
       "doc": "",
       "lib": "",
+      "name": "AssetExposureCeilingUpdated",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "admin",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "previous_ceiling",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "new_ceiling",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "current_liability",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "asset_exposure_ceiling_updated"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
       "name": "AssetRemoved",
       "params": [
         {
@@ -231,6 +280,49 @@
       ],
       "prefix_topics": [
         "asset_session_cap_updated"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
+      "name": "BuyerExposureCeilingUpdated",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "admin",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "previous_ceiling",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "new_ceiling",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "buyer_exposure_ceiling_updated"
       ]
     }
   },
@@ -704,7 +796,116 @@
           "type": "address"
         }
       ],
+      "name": "get_asset_exposure_ceiling",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "i128"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
       "name": "get_asset_max_session_amount",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "i128"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Read-only, authorization-free solvency view for an active or\\ndeprecated asset. It never writes state or extends TTLs.",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
+      "name": "get_asset_solvency",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": {
+              "udt": {
+                "name": "AssetSolvencySnapshot"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Open escrow currently held by `buyer` for `asset`.",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "buyer",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
+      "name": "get_buyer_exposure",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "i128"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
+      "name": "get_buyer_exposure_ceiling",
       "outputs": [
         {
           "result": {
@@ -975,6 +1176,36 @@
   },
   {
     "function_v0": {
+      "doc": "Admin-only: sets the ceiling on aggregate open escrow for `asset`.\\nLowering it below the current liability is allowed; existing sessions\\nare unaffected and new sessions are rejected until capacity returns.",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "ceiling",
+          "type": "i128"
+        }
+      ],
+      "name": "set_asset_exposure_ceiling",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
       "doc": "",
       "inputs": [
         {
@@ -989,6 +1220,36 @@
         }
       ],
       "name": "set_asset_max_session_amount",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Admin-only: sets the ceiling on open escrow any single buyer may hold\\nfor `asset`. Each buyer has an independent counter.",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "ceiling",
+          "type": "i128"
+        }
+      ],
+      "name": "set_buyer_exposure_ceiling",
       "outputs": [
         {
           "result": {
@@ -1223,6 +1484,31 @@
           "doc": "",
           "name": "AssetLiabilityOutstanding",
           "value": 35
+        },
+        {
+          "doc": "",
+          "name": "AssetExposureCeilingExceeded",
+          "value": 36
+        },
+        {
+          "doc": "",
+          "name": "InvalidExposureCeiling",
+          "value": 37
+        },
+        {
+          "doc": "",
+          "name": "ExposureCeilingNotConfigured",
+          "value": 38
+        },
+        {
+          "doc": "",
+          "name": "BuyerExposureCeilingExceeded",
+          "value": 39
+        },
+        {
+          "doc": "",
+          "name": "BuyerExposureUnderflow",
+          "value": 40
         }
       ],
       "doc": "",
@@ -1259,6 +1545,16 @@
           "type": "address"
         },
         {
+          "doc": "Ceiling on the sum of open escrow for this asset across all sessions.",
+          "name": "max_asset_exposure",
+          "type": "i128"
+        },
+        {
+          "doc": "Ceiling on the sum of open escrow for this asset held by any one buyer.",
+          "name": "max_buyer_exposure",
+          "type": "i128"
+        },
+        {
           "doc": "",
           "name": "max_session_amount",
           "type": "i128"
@@ -1266,6 +1562,67 @@
       ],
       "lib": "",
       "name": "AssetPolicy"
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "",
+      "fields": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "asset_status",
+          "type": {
+            "udt": {
+              "name": "AssetStatus"
+            }
+          }
+        },
+        {
+          "doc": "`liability - token_balance` when positive, otherwise `0`.",
+          "name": "deficit",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "liability",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "response_version",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "name": "status",
+          "type": {
+            "udt": {
+              "name": "SolvencyStatus"
+            }
+          }
+        },
+        {
+          "doc": "`token_balance - liability` when positive, otherwise `0`.",
+          "name": "surplus",
+          "type": "i128"
+        },
+        {
+          "doc": "Balance reported by the token for this contract, or `None` when the\\nbalance call failed.",
+          "name": "token_balance",
+          "type": {
+            "option": {
+              "value_type": "i128"
+            }
+          }
+        }
+      ],
+      "lib": "",
+      "name": "AssetSolvencySnapshot"
     }
   },
   {
@@ -1452,6 +1809,27 @@
         {
           "void_v0": {
             "doc": "",
+            "name": "Active"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Deprecated"
+          }
+        }
+      ],
+      "doc": "",
+      "lib": "",
+      "name": "AssetStatus"
+    }
+  },
+  {
+    "udt_union_v0": {
+      "cases": [
+        {
+          "void_v0": {
+            "doc": "",
             "name": "Recovered"
           }
         },
@@ -1561,6 +1939,39 @@
       "doc": "",
       "lib": "",
       "name": "SessionStatus"
+    }
+  },
+  {
+    "udt_union_v0": {
+      "cases": [
+        {
+          "void_v0": {
+            "doc": "Token balance equals tracked liability.",
+            "name": "Collateralized"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "Token balance exceeds tracked liability; `surplus` is positive.",
+            "name": "Surplus"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "Token balance is below tracked liability; `deficit` is positive.",
+            "name": "Underfunded"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "The token balance call failed or returned a value that cannot be a\\nbalance. Never healthy.",
+            "name": "BalanceUnavailable"
+          }
+        }
+      ],
+      "doc": "",
+      "lib": "",
+      "name": "SolvencyStatus"
     }
   }
 ]

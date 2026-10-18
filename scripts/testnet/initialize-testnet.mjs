@@ -19,6 +19,16 @@ const maxSessionAmount = process.env.LUMENBAZAAR_MAX_SESSION_AMOUNT || "10000000
 if (!/^[1-9][0-9]*$/.test(maxSessionAmount)) {
   throw new Error("LUMENBAZAAR_MAX_SESSION_AMOUNT must be a positive integer");
 }
+const maxAssetExposure =
+  process.env.LUMENBAZAAR_MAX_ASSET_EXPOSURE || "100000000000";
+if (!/^[1-9][0-9]*$/.test(maxAssetExposure)) {
+  throw new Error("LUMENBAZAAR_MAX_ASSET_EXPOSURE must be a positive integer");
+}
+const maxBuyerExposure =
+  process.env.LUMENBAZAAR_MAX_BUYER_EXPOSURE || "10000000000";
+if (!/^[1-9][0-9]*$/.test(maxBuyerExposure)) {
+  throw new Error("LUMENBAZAAR_MAX_BUYER_EXPOSURE must be a positive integer");
+}
 const uptoSessionContract =
   process.env.LUMENBAZAAR_UPTO_SESSION_CONTRACT_ID ||
   contracts["upto-session"]?.contractId ||
@@ -50,7 +60,12 @@ invokeContract({
     admin,
     "--asset_policies",
     JSON.stringify([
-      { asset: testTokenContract, max_session_amount: maxSessionAmount },
+      {
+        asset: testTokenContract,
+        max_session_amount: maxSessionAmount,
+        max_asset_exposure: maxAssetExposure,
+        max_buyer_exposure: maxBuyerExposure,
+      },
     ]),
   ],
   dryRun,

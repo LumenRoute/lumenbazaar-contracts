@@ -32,6 +32,13 @@ pub fn validate_asset_cap(max_session_amount: i128) -> Result<(), ContractError>
     Ok(())
 }
 
+pub fn validate_exposure_ceiling(ceiling: i128) -> Result<(), ContractError> {
+    if ceiling <= 0 {
+        return Err(ContractError::InvalidExposureCeiling);
+    }
+    Ok(())
+}
+
 pub struct AssetProbe {
     pub decimals: u32,
 }

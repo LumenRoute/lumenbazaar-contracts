@@ -10,6 +10,11 @@ The review target is the `upto-session` contract public interface:
 - `initialize(admin, asset_policies)`
 - `get_asset_max_session_amount(asset)`
 - `set_asset_max_session_amount(asset, max_session_amount)`
+- `get_asset_exposure_ceiling(asset)`
+- `set_asset_exposure_ceiling(asset, ceiling)`
+- `get_buyer_exposure_ceiling(asset)`
+- `set_buyer_exposure_ceiling(asset, ceiling)`
+- `get_buyer_exposure(buyer, asset)`
 - `get_admin()`
 - `get_admin_rotation()`
 - `propose_admin(pending_admin, expires_at_ledger)`
@@ -21,6 +26,7 @@ The review target is the `upto-session` contract public interface:
 - `remove_asset(asset)`
 - `get_session(session_id)`
 - `get_escrow_liability(asset)`
+- `get_asset_solvency(asset)`
 - `settle(session_id, actual_amount, usage_hash)`
 - `cancel(session_id)`
 - `recover_expired(session_id)`

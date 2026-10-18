@@ -39,6 +39,11 @@ pub enum ContractError {
     AssetNotActive = 33,
     AssetNotDeprecated = 34,
     AssetLiabilityOutstanding = 35,
+    AssetExposureCeilingExceeded = 36,
+    InvalidExposureCeiling = 37,
+    ExposureCeilingNotConfigured = 38,
+    BuyerExposureCeilingExceeded = 39,
+    BuyerExposureUnderflow = 40,
 }
 
 #[cfg(test)]
@@ -82,5 +87,10 @@ mod tests {
         assert_eq!(ContractError::AssetNotActive as u32, 33);
         assert_eq!(ContractError::AssetNotDeprecated as u32, 34);
         assert_eq!(ContractError::AssetLiabilityOutstanding as u32, 35);
+        assert_eq!(ContractError::AssetExposureCeilingExceeded as u32, 36);
+        assert_eq!(ContractError::InvalidExposureCeiling as u32, 37);
+        assert_eq!(ContractError::ExposureCeilingNotConfigured as u32, 38);
+        assert_eq!(ContractError::BuyerExposureCeilingExceeded as u32, 39);
+        assert_eq!(ContractError::BuyerExposureUnderflow as u32, 40);
     }
 }

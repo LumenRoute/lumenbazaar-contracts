@@ -9,3 +9,4 @@ These examples are mirrored by executable tests in `src/test.rs`.
 | Expired policy | `documentation_expired_policy_example_reports_expired` | A payment checked after `valid_until_ledger` returns `PolicyExpired`. |
 | Wrong seller | `documentation_wrong_seller_example_reports_seller_error` | A seller outside the allowlist returns `SellerNotAllowed`. |
 | Wrong asset | `documentation_wrong_asset_example_reports_asset_error` | An asset outside the allowlist returns `AssetNotAllowed`. |
+| Revoked agent | `owner_revocation_denies_later_checks_and_authorizations` | After `revoke_policy`, checks and authorizations return `PolicyRevoked`. |

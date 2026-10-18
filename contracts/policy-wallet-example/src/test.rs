@@ -2,8 +2,8 @@ extern crate std;
 
 use super::*;
 use soroban_sdk::{
-    testutils::{Address as _, Ledger as _},
-    vec, Address, BytesN, Env,
+    testutils::{Address as _, Events as _, Ledger as _},
+    vec, Address, BytesN, Env, Event,
 };
 use upto_session::{AssetPolicy, ContractError, UptoSessionContract, UptoSessionContractClient};
 
@@ -157,6 +157,8 @@ fn policy_wallet_storage_is_isolated_from_upto_session() {
                 AssetPolicy {
                     asset,
                     max_session_amount: 1,
+                    max_asset_exposure: 1,
+                    max_buyer_exposure: 1,
                 }
             ]
         )
@@ -355,5 +357,154 @@ fn documentation_wrong_asset_example_reports_asset_error() {
     assert_eq!(
         client.try_check_payment(&agent, &seller, &wrong_asset, &50, &resource_hash),
         Err(Ok(PolicyWalletError::AssetNotAllowed))
+    );
+}
+
+// ── owner-authorized revocation ─────────────────────────────────────────────
+
+#[test]
+fn owner_revocation_denies_later_checks_and_authorizations() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, agent, seller, asset, owner, resource_hash) = initialized_wallet(&env);
+    set_standard_policy(&env, &client, &agent, &seller, &asset, &resource_hash);
+    client.authorize_payment(&agent, &seller, &asset, &60, &resource_hash);
+    env.ledger().set_sequence_number(42);
+
+    client.revoke_policy(&agent);
+
+    let expected = AgentPolicyRevoked {
+        agent: agent.clone(),
+        owner,
+        revoked_at_ledger: 42,
+    }
+    .to_xdr(&env, &client.address);
+    assert_eq!(
+        env.events()
+            .all()
+            .filter_by_contract(&client.address)
+            .events()
+            .last(),
+        Some(&expected)
+    );
+    assert_eq!(client.get_policy_revocation(&agent), Some(42));
+    assert_eq!(
+        client.try_get_policy(&agent),
+        Err(Ok(PolicyWalletError::PolicyRevoked))
+    );
+    assert_eq!(
+        client.try_check_payment(&agent, &seller, &asset, &1, &resource_hash),
+        Err(Ok(PolicyWalletError::PolicyRevoked))
+    );
+    assert_eq!(
+        client.try_authorize_payment(&agent, &seller, &asset, &1, &resource_hash),
+        Err(Ok(PolicyWalletError::PolicyRevoked))
+    );
+    // The prior daily-spend record is preserved.
+    assert_eq!(client.spent_today(&agent), 60);
+}
+
+#[test]
+fn only_the_owner_can_revoke() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, agent, seller, asset, _owner, resource_hash) = initialized_wallet(&env);
+    set_standard_policy(&env, &client, &agent, &seller, &asset, &resource_hash);
+
+    // Without the owner's signature (the agent signing is not enough), the
+    // revocation fails and the policy remains usable.
+    env.set_auths(&[]);
+    assert!(client.try_revoke_policy(&agent).is_err());
+    env.mock_all_auths();
+    assert_eq!(client.get_policy_revocation(&agent), None);
+    assert!(client
+        .try_check_payment(&agent, &seller, &asset, &50, &resource_hash)
+        .is_ok());
+}
+
+#[test]
+fn missing_and_repeated_revocations_are_explicit() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, agent, seller, asset, _owner, resource_hash) = initialized_wallet(&env);
+
+    let stranger = Address::generate(&env);
+    assert_eq!(
+        client.try_revoke_policy(&stranger),
+        Err(Ok(PolicyWalletError::PolicyNotFound))
+    );
+    assert_eq!(client.get_policy_revocation(&stranger), None);
+    assert_eq!(
+        client.try_get_policy(&stranger),
+        Err(Ok(PolicyWalletError::PolicyNotFound))
+    );
+
+    set_standard_policy(&env, &client, &agent, &seller, &asset, &resource_hash);
+    env.ledger().set_sequence_number(10);
+    client.revoke_policy(&agent);
+    env.ledger().set_sequence_number(20);
+    assert_eq!(
+        client.try_revoke_policy(&agent),
+        Err(Ok(PolicyWalletError::PolicyRevoked))
+    );
+    // A repeated revocation keeps the original ledger and emits nothing.
+    assert_eq!(client.get_policy_revocation(&agent), Some(10));
+    assert!(env
+        .events()
+        .all()
+        .filter_by_contract(&client.address)
+        .events()
+        .is_empty());
+}
+
+#[test]
+fn revocation_does_not_affect_other_agents() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, agent, seller, asset, _owner, resource_hash) = initialized_wallet(&env);
+    let other = Address::generate(&env);
+    set_standard_policy(&env, &client, &agent, &seller, &asset, &resource_hash);
+    set_standard_policy(&env, &client, &other, &seller, &asset, &resource_hash);
+    client.authorize_payment(&agent, &seller, &asset, &30, &resource_hash);
+    client.authorize_payment(&other, &seller, &asset, &40, &resource_hash);
+
+    client.revoke_policy(&agent);
+
+    assert_eq!(client.get_policy_revocation(&other), None);
+    assert_eq!(client.get_policy(&other).agent, other);
+    client.authorize_payment(&other, &seller, &asset, &50, &resource_hash);
+    assert_eq!(client.spent_today(&other), 90);
+    assert_eq!(client.spent_today(&agent), 30);
+}
+
+#[test]
+fn setting_a_policy_again_is_an_explicit_regrant() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, agent, seller, asset, _owner, resource_hash) = initialized_wallet(&env);
+    set_standard_policy(&env, &client, &agent, &seller, &asset, &resource_hash);
+    client.authorize_payment(&agent, &seller, &asset, &70, &resource_hash);
+    client.revoke_policy(&agent);
+
+    set_standard_policy(&env, &client, &agent, &seller, &asset, &resource_hash);
+    assert_eq!(client.get_policy_revocation(&agent), None);
+    // The spend recorded before revocation still counts toward today's cap.
+    assert_eq!(
+        client.try_authorize_payment(&agent, &seller, &asset, &31, &resource_hash),
+        Err(Ok(PolicyWalletError::AmountExceedsDailyCap))
+    );
+    client.authorize_payment(&agent, &seller, &asset, &30, &resource_hash);
+    assert_eq!(client.spent_today(&agent), 100);
+}
+
+#[test]
+fn revocation_requires_initialization() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(PolicyWalletExampleContract, ());
+    let client = PolicyWalletExampleContractClient::new(&env, &contract_id);
+    assert_eq!(
+        client.try_revoke_policy(&Address::generate(&env)),
+        Err(Ok(PolicyWalletError::NotInitialized))
     );
 }

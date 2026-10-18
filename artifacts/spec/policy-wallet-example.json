@@ -1,5 +1,36 @@
 [
   {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "Emitted once when the owner revokes an agent's policy.",
+      "lib": "",
+      "name": "AgentPolicyRevoked",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "agent",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "revoked_at_ledger",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "agent_policy_revoked"
+      ]
+    }
+  },
+  {
     "function_v0": {
       "doc": "",
       "inputs": [
@@ -161,6 +192,26 @@
   },
   {
     "function_v0": {
+      "doc": "Ledger at which the agent's policy was revoked, if it is revoked.",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type": "address"
+        }
+      ],
+      "name": "get_policy_revocation",
+      "outputs": [
+        {
+          "option": {
+            "value_type": "u32"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
       "doc": "",
       "inputs": [
         {
@@ -194,6 +245,31 @@
       "doc": "",
       "inputs": [],
       "name": "require_owner",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "PolicyWalletError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Owner-only: removes the agent's policy so every later check and\\nauthorization fails with `PolicyRevoked`. Revoking an agent that never\\nhad a policy fails with `PolicyNotFound`; revoking twice fails with\\n`PolicyRevoked`. Daily-spend records and other agents are untouched.",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type": "address"
+        }
+      ],
+      "name": "revoke_policy",
       "outputs": [
         {
           "result": {
@@ -310,6 +386,11 @@
           "doc": "",
           "name": "ResourceHashNotAllowed",
           "value": 11
+        },
+        {
+          "doc": "",
+          "name": "PolicyRevoked",
+          "value": 12
         }
       ],
       "doc": "",

@@ -1,7 +1,7 @@
 {
   "contractVersion": "0.3.0",
   "interfaceVersion": 3,
-  "sourceSpecSha256": "1958bdd8f4654d58a215d8b4a597a053aae8eadeb9c04de848c075ba963d703d",
+  "sourceSpecSha256": "949ff4fca46a85f40f673ddbb8f23c07208c7e69042f51567f98d4eb352df18c",
   "methods": [
     "accept_admin",
     "cancel",
@@ -11,7 +11,11 @@
     "extend_ttl",
     "get_admin",
     "get_admin_rotation",
+    "get_asset_exposure_ceiling",
     "get_asset_max_session_amount",
+    "get_asset_solvency",
+    "get_buyer_exposure",
+    "get_buyer_exposure_ceiling",
     "get_configuration",
     "get_escrow_liability",
     "get_session",
@@ -21,7 +25,9 @@
     "recover_expired",
     "recover_expired_batch",
     "remove_asset",
+    "set_asset_exposure_ceiling",
     "set_asset_max_session_amount",
+    "set_buyer_exposure_ceiling",
     "settle"
   ],
   "events": [
@@ -146,6 +152,44 @@
       ]
     },
     {
+      "name": "AssetExposureCeilingUpdated",
+      "prefixTopics": [
+        "asset_exposure_ceiling_updated"
+      ],
+      "fields": [
+        {
+          "name": "asset",
+          "location": "topic_list",
+          "type": "address"
+        },
+        {
+          "name": "admin",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "previous_ceiling",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "new_ceiling",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "current_liability",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "AssetRemoved",
       "prefixTopics": [
         "asset_removed"
@@ -191,6 +235,39 @@
         },
         {
           "name": "new_max_session_amount",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "BuyerExposureCeilingUpdated",
+      "prefixTopics": [
+        "buyer_exposure_ceiling_updated"
+      ],
+      "fields": [
+        {
+          "name": "asset",
+          "location": "topic_list",
+          "type": "address"
+        },
+        {
+          "name": "admin",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "previous_ceiling",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "new_ceiling",
           "location": "data",
           "type": "i128"
         },
@@ -538,6 +615,26 @@
     {
       "name": "AssetLiabilityOutstanding",
       "value": 35
+    },
+    {
+      "name": "AssetExposureCeilingExceeded",
+      "value": 36
+    },
+    {
+      "name": "InvalidExposureCeiling",
+      "value": 37
+    },
+    {
+      "name": "ExposureCeilingNotConfigured",
+      "value": 38
+    },
+    {
+      "name": "BuyerExposureCeilingExceeded",
+      "value": 39
+    },
+    {
+      "name": "BuyerExposureUnderflow",
+      "value": 40
     }
   ]
 }

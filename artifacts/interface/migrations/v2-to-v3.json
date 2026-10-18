@@ -7,7 +7,8 @@
   "breakingChanges": [
     "New session IDs include protocol, interface, network, and contract domains.",
     "Usage commitments use a separately domain-separated XDR preimage.",
-    "Supported asset storage changes from a boolean marker to an explicit lifecycle state."
+    "Supported asset storage changes from a boolean marker to an explicit lifecycle state.",
+    "AssetPolicy adds max_asset_exposure and max_buyer_exposure; initialization requires positive values for every asset."
   ],
   "compatibilityNotes": [
     "Route every existing v2 session to its original v2 contract ID.",

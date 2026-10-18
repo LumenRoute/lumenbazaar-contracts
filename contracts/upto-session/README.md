@@ -23,6 +23,25 @@ supported asset. A change applies only to later session creation; it does not
 rewrite the cap or escrow accounting of an existing session. Integrators can
 read the active value with `get_asset_max_session_amount(asset)`.
 
+## Aggregate Exposure Ceilings
+
+Every `AssetPolicy` also carries a positive `max_asset_exposure` (ceiling on
+the asset's total open escrow) and `max_buyer_exposure` (ceiling on any one
+buyer's open escrow for the asset). `create_session` rejects a session that
+would exceed either before buyer authorization or transfer, and every terminal
+path releases the session's escrow from both counters once. The administrator
+updates them with `set_asset_exposure_ceiling` and `set_buyer_exposure_ceiling`,
+which publish `AssetExposureCeilingUpdated` and `BuyerExposureCeilingUpdated`.
+`get_buyer_exposure(buyer, asset)` reads a buyer's current open escrow. The
+invariants are in [docs/escrow-invariants.md](../../docs/escrow-invariants.md).
+
+## Solvency Snapshot
+
+`get_asset_solvency(asset)` is an authorization-free, read-only view of an
+active or deprecated asset's token balance, tracked liability, surplus,
+deficit, and solvency status. See
+[docs/backend-integration-handoff.md](../../docs/backend-integration-handoff.md#solvency-snapshot).
+
 ## Administrator Rotation
 
 The current administrator calls `propose_admin(pending_admin,
