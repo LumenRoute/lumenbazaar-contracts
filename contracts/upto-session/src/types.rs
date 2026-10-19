@@ -140,3 +140,21 @@ pub struct SessionRecoverability {
     pub asset: Option<Address>,
     pub refundable_amount: i128,
 }
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SolvencyAssetState {
+    Unknown,
+    Active,
+    Deprecated,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AssetSolvency {
+    pub asset: Address,
+    pub state: SolvencyAssetState,
+    pub balance: i128,
+    pub liability: i128,
+    pub surplus: i128,
+}

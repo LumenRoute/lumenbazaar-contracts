@@ -62,6 +62,7 @@ administrator-rotation events use version `3`.
 | `remove_asset(asset)` | Admin-authorized final removal after deprecation and only when recorded liability is exactly zero. |
 | `get_session(session_id)` | Read current session state for API responses, reconciliation, and settlement guards. |
 | `get_escrow_liability(asset)` | Read aggregate open-session escrow accounting for a supported asset and compare it with contract token custody. |
+| `get_solvency(assets)` | Read ordered multi-asset solvency (`AssetSolvency`: `asset`, `state`, `balance`, `liability`, `surplus`) for 1 to 16 assets without authorization. Rejects empty or oversized input with `InvalidBatchSize`. |
 | `settle(session_id, actual_amount, usage_hash)` | Seller-authorized settlement for actual usage. |
 | `preview_settle(session_id, actual_amount)` | Read-only, authorization-free preview returning `SettlementPreview` (eligibility, seller payout, buyer refund, expiry state, `SettlementRejectionReason`). Point-in-time only; does not guarantee future ledger eligibility. |
 | `cancel(session_id)` | Buyer-authorized cancellation before settlement. |

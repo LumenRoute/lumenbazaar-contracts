@@ -25,9 +25,13 @@ const requiredMethods = [
   "remove_asset",
   "get_session",
   "get_escrow_liability",
+  "get_solvency",
   "settle",
+  "preview_settle",
   "cancel",
+  "reject",
   "recover_expired",
+  "get_recoverability",
   "recover_expired_batch",
   "extend_ttl",
 ];
@@ -56,6 +60,9 @@ if (bindings.ContractError?.[32]?.message !== "InvalidAssetInterface") {
 }
 if (bindings.ContractError?.[35]?.message !== "AssetLiabilityOutstanding") {
   throw new Error("Expected complete asset lifecycle error mapping");
+}
+if (bindings.ContractError?.[36]?.message !== "SessionRejected") {
+  throw new Error("Expected SessionRejected error mapping");
 }
 if (packageJson.version !== "3.0.0") {
   throw new Error("Expected generated binding package version 3.0.0");

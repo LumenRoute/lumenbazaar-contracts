@@ -1,7 +1,7 @@
 {
   "contractVersion": "0.3.0",
   "interfaceVersion": 3,
-  "sourceSpecSha256": "1958bdd8f4654d58a215d8b4a597a053aae8eadeb9c04de848c075ba963d703d",
+  "sourceSpecSha256": "026dc59bcfe7c3993a8609b60250049d125371d8b5cca7b7b981aa580c044086",
   "methods": [
     "accept_admin",
     "cancel",
@@ -14,12 +14,16 @@
     "get_asset_max_session_amount",
     "get_configuration",
     "get_escrow_liability",
+    "get_recoverability",
     "get_session",
+    "get_solvency",
     "initialize",
     "interface_version",
+    "preview_settle",
     "propose_admin",
     "recover_expired",
     "recover_expired_batch",
+    "reject",
     "remove_asset",
     "set_asset_max_session_amount",
     "settle"
@@ -347,6 +351,48 @@
       ]
     },
     {
+      "name": "SessionRejected",
+      "prefixTopics": [
+        "session_rejected"
+      ],
+      "fields": [
+        {
+          "name": "session_id",
+          "location": "topic_list",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "name": "seller",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "buyer",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "asset",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        },
+        {
+          "name": "refunded_amount",
+          "location": "data",
+          "type": "i128"
+        }
+      ]
+    },
+    {
       "name": "SessionSettled",
       "prefixTopics": [
         "session_settled"
@@ -538,6 +584,10 @@
     {
       "name": "AssetLiabilityOutstanding",
       "value": 35
+    },
+    {
+      "name": "SessionRejected",
+      "value": 36
     }
   ]
 }

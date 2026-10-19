@@ -420,6 +420,59 @@
       "data_format": "map",
       "doc": "",
       "lib": "",
+      "name": "SessionRejected",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "seller",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "buyer",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "refunded_amount",
+          "type": "i128"
+        }
+      ],
+      "prefix_topics": [
+        "session_rejected"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
       "name": "SessionSettled",
       "params": [
         {
@@ -781,6 +834,30 @@
           }
         }
       ],
+      "name": "get_recoverability",
+      "outputs": [
+        {
+          "udt": {
+            "name": "SessionRecoverability"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        }
+      ],
       "name": "get_session",
       "outputs": [
         {
@@ -793,6 +870,43 @@
             "ok_type": {
               "udt": {
                 "name": "Session"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Read-only solvency snapshot for a caller-supplied list of one to\\n`MAX_SOLVENCY_QUERY_ASSETS` assets. Results preserve input order.\\nDuplicates are evaluated independently and returned once per\\noccurrence. Assets unknown to this deployment are reported as\\n`Unknown` with zero values and are never called, so arbitrary\\ncontracts cannot be invoked. `surplus` is `balance - liability`\\n(negative when underfunded).",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "assets",
+          "type": {
+            "vec": {
+              "element_type": "address"
+            }
+          }
+        }
+      ],
+      "name": "get_solvency",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": {
+              "vec": {
+                "element_type": {
+                  "udt": {
+                    "name": "AssetSolvency"
+                  }
+                }
               }
             }
           }
@@ -845,6 +959,35 @@
       "name": "interface_version",
       "outputs": [
         "u32"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "actual_amount",
+          "type": "i128"
+        }
+      ],
+      "name": "preview_settle",
+      "outputs": [
+        {
+          "udt": {
+            "name": "SettlementPreview"
+          }
+        }
       ]
     }
   },
@@ -943,6 +1086,35 @@
                 }
               }
             }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        }
+      ],
+      "name": "reject",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -1223,6 +1395,11 @@
           "doc": "",
           "name": "AssetLiabilityOutstanding",
           "value": 35
+        },
+        {
+          "doc": "",
+          "name": "SessionRejected",
+          "value": 36
         }
       ],
       "doc": "",
@@ -1266,6 +1443,44 @@
       ],
       "lib": "",
       "name": "AssetPolicy"
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "",
+      "fields": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "balance",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "liability",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "state",
+          "type": {
+            "udt": {
+              "name": "SolvencyAssetState"
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "surplus",
+          "type": "i128"
+        }
+      ],
+      "lib": "",
+      "name": "AssetSolvency"
     }
   },
   {
@@ -1447,6 +1662,105 @@
     }
   },
   {
+    "udt_struct_v0": {
+      "doc": "",
+      "fields": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": {
+            "option": {
+              "value_type": "address"
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "current_ledger",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "name": "expires_at_ledger",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "name": "recipient",
+          "type": {
+            "option": {
+              "value_type": "address"
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "refundable_amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "response_version",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "name": "status",
+          "type": {
+            "udt": {
+              "name": "RecoverabilityStatus"
+            }
+          }
+        }
+      ],
+      "lib": "",
+      "name": "SessionRecoverability"
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "",
+      "fields": [
+        {
+          "doc": "",
+          "name": "actual_amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "buyer_refund",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "eligible",
+          "type": "bool"
+        },
+        {
+          "doc": "",
+          "name": "is_expired",
+          "type": "bool"
+        },
+        {
+          "doc": "",
+          "name": "rejection_reason",
+          "type": {
+            "udt": {
+              "name": "SettlementRejectionReason"
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "seller_payout",
+          "type": "i128"
+        }
+      ],
+      "lib": "",
+      "name": "SettlementPreview"
+    }
+  },
+  {
     "udt_union_v0": {
       "cases": [
         {
@@ -1483,6 +1797,12 @@
           "void_v0": {
             "doc": "",
             "name": "AlreadyRecovered"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "AlreadyRejected"
           }
         },
         {
@@ -1536,6 +1856,57 @@
         {
           "void_v0": {
             "doc": "",
+            "name": "NotFound"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "NotExpired"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Recoverable"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "AlreadySettled"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "AlreadyCancelled"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "AlreadyRecovered"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "AlreadyRejected"
+          }
+        }
+      ],
+      "doc": "",
+      "lib": "",
+      "name": "RecoverabilityStatus"
+    }
+  },
+  {
+    "udt_union_v0": {
+      "cases": [
+        {
+          "void_v0": {
+            "doc": "",
             "name": "Open"
           }
         },
@@ -1556,11 +1927,113 @@
             "doc": "",
             "name": "Expired"
           }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Rejected"
+          }
         }
       ],
       "doc": "",
       "lib": "",
       "name": "SessionStatus"
+    }
+  },
+  {
+    "udt_union_v0": {
+      "cases": [
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "None"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "NotFound"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "AlreadySettled"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "AlreadyCancelled"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "AlreadyExpired"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "AlreadyRejected"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "InvalidAmount"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "AmountExceedsCap"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Expired"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "EscrowUnderfunded"
+          }
+        }
+      ],
+      "doc": "",
+      "lib": "",
+      "name": "SettlementRejectionReason"
+    }
+  },
+  {
+    "udt_union_v0": {
+      "cases": [
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Unknown"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Active"
+          }
+        },
+        {
+          "void_v0": {
+            "doc": "",
+            "name": "Deprecated"
+          }
+        }
+      ],
+      "doc": "",
+      "lib": "",
+      "name": "SolvencyAssetState"
     }
   }
 ]

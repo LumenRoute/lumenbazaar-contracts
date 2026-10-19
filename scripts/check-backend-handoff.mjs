@@ -35,9 +35,13 @@ const requiredFunctions = [
   "remove_asset",
   "get_session",
   "get_escrow_liability",
+  "get_solvency",
   "settle",
+  "preview_settle",
   "cancel",
+  "reject",
   "recover_expired",
+  "get_recoverability",
   "recover_expired_batch",
   "extend_ttl",
 ];
@@ -77,6 +81,7 @@ const requiredErrors = [
   "AssetNotActive",
   "AssetNotDeprecated",
   "AssetLiabilityOutstanding",
+  "SessionRejected",
 ];
 
 for (const item of [...requiredFunctions, ...requiredErrors]) {

@@ -9,9 +9,10 @@ pub mod validation;
 
 pub use errors::ContractError;
 pub use types::{
-    AdminRotation, AssetPolicy, AssetStatus, BatchRecoveryResult, BatchRecoveryStatus,
-    ContractConfiguration, OperationalState, RecoverabilityStatus, Session, SessionRecoverability,
-    SessionStatus, SettlementPreview, SettlementRejectionReason,
+    AdminRotation, AssetPolicy, AssetSolvency, AssetStatus, BatchRecoveryResult,
+    BatchRecoveryStatus, ContractConfiguration, OperationalState, RecoverabilityStatus, Session,
+    SessionRecoverability, SessionStatus, SettlementPreview, SettlementRejectionReason,
+    SolvencyAssetState,
 };
 
 use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
@@ -24,6 +25,7 @@ pub const CONFIGURATION_RESPONSE_VERSION: u32 = 1;
 pub const RECOVERABILITY_RESPONSE_VERSION: u32 = 1;
 pub const MAX_SUPPORTED_ASSETS: u32 = 16;
 pub const MAX_RECOVERY_BATCH_SIZE: u32 = 8;
+pub const MAX_SOLVENCY_QUERY_ASSETS: u32 = 16;
 
 #[contractimpl]
 impl UptoSessionContract {
@@ -650,6 +652,54 @@ impl UptoSessionContract {
             asset: Some(session.asset),
             refundable_amount,
         }
+    }
+
+    /// Read-only solvency snapshot for a caller-supplied list of one to
+    /// `MAX_SOLVENCY_QUERY_ASSETS` assets. Results preserve input order.
+    /// Duplicates are evaluated independently and returned once per
+    /// occurrence. Assets unknown to this deployment are reported as
+    /// `Unknown` with zero values and are never called, so arbitrary
+    /// contracts cannot be invoked. `surplus` is `balance - liability`
+    /// (negative when underfunded).
+    pub fn get_solvency(
+        env: Env,
+        assets: Vec<Address>,
+    ) -> Result<Vec<AssetSolvency>, ContractError> {
+        if assets.is_empty() || assets.len() > MAX_SOLVENCY_QUERY_ASSETS {
+            return Err(ContractError::InvalidBatchSize);
+        }
+        if !storage::has_admin(&env) {
+            return Err(ContractError::NotInitialized);
+        }
+
+        let contract = env.current_contract_address();
+        let mut results = Vec::new(&env);
+        for asset in assets.iter() {
+            let state = match storage::read_asset_status(&env, &asset) {
+                Some(AssetStatus::Active) => SolvencyAssetState::Active,
+                Some(AssetStatus::Deprecated) => SolvencyAssetState::Deprecated,
+                None => {
+                    results.push_back(AssetSolvency {
+                        asset,
+                        state: SolvencyAssetState::Unknown,
+                        balance: 0,
+                        liability: 0,
+                        surplus: 0,
+                    });
+                    continue;
+                }
+            };
+            let balance = token::Client::new(&env, &asset).balance(&contract);
+            let liability = storage::read_liability(&env, &asset);
+            results.push_back(AssetSolvency {
+                asset,
+                state,
+                balance,
+                liability,
+                surplus: balance.saturating_sub(liability),
+            });
+        }
+        Ok(results)
     }
 
     pub fn get_session(env: Env, session_id: BytesN<32>) -> Result<Session, ContractError> {
