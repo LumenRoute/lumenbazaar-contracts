@@ -4,6 +4,10 @@ use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, 
 
 pub const LEDGERS_PER_DAY: u32 = 17_280;
 
+// TTL management constants for instance storage keys
+pub const DEFAULT_TTL_THRESHOLD: u32 = 100_000;
+pub const TTL_EXTENSION_AMOUNT: u32 = 1_000_000;
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
@@ -73,6 +77,7 @@ impl PolicyWalletExampleContract {
             example_only: true,
         };
         env.storage().instance().set(&DataKey::Config, &config);
+        env.storage().instance().extend_ttl(DEFAULT_TTL_THRESHOLD, TTL_EXTENSION_AMOUNT);
 
         Ok(())
     }
@@ -102,6 +107,7 @@ impl PolicyWalletExampleContract {
         env.storage()
             .instance()
             .set(&DataKey::Policy(agent), &policy);
+        env.storage().instance().extend_ttl(DEFAULT_TTL_THRESHOLD, TTL_EXTENSION_AMOUNT);
 
         Ok(())
     }
@@ -141,6 +147,7 @@ impl PolicyWalletExampleContract {
         env.storage()
             .instance()
             .set(&DataKey::DailySpend(agent, ledger_day), &next_spent);
+            env.storage().instance().extend_ttl(DEFAULT_TTL_THRESHOLD, TTL_EXTENSION_AMOUNT);
 
         Ok(())
     }
@@ -239,12 +246,20 @@ fn validate_payment(
     Ok(())
 }
 
-fn read_daily_spend(env: &Env, agent: &Address, ledger_day: u32) -> i128 {
+
+pub fn extend_instance_ttl(env: &Env) {
     env.storage()
         .instance()
-        .get(&DataKey::DailySpend(agent.clone(), ledger_day))
-        .unwrap_or(0)
+        .extend_ttl(DEFAULT_TTL_THRESHOLD, TTL_EXTENSION_AMOUNT);
 }
+
+// Updated write functions to extend TTL
+
+// In initialize, after setting config
+// In set_policy, after setting policy
+// In authorize_payment, after updating daily spend
+
+
 
 fn current_ledger_day(env: &Env) -> u32 {
     env.ledger().sequence() / LEDGERS_PER_DAY
@@ -252,3 +267,10 @@ fn current_ledger_day(env: &Env) -> u32 {
 
 #[cfg(test)]
 mod test;
+/// Reads the daily spend for an agent on a given ledger day.
+/// Returns 0 if no record exists.
+fn read_daily_spend(env: &Env, agent: &Address, ledger_day: u32) -> i128 {
+    let key = DataKey::DailySpend(agent.clone(), ledger_day);
+    env.storage().instance().get(&key).unwrap_or(0)
+}
+
