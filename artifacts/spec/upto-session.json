@@ -820,6 +820,39 @@
       "inputs": [
         {
           "doc": "",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        }
+      ],
+      "name": "get_session_status",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": {
+              "udt": {
+                "name": "SessionStatusResponse"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
           "name": "admin",
           "type": "address"
         },
@@ -1610,6 +1643,34 @@
       ],
       "lib": "",
       "name": "Session"
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "",
+      "fields": [
+        {
+          "doc": "",
+          "name": "exists",
+          "type": "bool"
+        },
+        {
+          "doc": "",
+          "name": "expires_at_ledger",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "name": "status",
+          "type": {
+            "udt": {
+              "name": "SessionStatus"
+            }
+          }
+        }
+      ],
+      "lib": "",
+      "name": "SessionStatusResponse"
     }
   },
   {

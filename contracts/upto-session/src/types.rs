@@ -98,3 +98,11 @@ pub struct CommitmentDomainMetadata {
     pub session_id_domain: BytesN<32>,
     pub usage_commitment_domain: BytesN<32>,
 }
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SessionStatusResponse {
+    pub exists: bool,
+    pub status: SessionStatus,
+    pub expires_at_ledger: u32,
+}

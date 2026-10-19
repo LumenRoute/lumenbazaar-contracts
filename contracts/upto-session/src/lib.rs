@@ -11,6 +11,7 @@ pub use errors::ContractError;
 pub use types::{
     AdminRotation, AssetPolicy, AssetStatus, BatchRecoveryResult, BatchRecoveryStatus,
     CommitmentDomainMetadata, ContractConfiguration, OperationalState, Session, SessionStatus,
+    SessionStatusResponse,
 };
 
 use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
@@ -499,6 +500,19 @@ impl UptoSessionContract {
 
     pub fn get_session(env: Env, session_id: BytesN<32>) -> Result<Session, ContractError> {
         storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)
+    }
+
+    pub fn get_session_status(
+        env: Env,
+        session_id: BytesN<32>,
+    ) -> Result<SessionStatusResponse, ContractError> {
+        let session =
+            storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
+        Ok(SessionStatusResponse {
+            exists: true,
+            status: session.status,
+            expires_at_ledger: session.expires_at_ledger,
+        })
     }
 
     pub fn get_escrow_liability(env: Env, asset: Address) -> Result<i128, ContractError> {

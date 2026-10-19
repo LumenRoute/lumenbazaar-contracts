@@ -1687,6 +1687,104 @@ fn get_session_returns_not_found_for_missing_session() {
         client.try_get_session(&missing_id),
         Err(Ok(ContractError::SessionNotFound))
     );
+    assert_eq!(
+        client.try_get_session_status(&missing_id),
+        Err(Ok(ContractError::SessionNotFound))
+    );
+}
+
+#[test]
+fn session_status_query_decodes_open_and_all_terminal_states_compatibly() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 1000);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let open_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &50,
+        &BytesN::from_array(&env, &[101; 32]),
+    );
+    let settled_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &50,
+        &BytesN::from_array(&env, &[102; 32]),
+    );
+    let cancelled_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &50,
+        &BytesN::from_array(&env, &[103; 32]),
+    );
+    let expired_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &30,
+        &BytesN::from_array(&env, &[104; 32]),
+    );
+
+    // Verify open state
+    let open_full = client.get_session(&open_id);
+    let open_status = client.get_session_status(&open_id);
+    assert!(open_status.exists);
+    assert_eq!(open_status.status, SessionStatus::Open);
+    assert_eq!(open_status.status, open_full.status);
+    assert_eq!(open_status.expires_at_ledger, 50);
+    assert_eq!(open_status.expires_at_ledger, open_full.expires_at_ledger);
+
+    // Settle settled_id
+    client.settle(&settled_id, &50, &BytesN::from_array(&env, &[105; 32]));
+    let settled_full = client.get_session(&settled_id);
+    let settled_status = client.get_session_status(&settled_id);
+    assert!(settled_status.exists);
+    assert_eq!(settled_status.status, SessionStatus::Settled);
+    assert_eq!(settled_status.status, settled_full.status);
+    assert_eq!(settled_status.expires_at_ledger, 50);
+    assert_eq!(
+        settled_status.expires_at_ledger,
+        settled_full.expires_at_ledger
+    );
+
+    // Cancel cancelled_id
+    client.cancel(&cancelled_id);
+    let cancelled_full = client.get_session(&cancelled_id);
+    let cancelled_status = client.get_session_status(&cancelled_id);
+    assert!(cancelled_status.exists);
+    assert_eq!(cancelled_status.status, SessionStatus::Cancelled);
+    assert_eq!(cancelled_status.status, cancelled_full.status);
+    assert_eq!(cancelled_status.expires_at_ledger, 50);
+    assert_eq!(
+        cancelled_status.expires_at_ledger,
+        cancelled_full.expires_at_ledger
+    );
+
+    // Expire expired_id
+    env.ledger().set_sequence_number(35);
+    client.recover_expired(&expired_id);
+    let expired_full = client.get_session(&expired_id);
+    let expired_status = client.get_session_status(&expired_id);
+    assert!(expired_status.exists);
+    assert_eq!(expired_status.status, SessionStatus::Expired);
+    assert_eq!(expired_status.status, expired_full.status);
+    assert_eq!(expired_status.expires_at_ledger, 30);
+    assert_eq!(
+        expired_status.expires_at_ledger,
+        expired_full.expires_at_ledger
+    );
 }
 
 #[test]
