@@ -48,9 +48,10 @@ administrator-rotation events use version `3`.
 | Function | Backend use |
 | --- | --- |
 | `interface_version()` | Require result `3` before encoding v3 initialization, configuration, cap-policy, administrator-rotation, liability, or batch-recovery calls. |
-| `initialize(admin, asset_policies)` | One-time deployment setup with one to 16 unique assets and positive explicit session caps. Every asset must pass the bounded read-only probe. Do not call from request handlers. |
+| `initialize(admin, asset_policies)` | One-time deployment setup with one to 16 unique assets and explicit positive session bounds (`min_session_amount` <= `max_session_amount`). Every asset must pass the bounded read-only probe. Do not call from request handlers. |
 | `get_asset_max_session_amount(asset)` | Read the active creation cap for a supported asset. |
-| `set_asset_max_session_amount(asset, max_session_amount)` | Authenticated administrator update for future sessions only. |
+| `set_asset_max_session_amount(asset, max_session_amount)` | Authenticated administrator update for future sessions only; rejected with `InvalidAssetCap` if below the asset minimum. |
+| `get_asset_min_session_amount(asset)` | Read the minimum `max_amount` accepted by `create_session` for a supported asset. Existing sessions are never modified by policy changes. |
 | `get_admin()` | Read the active administrator. |
 | `get_admin_rotation()` | Read the optional pending administrator and expiry ledger. |
 | `propose_admin(pending_admin, expires_at_ledger)` | Current-admin-authorized proposal; does not transfer privileges. |
@@ -168,7 +169,7 @@ codes 23 through 32 without changing the earlier mappings.
 | 20 | `NotInitialized` | Initialize a new deployment before creating sessions. |
 | 21 | `SessionExpired` | Treat as finalized by expiry recovery. |
 | 22 | `SessionNotExpired` | Do not recover before the exact expiry ledger. |
-| 23 | `InvalidAssetCap` | Reject zero or negative configured session caps. |
+| 23 | `InvalidAssetCap` | Reject zero or negative caps or minimums, a minimum above the maximum, or a cap update below the minimum. |
 | 24 | `AssetCapNotConfigured` | Stop creation and investigate incomplete asset policy state. |
 | 25 | `InvalidAdmin` | Reject proposals that target the active administrator. |
 | 26 | `InvalidAdminRotationExpiry` | Reject expired or excessively long proposal windows. |

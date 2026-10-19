@@ -47,7 +47,10 @@ impl UptoSessionContract {
         }
         let mut supported_assets = Vec::new(&env);
         for policy in asset_policies.iter() {
-            validation::validate_asset_cap(policy.max_session_amount)?;
+            validation::validate_asset_policy(
+                policy.min_session_amount,
+                policy.max_session_amount,
+            )?;
             if supported_assets.iter().any(|asset| asset == policy.asset) {
                 return Err(ContractError::InvalidSupportedAssets);
             }
@@ -57,6 +60,7 @@ impl UptoSessionContract {
             let probe = validation::validate_supported_asset(&env, &policy.asset, &admin)?;
             storage::write_supported_asset(&env, &policy.asset);
             storage::write_asset_max_session_amount(&env, &policy.asset, policy.max_session_amount);
+            storage::write_asset_min_session_amount(&env, &policy.asset, policy.min_session_amount);
             events::publish_asset_activated(&env, &policy.asset, probe.decimals);
         }
         storage::write_supported_assets(&env, &supported_assets);
@@ -80,6 +84,9 @@ impl UptoSessionContract {
         validation::validate_asset_cap(max_session_amount)?;
         admin.require_auth();
 
+        let min_session_amount = storage::read_asset_min_session_amount(&env, &asset)
+            .ok_or(ContractError::AssetCapNotConfigured)?;
+        validation::validate_asset_policy(min_session_amount, max_session_amount)?;
         let previous_max_session_amount = storage::read_asset_max_session_amount(&env, &asset)
             .ok_or(ContractError::AssetCapNotConfigured)?;
         storage::write_asset_max_session_amount(&env, &asset, max_session_amount);
@@ -99,6 +106,14 @@ impl UptoSessionContract {
             return Err(ContractError::UnsupportedAsset);
         }
         storage::read_asset_max_session_amount(&env, &asset)
+            .ok_or(ContractError::AssetCapNotConfigured)
+    }
+
+    pub fn get_asset_min_session_amount(env: Env, asset: Address) -> Result<i128, ContractError> {
+        if !storage::is_supported_asset(&env, &asset) {
+            return Err(ContractError::UnsupportedAsset);
+        }
+        storage::read_asset_min_session_amount(&env, &asset)
             .ok_or(ContractError::AssetCapNotConfigured)
     }
 
@@ -224,6 +239,11 @@ impl UptoSessionContract {
         }
         let asset_cap = storage::read_asset_max_session_amount(&env, &asset)
             .ok_or(ContractError::AssetCapNotConfigured)?;
+        let asset_min = storage::read_asset_min_session_amount(&env, &asset)
+            .ok_or(ContractError::AssetCapNotConfigured)?;
+        if max_amount < asset_min {
+            return Err(ContractError::InvalidAmount);
+        }
         if max_amount > asset_cap {
             return Err(ContractError::AmountExceedsCap);
         }

@@ -157,6 +157,7 @@ fn policy_wallet_storage_is_isolated_from_upto_session() {
                 AssetPolicy {
                     asset,
                     max_session_amount: 1,
+                    min_session_amount: 1,
                 }
             ]
         )

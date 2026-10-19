@@ -61,6 +61,7 @@ fn asset_policy(asset: &Address, max_session_amount: i128) -> AssetPolicy {
     AssetPolicy {
         asset: asset.clone(),
         max_session_amount,
+        min_session_amount: 1,
     }
 }
 
@@ -3191,4 +3192,75 @@ fn extend_ttl_rejects_missing_session() {
         client.try_extend_ttl(&missing_id),
         Err(Ok(ContractError::SessionNotFound))
     );
+}
+
+#[test]
+fn per_asset_minimum_enforces_boundaries_and_policy_invariants() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 1_000);
+    let other = create_test_asset(&env, &buyer, 1_000);
+
+    let bad = |min: i128, max: i128| AssetPolicy {
+        asset: asset.clone(),
+        max_session_amount: max,
+        min_session_amount: min,
+    };
+    for policy in [bad(0, 100), bad(-1, 100), bad(101, 100)] {
+        assert_eq!(
+            client.try_initialize(&admin, &soroban_sdk::vec![&env, policy]),
+            Err(Ok(ContractError::InvalidAssetCap))
+        );
+    }
+
+    client.initialize(
+        &admin,
+        &soroban_sdk::vec![
+            &env,
+            AssetPolicy {
+                asset: asset.clone(),
+                max_session_amount: 100,
+                min_session_amount: 10,
+            },
+            AssetPolicy {
+                asset: other.clone(),
+                max_session_amount: 500,
+                min_session_amount: 50,
+            }
+        ],
+    );
+    assert_eq!(client.get_asset_min_session_amount(&asset), 10);
+    assert_eq!(client.get_asset_min_session_amount(&other), 50);
+
+    let hash = |n: u8| BytesN::from_array(&env, &[n; 32]);
+    assert_eq!(
+        client.try_create_session(&buyer, &seller, &asset, &9, &50, &hash(90)),
+        Err(Ok(ContractError::InvalidAmount))
+    );
+    assert_eq!(
+        client.try_create_session(&buyer, &seller, &asset, &101, &50, &hash(91)),
+        Err(Ok(ContractError::AmountExceedsCap))
+    );
+    // Same amount is valid for one asset and below the other asset's minimum.
+    assert_eq!(
+        client.try_create_session(&buyer, &seller, &other, &10, &50, &hash(92)),
+        Err(Ok(ContractError::InvalidAmount))
+    );
+    let at_min = client.create_session(&buyer, &seller, &asset, &10, &50, &hash(93));
+    let at_max = client.create_session(&buyer, &seller, &asset, &100, &50, &hash(94));
+
+    // The cap cannot be moved below the minimum; a valid update leaves sessions intact.
+    assert_eq!(
+        client.try_set_asset_max_session_amount(&asset, &9),
+        Err(Ok(ContractError::InvalidAssetCap))
+    );
+    client.set_asset_max_session_amount(&asset, &10);
+    assert_eq!(client.get_session(&at_min).max_amount, 10);
+    assert_eq!(client.get_session(&at_max).max_amount, 100);
+    assert_eq!(client.get_asset_min_session_amount(&asset), 10);
 }

@@ -32,6 +32,17 @@ pub fn validate_asset_cap(max_session_amount: i128) -> Result<(), ContractError>
     Ok(())
 }
 
+pub fn validate_asset_policy(
+    min_session_amount: i128,
+    max_session_amount: i128,
+) -> Result<(), ContractError> {
+    validate_asset_cap(max_session_amount)?;
+    if min_session_amount <= 0 || min_session_amount > max_session_amount {
+        return Err(ContractError::InvalidAssetCap);
+    }
+    Ok(())
+}
+
 pub struct AssetProbe {
     pub decimals: u32,
 }

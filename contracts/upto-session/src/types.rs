@@ -5,6 +5,7 @@ use soroban_sdk::{contracttype, Address, BytesN, Vec};
 pub struct AssetPolicy {
     pub asset: Address,
     pub max_session_amount: i128,
+    pub min_session_amount: i128,
 }
 
 #[contracttype]

@@ -15,6 +15,7 @@ pub enum DataKey {
     StorageLayoutVersion,
     SupportedAsset(Address),
     AssetMaxSessionAmount(Address),
+    AssetMinSessionAmount(Address),
     SupportedAssets,
     OperationalState,
     Liability(Address),
@@ -93,6 +94,18 @@ pub fn read_asset_max_session_amount(env: &Env, asset: &Address) -> Option<i128>
     env.storage()
         .instance()
         .get(&DataKey::AssetMaxSessionAmount(asset.clone()))
+}
+
+pub fn write_asset_min_session_amount(env: &Env, asset: &Address, amount: i128) {
+    env.storage()
+        .instance()
+        .set(&DataKey::AssetMinSessionAmount(asset.clone()), &amount);
+}
+
+pub fn read_asset_min_session_amount(env: &Env, asset: &Address) -> Option<i128> {
+    env.storage()
+        .instance()
+        .get(&DataKey::AssetMinSessionAmount(asset.clone()))
 }
 
 pub fn write_supported_assets(env: &Env, assets: &Vec<Address>) {

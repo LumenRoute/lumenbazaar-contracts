@@ -751,6 +751,31 @@
   {
     "function_v0": {
       "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
+      "name": "get_asset_min_session_amount",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "i128"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
       "inputs": [],
       "name": "get_commitment_domain_metadata",
       "outputs": [
@@ -1346,6 +1371,11 @@
         {
           "doc": "",
           "name": "max_session_amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "min_session_amount",
           "type": "i128"
         }
       ],
@@ -1956,6 +1986,15 @@
           "tuple_v0": {
             "doc": "",
             "name": "AssetMaxSessionAmount",
+            "type": [
+              "address"
+            ]
+          }
+        },
+        {
+          "tuple_v0": {
+            "doc": "",
+            "name": "AssetMinSessionAmount",
             "type": [
               "address"
             ]
