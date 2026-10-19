@@ -10,7 +10,8 @@ pub mod validation;
 pub use errors::ContractError;
 pub use types::{
     AdminRotation, AssetPolicy, AssetStatus, BatchRecoveryResult, BatchRecoveryStatus,
-    ContractConfiguration, OperationalState, Session, SessionStatus,
+    ContractConfiguration, OperationalState, Session, SessionStatus, SettlementPreview,
+    SettlementRejectionReason,
 };
 
 use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
@@ -362,6 +363,70 @@ impl UptoSessionContract {
         );
 
         Ok(())
+    }
+
+    pub fn preview_settle(
+        env: Env,
+        session_id: BytesN<32>,
+        actual_amount: i128,
+    ) -> SettlementPreview {
+        let session = match storage::read_session(&env, &session_id) {
+            Some(s) => s,
+            None => {
+                return SettlementPreview {
+                    eligible: false,
+                    actual_amount,
+                    seller_payout: 0,
+                    buyer_refund: 0,
+                    is_expired: false,
+                    rejection_reason: SettlementRejectionReason::NotFound,
+                };
+            }
+        };
+
+        let is_expired = env.ledger().sequence() >= session.expires_at_ledger;
+
+        let rejection_reason = match &session.status {
+            SessionStatus::Settled => SettlementRejectionReason::AlreadySettled,
+            SessionStatus::Cancelled => SettlementRejectionReason::AlreadyCancelled,
+            SessionStatus::Expired => SettlementRejectionReason::AlreadyExpired,
+            SessionStatus::Rejected => SettlementRejectionReason::AlreadyRejected,
+            SessionStatus::Open => {
+                if actual_amount <= 0 {
+                    SettlementRejectionReason::InvalidAmount
+                } else if actual_amount > session.max_amount {
+                    SettlementRejectionReason::AmountExceedsCap
+                } else if is_expired {
+                    SettlementRejectionReason::Expired
+                } else {
+                    let contract = env.current_contract_address();
+                    let asset = token::Client::new(&env, &session.asset);
+                    if session.escrowed_amount != session.max_amount
+                        || asset.balance(&contract) < storage::read_liability(&env, &session.asset)
+                    {
+                        SettlementRejectionReason::EscrowUnderfunded
+                    } else {
+                        SettlementRejectionReason::None
+                    }
+                }
+            }
+        };
+
+        let eligible = rejection_reason == SettlementRejectionReason::None;
+        let (seller_payout, buyer_refund) = if eligible {
+            (actual_amount, session.escrowed_amount - actual_amount)
+        } else {
+            (0, 0)
+        };
+
+        SettlementPreview {
+            eligible,
+            actual_amount,
+            seller_payout,
+            buyer_refund,
+            is_expired,
+            rejection_reason,
+        }
     }
 
     pub fn cancel(env: Env, session_id: BytesN<32>) -> Result<(), ContractError> {

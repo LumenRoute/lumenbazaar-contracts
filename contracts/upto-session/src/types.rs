@@ -90,3 +90,29 @@ pub struct BatchRecoveryResult {
     pub status: BatchRecoveryStatus,
     pub refunded_amount: i128,
 }
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SettlementRejectionReason {
+    None,
+    NotFound,
+    AlreadySettled,
+    AlreadyCancelled,
+    AlreadyExpired,
+    AlreadyRejected,
+    InvalidAmount,
+    AmountExceedsCap,
+    Expired,
+    EscrowUnderfunded,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SettlementPreview {
+    pub eligible: bool,
+    pub actual_amount: i128,
+    pub seller_payout: i128,
+    pub buyer_refund: i128,
+    pub is_expired: bool,
+    pub rejection_reason: SettlementRejectionReason,
+}
