@@ -88,3 +88,13 @@ pub struct BatchRecoveryResult {
     pub status: BatchRecoveryStatus,
     pub refunded_amount: i128,
 }
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CommitmentDomainMetadata {
+    pub response_version: u32,
+    pub interface_version: u32,
+    pub receipt_schema_version: u32,
+    pub session_id_domain: BytesN<32>,
+    pub usage_commitment_domain: BytesN<32>,
+}

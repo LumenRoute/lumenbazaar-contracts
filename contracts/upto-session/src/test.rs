@@ -815,6 +815,36 @@ fn configuration_query_decodes_paused_and_deprecated_states() {
 }
 
 #[test]
+fn commitment_domain_metadata_query_returns_authoritative_constants() {
+    let env = Env::default();
+    env.ledger().set_network_id([7; 32]);
+    let contract_id = Address::generate(&env);
+    env.register_at(&contract_id, UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+
+    // Call without initialization or authorization
+    let metadata = client.get_commitment_domain_metadata();
+
+    assert_eq!(
+        metadata.response_version,
+        COMMITMENT_DOMAIN_METADATA_RESPONSE_VERSION
+    );
+    assert_eq!(metadata.interface_version, INTERFACE_VERSION);
+    assert_eq!(metadata.receipt_schema_version, RECEIPT_SCHEMA_VERSION);
+
+    let (expected_session_domain, expected_usage_domain) = env.as_contract(&contract_id, || {
+        (
+            ids::session_id_domain_hash(&env),
+            ids::usage_commitment_domain_hash(&env),
+        )
+    });
+
+    assert_eq!(metadata.session_id_domain, expected_session_domain);
+    assert_eq!(metadata.usage_commitment_domain, expected_usage_domain);
+    assert_ne!(metadata.session_id_domain, metadata.usage_commitment_domain);
+}
+
+#[test]
 fn activation_probes_valid_asset_without_moving_funds_and_emits_event() {
     let env = Env::default();
     env.mock_all_auths();

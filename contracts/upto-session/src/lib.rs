@@ -10,7 +10,7 @@ pub mod validation;
 pub use errors::ContractError;
 pub use types::{
     AdminRotation, AssetPolicy, AssetStatus, BatchRecoveryResult, BatchRecoveryStatus,
-    ContractConfiguration, OperationalState, Session, SessionStatus,
+    CommitmentDomainMetadata, ContractConfiguration, OperationalState, Session, SessionStatus,
 };
 
 use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
@@ -20,6 +20,8 @@ pub struct UptoSessionContract;
 
 pub const INTERFACE_VERSION: u32 = 3;
 pub const CONFIGURATION_RESPONSE_VERSION: u32 = 1;
+pub const COMMITMENT_DOMAIN_METADATA_RESPONSE_VERSION: u32 = 1;
+pub const RECEIPT_SCHEMA_VERSION: u32 = 1;
 pub const MAX_SUPPORTED_ASSETS: u32 = 16;
 pub const MAX_RECOVERY_BATCH_SIZE: u32 = 8;
 
@@ -183,6 +185,16 @@ impl UptoSessionContract {
             instance_ttl_threshold: storage::DEFAULT_TTL_THRESHOLD,
             instance_ttl_extension: storage::TTL_EXTENSION_AMOUNT,
         })
+    }
+
+    pub fn get_commitment_domain_metadata(env: Env) -> CommitmentDomainMetadata {
+        CommitmentDomainMetadata {
+            response_version: COMMITMENT_DOMAIN_METADATA_RESPONSE_VERSION,
+            interface_version: INTERFACE_VERSION,
+            receipt_schema_version: RECEIPT_SCHEMA_VERSION,
+            session_id_domain: ids::session_id_domain_hash(&env),
+            usage_commitment_domain: ids::usage_commitment_domain_hash(&env),
+        }
     }
 
     pub fn create_session(
