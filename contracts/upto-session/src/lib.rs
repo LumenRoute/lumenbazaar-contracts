@@ -10,8 +10,8 @@ pub mod validation;
 pub use errors::ContractError;
 pub use types::{
     AdminRotation, AssetPolicy, AssetStatus, BatchRecoveryResult, BatchRecoveryStatus,
-    ContractConfiguration, OperationalState, Session, SessionStatus, SettlementPreview,
-    SettlementRejectionReason,
+    ContractConfiguration, OperationalState, RecoverabilityStatus, Session, SessionRecoverability,
+    SessionStatus, SettlementPreview, SettlementRejectionReason,
 };
 
 use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
@@ -21,6 +21,7 @@ pub struct UptoSessionContract;
 
 pub const INTERFACE_VERSION: u32 = 3;
 pub const CONFIGURATION_RESPONSE_VERSION: u32 = 1;
+pub const RECOVERABILITY_RESPONSE_VERSION: u32 = 1;
 pub const MAX_SUPPORTED_ASSETS: u32 = 16;
 pub const MAX_RECOVERY_BATCH_SIZE: u32 = 8;
 
@@ -605,6 +606,50 @@ impl UptoSessionContract {
         }
 
         Ok(results)
+    }
+
+    pub fn get_recoverability(env: Env, session_id: BytesN<32>) -> SessionRecoverability {
+        let current_ledger = env.ledger().sequence();
+        let session = match storage::read_session(&env, &session_id) {
+            Some(session) => session,
+            None => {
+                return SessionRecoverability {
+                    response_version: RECOVERABILITY_RESPONSE_VERSION,
+                    status: RecoverabilityStatus::NotFound,
+                    expires_at_ledger: 0,
+                    current_ledger,
+                    recipient: None,
+                    asset: None,
+                    refundable_amount: 0,
+                };
+            }
+        };
+
+        let status = match session.status {
+            SessionStatus::Settled => RecoverabilityStatus::AlreadySettled,
+            SessionStatus::Cancelled => RecoverabilityStatus::AlreadyCancelled,
+            SessionStatus::Expired => RecoverabilityStatus::AlreadyRecovered,
+            SessionStatus::Rejected => RecoverabilityStatus::AlreadyRejected,
+            SessionStatus::Open if current_ledger < session.expires_at_ledger => {
+                RecoverabilityStatus::NotExpired
+            }
+            SessionStatus::Open => RecoverabilityStatus::Recoverable,
+        };
+        let refundable_amount = if status == RecoverabilityStatus::Recoverable {
+            session.escrowed_amount
+        } else {
+            0
+        };
+
+        SessionRecoverability {
+            response_version: RECOVERABILITY_RESPONSE_VERSION,
+            status,
+            expires_at_ledger: session.expires_at_ledger,
+            current_ledger,
+            recipient: Some(session.buyer),
+            asset: Some(session.asset),
+            refundable_amount,
+        }
     }
 
     pub fn get_session(env: Env, session_id: BytesN<32>) -> Result<Session, ContractError> {

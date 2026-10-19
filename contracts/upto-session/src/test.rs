@@ -3381,3 +3381,69 @@ fn extend_ttl_rejects_missing_session() {
         Err(Ok(ContractError::SessionNotFound))
     );
 }
+
+#[test]
+fn recoverability_query_matches_recover_expired_boundary_and_terminal_states() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 2_000);
+    let resource_hash = BytesN::from_array(&env, &[94; 32]);
+    let usage_hash = BytesN::from_array(&env, &[95; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let missing = client.get_recoverability(&BytesN::from_array(&env, &[96; 32]));
+    assert_eq!(missing.status, RecoverabilityStatus::NotFound);
+    assert_eq!(missing.response_version, 1);
+    assert_eq!(missing.recipient, None);
+    assert_eq!(missing.refundable_amount, 0);
+
+    let open_id = client.create_session(&buyer, &seller, &asset, &200, &50, &resource_hash);
+    env.ledger().set_sequence_number(49);
+    let before = client.get_recoverability(&open_id);
+    assert_eq!(before.status, RecoverabilityStatus::NotExpired);
+    assert_eq!(before.expires_at_ledger, 50);
+    assert_eq!(before.current_ledger, 49);
+    assert_eq!(before.recipient, Some(buyer.clone()));
+    assert_eq!(before.asset, Some(asset.clone()));
+    assert_eq!(before.refundable_amount, 0);
+    assert_eq!(
+        client.try_recover_expired(&open_id),
+        Err(Ok(ContractError::SessionNotExpired))
+    );
+
+    env.ledger().set_sequence_number(50);
+    let at = client.get_recoverability(&open_id);
+    assert_eq!(at.status, RecoverabilityStatus::Recoverable);
+    assert_eq!(at.refundable_amount, 200);
+    assert_eq!(at.recipient, Some(buyer.clone()));
+    // Query is storage-neutral: session still open.
+    assert_eq!(client.get_session(&open_id).status, SessionStatus::Open);
+    client.recover_expired(&open_id);
+    assert_eq!(
+        client.get_recoverability(&open_id).status,
+        RecoverabilityStatus::AlreadyRecovered
+    );
+
+    env.ledger().set_sequence_number(1);
+    let settled = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    client.settle(&settled, &100, &usage_hash);
+    assert_eq!(
+        client.get_recoverability(&settled).status,
+        RecoverabilityStatus::AlreadySettled
+    );
+    let cancelled = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    client.cancel(&cancelled);
+    assert_eq!(
+        client.get_recoverability(&cancelled).status,
+        RecoverabilityStatus::AlreadyCancelled
+    );
+    let rejected = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    client.reject(&rejected);
+    let rej = client.get_recoverability(&rejected);
+    assert_eq!(rej.status, RecoverabilityStatus::AlreadyRejected);
+    assert_eq!(rej.refundable_amount, 0);
+}

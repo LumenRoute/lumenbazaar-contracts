@@ -67,6 +67,7 @@ administrator-rotation events use version `3`.
 | `cancel(session_id)` | Buyer-authorized cancellation before settlement. |
 | `reject(session_id)` | Seller-authorized rejection and full refund to the buyer before expiry. |
 | `recover_expired(session_id)` | Permissionless full refund to the stored buyer at or after expiry. |
+| `get_recoverability(session_id)` | Read-only, authorization-free versioned (`response_version` 1) `SessionRecoverability`: status (`NotFound`, `NotExpired`, `Recoverable`, terminal states), expiry and current ledger, stored buyer recipient, asset, and refundable amount. Recoverable exactly when `recover_expired` would succeed (ledger >= expiry). |
 | `recover_expired_batch(session_ids)` | Recover up to eight caller-supplied IDs with ordered per-item results. Missing, premature, terminal, and repeated IDs do not block eligible recoveries. |
 | `extend_ttl(session_id)` | Extend storage TTL for still-open sessions. |
 
