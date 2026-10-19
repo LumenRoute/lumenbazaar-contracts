@@ -4,9 +4,60 @@ use soroban_sdk::{token, Address, BytesN, Env};
 pub const MAX_SESSION_DURATION_LEDGERS: u32 = 518_400;
 pub const MIN_ADMIN_ROTATION_DURATION_LEDGERS: u32 = 1;
 pub const MAX_ADMIN_ROTATION_DURATION_LEDGERS: u32 = 17_280;
+pub const MIN_CAP_INCREASE_DELAY_LEDGERS: u32 = 100;
+pub const MAX_CAP_INCREASE_DELAY_LEDGERS: u32 = 17_280;
 pub const MAX_TOKEN_DECIMALS: u32 = 38;
 pub const MAX_TOKEN_NAME_BYTES: u32 = 64;
 pub const MAX_TOKEN_SYMBOL_BYTES: u32 = 12;
+
+pub const SUPPORTED_RESOURCE_SCHEME_VERSION: u32 = 1;
+pub const SUPPORTED_USAGE_SCHEME_VERSION: u32 = 1;
+
+pub fn validate_commitment_scheme(
+    scheme_version: u32,
+    expected_version: u32,
+) -> Result<(), ContractError> {
+    if scheme_version != expected_version {
+        return Err(ContractError::UnsupportedCommitmentScheme);
+    }
+    Ok(())
+}
+
+pub fn validate_cap_increase_proposal(
+    env: &Env,
+    current_cap: i128,
+    proposed_max_amount: i128,
+    active_at_ledger: u32,
+    expires_at_ledger: u32,
+) -> Result<(), ContractError> {
+    validate_asset_cap(proposed_max_amount)?;
+    if proposed_max_amount <= current_cap {
+        return Err(ContractError::InvalidAssetCap);
+    }
+    let current_ledger = env.ledger().sequence();
+    let min_active = match current_ledger.checked_add(MIN_CAP_INCREASE_DELAY_LEDGERS) {
+        Some(val) => val,
+        None => return Err(ContractError::InvalidCapIncreaseDelay),
+    };
+    let max_active = match current_ledger.checked_add(MAX_CAP_INCREASE_DELAY_LEDGERS) {
+        Some(val) => val,
+        None => return Err(ContractError::InvalidCapIncreaseDelay),
+    };
+    if active_at_ledger < min_active || active_at_ledger > max_active {
+        return Err(ContractError::InvalidCapIncreaseDelay);
+    }
+    if expires_at_ledger <= active_at_ledger {
+        return Err(ContractError::InvalidCapIncreaseDelay);
+    }
+    let max_expiry = match active_at_ledger.checked_add(MAX_CAP_INCREASE_DELAY_LEDGERS) {
+        Some(val) => val,
+        None => return Err(ContractError::InvalidCapIncreaseDelay),
+    };
+    if expires_at_ledger > max_expiry {
+        return Err(ContractError::InvalidCapIncreaseDelay);
+    }
+    Ok(())
+}
 
 pub fn validate_admin_rotation(
     env: &Env,
@@ -309,6 +360,10 @@ mod tests {
             resource_hash,
             usage_hash: None,
             status: crate::SessionStatus::Open,
+            creation_ledger: 10,
+            finalized_ledger: None,
+            resource_scheme_version: 1,
+            usage_scheme_version: None,
         };
 
         assert_eq!(
@@ -342,6 +397,10 @@ mod tests {
             resource_hash,
             usage_hash: None,
             status: crate::SessionStatus::Open,
+            creation_ledger: 10,
+            finalized_ledger: None,
+            resource_scheme_version: 1,
+            usage_scheme_version: None,
         };
 
         assert_eq!(

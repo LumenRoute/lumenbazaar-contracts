@@ -19,9 +19,14 @@ current asset policy before buyer authorization or token transfer.
 
 The authenticated administrator may call
 `set_asset_max_session_amount(asset, max_session_amount)` for an existing
-supported asset. A change applies only to later session creation; it does not
-rewrite the cap or escrow accounting of an existing session. Integrators can
-read the active value with `get_asset_max_session_amount(asset)`.
+supported asset. Cap decreases take effect immediately. Cap increases must be
+proposed via `propose_asset_cap_increase(asset, proposed_max_amount, active_at_ledger, expires_at_ledger)`
+with a bounded activation delay between 100 and 17,280 ledgers, and accepted via
+`accept_asset_cap_increase(asset)` once active. Pending proposals can be cancelled via
+`cancel_asset_cap_increase(asset)`. A change applies only to later session creation;
+it does not rewrite the cap or escrow accounting of an existing session. Integrators can
+read the active value with `get_asset_max_session_amount(asset)` and any pending proposal
+with `get_asset_cap_increase(asset)`.
 
 ## Administrator Rotation
 
@@ -50,6 +55,16 @@ recovery. It is an accounting value, not session enumeration. Integrators
 should compare it with the contract's token balance; a balance lower than the
 reported liability indicates under-collateralization, while a higher balance
 may include unsolicited token transfers.
+
+## Session Audit Ledgers & Commitment Versioning
+
+Stored `Session` records track lifecycle ledgers and explicit commitment scheme versions:
+- `creation_ledger`: The ledger sequence number at which the session was created (immutable).
+- `finalized_ledger`: `None` while open; records the ledger sequence of settlement, cancellation, or expiry recovery.
+- `resource_scheme_version`: Supported resource commitment scheme (version 1).
+- `usage_scheme_version`: Set to supported usage commitment scheme (version 1) upon settlement.
+
+Unsupported commitment schemes are rejected with `ContractError::UnsupportedCommitmentScheme` before state transitions or fund transfers.
 
 ## Session ID Derivation
 

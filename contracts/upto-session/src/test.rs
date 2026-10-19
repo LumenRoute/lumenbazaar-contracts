@@ -594,16 +594,21 @@ fn public_interface_is_callable() {
     let session_id = client.create_session(&buyer, &seller, &asset, &100, &10, &resource_hash);
 
     assert_eq!(session_id, expected_id);
-    assert_eq!(client.get_session(&session_id).id, session_id);
+    let open_session = client.get_session(&session_id);
+    assert_eq!(open_session.id, session_id);
+    assert_eq!(open_session.creation_ledger, 0);
+    assert_eq!(open_session.finalized_ledger, None);
+    assert_eq!(open_session.resource_scheme_version, 1);
+    assert_eq!(open_session.usage_scheme_version, None);
 
     // Test settle
     let usage_hash = BytesN::from_array(&env, &[25; 32]);
     client.settle(&session_id, &10, &usage_hash);
-    assert_eq!(client.get_session(&session_id).settled_amount, 10);
-    assert_eq!(
-        client.get_session(&session_id).status,
-        SessionStatus::Settled
-    );
+    let settled_session = client.get_session(&session_id);
+    assert_eq!(settled_session.settled_amount, 10);
+    assert_eq!(settled_session.status, SessionStatus::Settled);
+    assert_eq!(settled_session.finalized_ledger, Some(0));
+    assert_eq!(settled_session.usage_scheme_version, Some(1));
 
     // Test extend_ttl on settled session - should fail
     assert!(client.try_extend_ttl(&session_id).is_err());
@@ -611,6 +616,9 @@ fn public_interface_is_callable() {
     // Test cancel and extend_ttl on separate open sessions
     let session_id_2 = client.create_session(&buyer, &seller, &asset, &100, &10, &resource_hash);
     client.cancel(&session_id_2);
+    let cancelled_session = client.get_session(&session_id_2);
+    assert_eq!(cancelled_session.status, SessionStatus::Cancelled);
+    assert_eq!(cancelled_session.finalized_ledger, Some(0));
     assert_eq!(
         client.try_extend_ttl(&session_id_2),
         Err(Ok(ContractError::TtlExtensionFailed))
@@ -1045,6 +1053,53 @@ fn admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions() {
     assert_eq!(
         client.try_create_session(&buyer, &seller, &asset, &51, &50, &resource_hash),
         Err(Ok(ContractError::AmountExceedsCap))
+    );
+
+    // Timelocked cap increase flow:
+    // Immediate increase is rejected
+    assert_eq!(
+        client.try_set_asset_max_session_amount(&asset, &150),
+        Err(Ok(ContractError::CapIncreasePending))
+    );
+
+    // Propose cap increase from 50 to 150
+    // Bounded delay: active at sequence 100 ledgers from now
+    let current_seq = env.ledger().sequence();
+    let active_at = current_seq + 100;
+    let expires_at = active_at + 1000;
+
+    // Proposal before activation ledger cannot be accepted
+    client.propose_asset_cap_increase(&asset, &150, &active_at, &expires_at);
+    assert_eq!(
+        client.try_accept_asset_cap_increase(&asset),
+        Err(Ok(ContractError::CapIncreaseNotReady))
+    );
+
+    // Cannot propose another while pending
+    assert_eq!(
+        client.try_propose_asset_cap_increase(&asset, &200, &active_at, &expires_at),
+        Err(Ok(ContractError::CapIncreasePending))
+    );
+
+    // Cancel proposal
+    client.cancel_asset_cap_increase(&asset);
+    assert_eq!(
+        client.try_accept_asset_cap_increase(&asset),
+        Err(Ok(ContractError::CapIncreaseNotFound))
+    );
+
+    // Re-propose and advance sequence past active_at
+    client.propose_asset_cap_increase(&asset, &150, &active_at, &expires_at);
+    env.ledger().set_sequence_number(active_at);
+    client.accept_asset_cap_increase(&asset);
+    assert_eq!(client.get_asset_max_session_amount(&asset), 150);
+
+    // Expired proposals cannot be accepted
+    client.propose_asset_cap_increase(&asset, &200, &(active_at + 200), &(active_at + 300));
+    env.ledger().set_sequence_number(active_at + 300);
+    assert_eq!(
+        client.try_accept_asset_cap_increase(&asset),
+        Err(Ok(ContractError::CapIncreaseExpired))
     );
 }
 
@@ -1700,6 +1755,10 @@ fn settle_requires_seller_auth() {
                 resource_hash,
                 usage_hash: None,
                 status: SessionStatus::Open,
+                creation_ledger: 10,
+                finalized_ledger: None,
+                resource_scheme_version: 1,
+                usage_scheme_version: None,
             },
         );
     });
@@ -1735,6 +1794,10 @@ fn settle_rejects_wrong_seller_auth() {
                 resource_hash,
                 usage_hash: None,
                 status: SessionStatus::Open,
+                creation_ledger: 10,
+                finalized_ledger: None,
+                resource_scheme_version: 1,
+                usage_scheme_version: None,
             },
         );
     });
@@ -1788,6 +1851,10 @@ fn settle_rejects_finalized_sessions() {
                 resource_hash: resource_hash.clone(),
                 usage_hash: Some(usage_hash.clone()),
                 status: SessionStatus::Settled,
+                creation_ledger: 10,
+                finalized_ledger: Some(25),
+                resource_scheme_version: 1,
+                usage_scheme_version: Some(1),
             },
         );
         storage::write_session(
@@ -1804,6 +1871,10 @@ fn settle_rejects_finalized_sessions() {
                 resource_hash,
                 usage_hash: None,
                 status: SessionStatus::Cancelled,
+                creation_ledger: 10,
+                finalized_ledger: Some(20),
+                resource_scheme_version: 1,
+                usage_scheme_version: None,
             },
         );
     });
@@ -2810,6 +2881,10 @@ fn cancel_requires_buyer_auth() {
                 resource_hash,
                 usage_hash: None,
                 status: SessionStatus::Open,
+                creation_ledger: 10,
+                finalized_ledger: None,
+                resource_scheme_version: 1,
+                usage_scheme_version: None,
             },
         );
     });
@@ -2858,6 +2933,10 @@ fn cancel_rejects_already_settled_session() {
                 resource_hash,
                 usage_hash: Some(usage_hash),
                 status: SessionStatus::Settled,
+                creation_ledger: 10,
+                finalized_ledger: Some(30),
+                resource_scheme_version: 1,
+                usage_scheme_version: Some(1),
             },
         );
     });
@@ -2895,6 +2974,10 @@ fn cancel_rejects_already_cancelled_session() {
                 resource_hash,
                 usage_hash: None,
                 status: SessionStatus::Cancelled,
+                creation_ledger: 10,
+                finalized_ledger: Some(25),
+                resource_scheme_version: 1,
+                usage_scheme_version: None,
             },
         );
     });
@@ -2987,6 +3070,10 @@ fn extend_ttl_rejects_cancelled_sessions() {
                 resource_hash,
                 usage_hash: None,
                 status: SessionStatus::Cancelled,
+                creation_ledger: 10,
+                finalized_ledger: Some(25),
+                resource_scheme_version: 1,
+                usage_scheme_version: None,
             },
         );
     });
@@ -3024,6 +3111,10 @@ fn extend_ttl_rejects_settled_sessions() {
                 resource_hash,
                 usage_hash: Some(usage_hash),
                 status: SessionStatus::Settled,
+                creation_ledger: 10,
+                finalized_ledger: Some(30),
+                resource_scheme_version: 1,
+                usage_scheme_version: Some(1),
             },
         );
     });

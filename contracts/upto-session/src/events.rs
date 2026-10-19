@@ -12,6 +12,26 @@ pub struct AssetSessionCapUpdated {
 }
 
 #[contractevent]
+pub struct CapIncreaseProposed {
+    #[topic]
+    pub asset: Address,
+    pub admin: Address,
+    pub proposed_max_amount: i128,
+    pub active_at_ledger: u32,
+    pub expires_at_ledger: u32,
+    pub event_version: u32,
+}
+
+#[contractevent]
+pub struct CapIncreaseCancelled {
+    #[topic]
+    pub asset: Address,
+    pub admin: Address,
+    pub proposed_max_amount: i128,
+    pub event_version: u32,
+}
+
+#[contractevent]
 pub struct AssetDeprecated {
     #[topic]
     pub asset: Address,
@@ -135,6 +155,40 @@ pub fn publish_asset_session_cap_updated(
         admin: admin.clone(),
         previous_max_session_amount,
         new_max_session_amount,
+        event_version: 3,
+    }
+    .publish(env);
+}
+
+pub fn publish_cap_increase_proposed(
+    env: &Env,
+    asset: &Address,
+    admin: &Address,
+    proposed_max_amount: i128,
+    active_at_ledger: u32,
+    expires_at_ledger: u32,
+) {
+    CapIncreaseProposed {
+        asset: asset.clone(),
+        admin: admin.clone(),
+        proposed_max_amount,
+        active_at_ledger,
+        expires_at_ledger,
+        event_version: 3,
+    }
+    .publish(env);
+}
+
+pub fn publish_cap_increase_cancelled(
+    env: &Env,
+    asset: &Address,
+    admin: &Address,
+    proposed_max_amount: i128,
+) {
+    CapIncreaseCancelled {
+        asset: asset.clone(),
+        admin: admin.clone(),
+        proposed_max_amount,
         event_version: 3,
     }
     .publish(env);
