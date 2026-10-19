@@ -1,7 +1,7 @@
 {
   "contractVersion": "0.3.0",
   "interfaceVersion": 3,
-  "sourceSpecSha256": "1958bdd8f4654d58a215d8b4a597a053aae8eadeb9c04de848c075ba963d703d",
+  "sourceSpecSha256": "aeaabd8c974fd5e932983dc94d6ed1b6b11bcc847c7b763929619551e08bd6e8",
   "methods": [
     "accept_admin",
     "cancel",
@@ -12,9 +12,11 @@
     "get_admin",
     "get_admin_rotation",
     "get_asset_max_session_amount",
+    "get_commitment_domain_metadata",
     "get_configuration",
     "get_escrow_liability",
     "get_session",
+    "get_session_status",
     "initialize",
     "interface_version",
     "propose_admin",
@@ -139,6 +141,15 @@
           "type": "address"
         },
         {
+          "name": "reason_commitment",
+          "location": "data",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
           "name": "event_version",
           "location": "data",
           "type": "u32"
@@ -160,6 +171,15 @@
           "name": "admin",
           "location": "data",
           "type": "address"
+        },
+        {
+          "name": "reason_commitment",
+          "location": "data",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
         },
         {
           "name": "event_version",

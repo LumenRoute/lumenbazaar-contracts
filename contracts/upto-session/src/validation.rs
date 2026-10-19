@@ -126,6 +126,17 @@ pub fn validate_usage_hash(env: &Env, usage_hash: &BytesN<32>) -> Result<(), Con
     Ok(())
 }
 
+pub fn validate_reason_commitment(
+    env: &Env,
+    reason_commitment: &BytesN<32>,
+) -> Result<(), ContractError> {
+    if reason_commitment == &BytesN::from_array(env, &[0; 32]) {
+        return Err(ContractError::InvalidResourceHash);
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     extern crate std;

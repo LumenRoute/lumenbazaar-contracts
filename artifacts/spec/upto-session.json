@@ -151,6 +151,16 @@
         {
           "doc": "",
           "location": "data",
+          "name": "reason_commitment",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "doc": "",
+          "location": "data",
           "name": "event_version",
           "type": "u32"
         }
@@ -178,6 +188,16 @@
           "location": "data",
           "name": "admin",
           "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "reason_commitment",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
         },
         {
           "doc": "",
@@ -611,6 +631,15 @@
           "doc": "",
           "name": "asset",
           "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "reason_commitment",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
         }
       ],
       "name": "deprecate_asset",
@@ -1003,6 +1032,15 @@
           "doc": "",
           "name": "asset",
           "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "reason_commitment",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
         }
       ],
       "name": "remove_asset",

@@ -2059,17 +2059,25 @@ fn asset_deprecation_requires_admin_and_blocks_new_sessions() {
         }])
         .initialize(&admin, &asset_policies);
 
+    let deprecate_reason = BytesN::from_array(&env, &[70; 32]);
+    let empty_reason = BytesN::from_array(&env, &[0; 32]);
+
+    assert_eq!(
+        client.try_deprecate_asset(&asset, &empty_reason),
+        Err(Ok(ContractError::InvalidResourceHash))
+    );
+
     let unauthorized = client
         .mock_auths(&[MockAuth {
             address: &attacker,
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "deprecate_asset",
-                args: (asset.clone(),).into_val(&env),
+                args: (asset.clone(), deprecate_reason.clone()).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .try_deprecate_asset(&asset);
+        .try_deprecate_asset(&asset, &deprecate_reason);
     assert!(unauthorized.is_err());
     env.as_contract(&contract_id, || {
         assert_eq!(
@@ -2084,16 +2092,17 @@ fn asset_deprecation_requires_admin_and_blocks_new_sessions() {
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "deprecate_asset",
-                args: (asset.clone(),).into_val(&env),
+                args: (asset.clone(), deprecate_reason.clone()).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .deprecate_asset(&asset);
+        .deprecate_asset(&asset, &deprecate_reason);
     assert_eq!(
         env.events().all().filter_by_contract(&contract_id),
         std::vec![events::AssetDeprecated {
             asset: asset.clone(),
             admin: admin.clone(),
+            reason_commitment: deprecate_reason.clone(),
             event_version: 3,
         }
         .to_xdr(&env, &contract_id)]
@@ -2111,11 +2120,11 @@ fn asset_deprecation_requires_admin_and_blocks_new_sessions() {
                 invoke: &MockAuthInvoke {
                     contract: &contract_id,
                     fn_name: "deprecate_asset",
-                    args: (asset.clone(),).into_val(&env),
+                    args: (asset.clone(), deprecate_reason.clone()).into_val(&env),
                     sub_invokes: &[],
                 },
             }])
-            .try_deprecate_asset(&asset),
+            .try_deprecate_asset(&asset, &deprecate_reason),
         Err(Ok(ContractError::AssetNotActive))
     );
 
@@ -2165,9 +2174,17 @@ fn deprecated_asset_terminal_paths_clear_liability_before_removal() {
         &BytesN::from_array(&env, &[74; 32]),
     );
 
-    client.deprecate_asset(&asset);
+    let deprecate_reason = BytesN::from_array(&env, &[77; 32]);
+    let remove_reason = BytesN::from_array(&env, &[78; 32]);
+    let empty_reason = BytesN::from_array(&env, &[0; 32]);
+
+    client.deprecate_asset(&asset, &deprecate_reason);
     assert_eq!(
-        client.try_remove_asset(&asset),
+        client.try_remove_asset(&asset, &empty_reason),
+        Err(Ok(ContractError::InvalidResourceHash))
+    );
+    assert_eq!(
+        client.try_remove_asset(&asset, &remove_reason),
         Err(Ok(ContractError::AssetLiabilityOutstanding))
     );
 
@@ -2192,10 +2209,11 @@ fn deprecated_asset_terminal_paths_clear_liability_before_removal() {
         assert_eq!(storage::read_liability(&env, &asset), 0);
     });
 
-    client.remove_asset(&asset);
+    client.remove_asset(&asset, &remove_reason);
     let expected = events::AssetRemoved {
         asset: asset.clone(),
         admin: admin.clone(),
+        reason_commitment: remove_reason.clone(),
         event_version: 3,
     }
     .to_xdr(&env, &contract_id);
@@ -2211,7 +2229,7 @@ fn deprecated_asset_terminal_paths_clear_liability_before_removal() {
         assert_eq!(storage::read_asset_status(&env, &asset), None);
     });
     assert_eq!(
-        client.try_remove_asset(&asset),
+        client.try_remove_asset(&asset, &remove_reason),
         Err(Ok(ContractError::AssetNotDeprecated))
     );
 }

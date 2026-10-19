@@ -279,7 +279,12 @@ impl UptoSessionContract {
         Ok(session_id)
     }
 
-    pub fn deprecate_asset(env: Env, asset: Address) -> Result<(), ContractError> {
+    pub fn deprecate_asset(
+        env: Env,
+        asset: Address,
+        reason_commitment: BytesN<32>,
+    ) -> Result<(), ContractError> {
+        validation::validate_reason_commitment(&env, &reason_commitment)?;
         let admin = require_admin(&env)?;
         match storage::read_asset_status(&env, &asset) {
             Some(AssetStatus::Active) => {}
@@ -288,11 +293,16 @@ impl UptoSessionContract {
 
         storage::write_asset_status(&env, &asset, &AssetStatus::Deprecated);
         storage::extend_instance_ttl(&env);
-        events::publish_asset_deprecated(&env, &asset, &admin);
+        events::publish_asset_deprecated(&env, &asset, &admin, &reason_commitment);
         Ok(())
     }
 
-    pub fn remove_asset(env: Env, asset: Address) -> Result<(), ContractError> {
+    pub fn remove_asset(
+        env: Env,
+        asset: Address,
+        reason_commitment: BytesN<32>,
+    ) -> Result<(), ContractError> {
+        validation::validate_reason_commitment(&env, &reason_commitment)?;
         let admin = require_admin(&env)?;
         if storage::read_asset_status(&env, &asset) != Some(AssetStatus::Deprecated) {
             return Err(ContractError::AssetNotDeprecated);
@@ -303,7 +313,7 @@ impl UptoSessionContract {
 
         storage::remove_asset_status(&env, &asset);
         storage::extend_instance_ttl(&env);
-        events::publish_asset_removed(&env, &asset, &admin);
+        events::publish_asset_removed(&env, &asset, &admin, &reason_commitment);
         Ok(())
     }
 

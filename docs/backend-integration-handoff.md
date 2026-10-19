@@ -59,8 +59,8 @@ administrator-rotation events use version `3`.
 | `get_configuration()` | Read response/interface/storage versions, administrator, bounded supported assets, operational state, and instance TTL policy without authorization. |
 | `get_commitment_domain_metadata()` | Read versioned commitment domain metadata, interface version, receipt schema version, and domain hash constants without authorization. |
 | `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash)` | Create a buyer-authorized spending cap and escrow the full cap for a resource. |
-| `deprecate_asset(asset)` | Admin-authorized transition from active to deprecated; blocks new sessions without changing existing sessions. |
-| `remove_asset(asset)` | Admin-authorized final removal after deprecation and only when recorded liability is exactly zero. |
+| `deprecate_asset(asset, reason_commitment)` | Admin-authorized transition from active to deprecated with fixed-size reason commitment; blocks new sessions without changing existing sessions. |
+| `remove_asset(asset, reason_commitment)` | Admin-authorized final removal with fixed-size reason commitment after deprecation and only when recorded liability is exactly zero. |
 | `get_session(session_id)` | Read current session state for API responses, reconciliation, and settlement guards. |
 | `get_session_status(session_id)` | Read lightweight session status (exists, status, expires_at_ledger) without decoding commitment fields. |
 | `get_escrow_liability(asset)` | Read aggregate open-session escrow accounting for a supported asset and compare it with contract token custody. |
@@ -261,6 +261,34 @@ customer identifiers, access tokens, IP addresses, URLs containing private
 parameters, and fine-grained usage logs must remain in access-controlled
 off-chain storage. Use opaque `receiptId` values and coarse measurement units
 that do not reveal private activity.
+
+## Asset Lifecycle Reason Commitments
+
+Asset deprecation and removal invocations accept a 32-byte reason commitment
+(`reason_commitment: BytesN<32>`). Empty commitments (`[0; 32]`) fail closed
+before any state mutation.
+
+The on-chain contract stores and emits only the 32-byte digest in the
+`AssetDeprecated` and `AssetRemoved` events, preserving auditability while
+preventing private incident text, governance discussions, or unbounded data
+from entering ledger state.
+
+Backends and operators should generate reason commitments by hashing the UTF-8
+canonical representation of an off-chain record (such as an incident report,
+governance decision, or review record) using SHA-256:
+
+```json
+{
+  "action": "deprecate_asset",
+  "asset": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+  "reason": "Security deprecation following provider key rotation",
+  "referenceId": "INC-2026-10-19-01",
+  "timestamp": 1792437600
+}
+```
+
+Off-chain audit logs retain the full record preimage to prove integrity against
+the emitted event's `reason_commitment`.
 
 ## Settlement Guardrails
 
