@@ -2944,6 +2944,143 @@ fn cancel_emits_stable_event() {
 }
 
 #[test]
+fn reject_allows_seller_rejection_and_refunds_buyer_only() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
+    let resource_hash = BytesN::from_array(&env, &[81; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    let session_before = client.get_session(&session_id);
+    assert_eq!(session_before.status, SessionStatus::Open);
+
+    let reject_result = client.try_reject(&session_id);
+    assert!(reject_result.is_ok(), "Reject should succeed");
+
+    assert_eq!(
+        env.events().all().filter_by_contract(&contract_id),
+        std::vec![events::SessionRejected {
+            session_id: session_id.clone(),
+            seller: seller.clone(),
+            buyer: buyer.clone(),
+            asset: asset.clone(),
+            event_version: 2,
+            refunded_amount: 500,
+        }
+        .to_xdr(&env, &contract_id)]
+    );
+
+    let session_after = client.get_session(&session_id);
+    assert_eq!(session_after.status, SessionStatus::Rejected);
+    assert_eq!(session_after.escrowed_amount, 0);
+
+    let token_client = token::Client::new(&env, &asset);
+    assert_eq!(token_client.balance(&buyer), 500);
+    assert_eq!(token_client.balance(&seller), 0);
+    assert_eq!(token_client.balance(&contract_id), 0);
+}
+
+#[test]
+fn reject_requires_seller_auth() {
+    let env = Env::default();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let session_id = BytesN::from_array(&env, &[82; 32]);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[83; 32]);
+
+    env.as_contract(&contract_id, || {
+        storage::write_session(
+            &env,
+            &Session {
+                id: session_id.clone(),
+                buyer,
+                seller,
+                asset,
+                max_amount: 100,
+                escrowed_amount: 100,
+                settled_amount: 0,
+                expires_at_ledger: 50,
+                resource_hash,
+                usage_hash: None,
+                status: SessionStatus::Open,
+            },
+        );
+    });
+
+    assert!(client.try_reject(&session_id).is_err());
+}
+
+#[test]
+fn reject_rejects_terminal_and_expired_states() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 2_000);
+    let resource_hash = BytesN::from_array(&env, &[84; 32]);
+    let usage_hash = BytesN::from_array(&env, &[85; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let missing_id = BytesN::from_array(&env, &[86; 32]);
+    assert_eq!(
+        client.try_reject(&missing_id),
+        Err(Ok(ContractError::SessionNotFound))
+    );
+
+    let rejected_id = client.create_session(&buyer, &seller, &asset, &200, &50, &resource_hash);
+    client.reject(&rejected_id);
+    assert_eq!(
+        client.try_reject(&rejected_id),
+        Err(Ok(ContractError::SessionRejected))
+    );
+    assert_eq!(
+        client.try_settle(&rejected_id, &100, &usage_hash),
+        Err(Ok(ContractError::SessionRejected))
+    );
+    assert_eq!(
+        client.try_cancel(&rejected_id),
+        Err(Ok(ContractError::SessionRejected))
+    );
+    env.ledger().set_sequence_number(50);
+    assert_eq!(
+        client.try_recover_expired(&rejected_id),
+        Err(Ok(ContractError::SessionRejected))
+    );
+
+    let settled_id = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    client.settle(&settled_id, &100, &usage_hash);
+    assert_eq!(
+        client.try_reject(&settled_id),
+        Err(Ok(ContractError::SessionAlreadySettled))
+    );
+
+    let cancelled_id = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    client.cancel(&cancelled_id);
+    assert_eq!(
+        client.try_reject(&cancelled_id),
+        Err(Ok(ContractError::SessionCancelled))
+    );
+
+    let expired_id = client.create_session(&buyer, &seller, &asset, &200, &70, &resource_hash);
+    env.ledger().set_sequence_number(70);
+    assert_eq!(
+        client.try_reject(&expired_id),
+        Err(Ok(ContractError::ExpiredSession))
+    );
+}
+
+#[test]
 fn extend_ttl_succeeds_for_open_sessions() {
     let env = Env::default();
     env.mock_all_auths();

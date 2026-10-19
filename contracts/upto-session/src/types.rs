@@ -28,6 +28,7 @@ pub enum SessionStatus {
     Settled,
     Cancelled,
     Expired,
+    Rejected,
 }
 
 #[contracttype]
@@ -63,6 +64,7 @@ pub enum BatchRecoveryStatus {
     AlreadySettled,
     AlreadyCancelled,
     AlreadyRecovered,
+    AlreadyRejected,
     Duplicate,
     EscrowUnavailable,
 }

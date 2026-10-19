@@ -19,6 +19,7 @@ mod tests {
         Settled,
         Cancelled,
         Expired,
+        Rejected,
     }
 
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -62,6 +63,7 @@ mod tests {
         Create { buyer_authorized: bool, cap: u8 },
         Settle { seller_authorized: bool, amount: u8 },
         Cancel { buyer_authorized: bool },
+        Reject { seller_authorized: bool },
         AdvanceToExpiry,
         Recover,
     }
@@ -76,7 +78,7 @@ mod tests {
         UnsupportedAsset,
     }
 
-    const ACTIONS: [Action; 17] = [
+    const ACTIONS: [Action; 19] = [
         Action::Initialize {
             admin_authorized: false,
         },
@@ -124,6 +126,12 @@ mod tests {
         },
         Action::Cancel {
             buyer_authorized: true,
+        },
+        Action::Reject {
+            seller_authorized: false,
+        },
+        Action::Reject {
+            seller_authorized: true,
         },
         Action::AdvanceToExpiry,
         Action::Recover,
@@ -202,6 +210,18 @@ mod tests {
                 state.buyer_refunded = state.cap;
                 finish_terminal_transition(state);
             }
+            Action::Reject { seller_authorized } => {
+                require_open(state)?;
+                if state.ledger >= EXPIRY_LEDGER {
+                    return Err(Rejection::Expired);
+                }
+                if !seller_authorized {
+                    return Err(Rejection::Unauthorized);
+                }
+                state.status = Status::Rejected;
+                state.buyer_refunded = state.cap;
+                finish_terminal_transition(state);
+            }
             Action::AdvanceToExpiry => {
                 state.ledger = EXPIRY_LEDGER;
             }
@@ -256,7 +276,7 @@ mod tests {
                     return Some("open-session liability did not equal escrowed cap");
                 }
             }
-            Status::Settled | Status::Cancelled | Status::Expired => {
+            Status::Settled | Status::Cancelled | Status::Expired | Status::Rejected => {
                 if state.liability != 0
                     || state.contract_balance != 0
                     || state.terminal_transitions != 1

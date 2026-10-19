@@ -308,6 +308,7 @@ impl UptoSessionContract {
             SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
             SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
             SessionStatus::Expired => return Err(ContractError::SessionExpired),
+            SessionStatus::Rejected => return Err(ContractError::SessionRejected),
         }
 
         validation::validate_settlement_amount(&env, &session, actual_amount)?;
@@ -372,6 +373,7 @@ impl UptoSessionContract {
             SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
             SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
             SessionStatus::Expired => return Err(ContractError::SessionExpired),
+            SessionStatus::Rejected => return Err(ContractError::SessionRejected),
         }
 
         if env.ledger().sequence() >= session.expires_at_ledger {
@@ -414,6 +416,59 @@ impl UptoSessionContract {
         Ok(())
     }
 
+    pub fn reject(env: Env, session_id: BytesN<32>) -> Result<(), ContractError> {
+        let mut session =
+            storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
+
+        match &session.status {
+            SessionStatus::Open => {}
+            SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
+            SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
+            SessionStatus::Expired => return Err(ContractError::SessionExpired),
+            SessionStatus::Rejected => return Err(ContractError::SessionRejected),
+        }
+
+        if env.ledger().sequence() >= session.expires_at_ledger {
+            return Err(ContractError::ExpiredSession);
+        }
+        session.seller.require_auth();
+        let refunded_amount = session.escrowed_amount;
+        let asset = token::Client::new(&env, &session.asset);
+        let contract = env.current_contract_address();
+        if refunded_amount != session.max_amount
+            || asset.balance(&contract) < storage::read_liability(&env, &session.asset)
+        {
+            return Err(ContractError::EscrowUnderfunded);
+        }
+        let contract_balance_before = asset.balance(&contract);
+        let buyer_balance_before = asset.balance(&session.buyer);
+        storage::decrease_liability(&env, &session.asset, refunded_amount)?;
+        asset.transfer(&contract, &session.buyer, &refunded_amount);
+        verify_debit(
+            contract_balance_before,
+            asset.balance(&contract),
+            refunded_amount,
+        )?;
+        verify_credit(
+            buyer_balance_before,
+            asset.balance(&session.buyer),
+            refunded_amount,
+        )?;
+        session.escrowed_amount = 0;
+        session.status = SessionStatus::Rejected;
+        storage::write_session(&env, &session);
+        events::publish_session_rejected(
+            &env,
+            &session_id,
+            &session.seller,
+            &session.buyer,
+            &session.asset,
+            refunded_amount,
+        );
+
+        Ok(())
+    }
+
     pub fn recover_expired(env: Env, session_id: BytesN<32>) -> Result<(), ContractError> {
         let mut session =
             storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
@@ -423,6 +478,7 @@ impl UptoSessionContract {
             SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
             SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
             SessionStatus::Expired => return Err(ContractError::SessionExpired),
+            SessionStatus::Rejected => return Err(ContractError::SessionRejected),
         }
         if env.ledger().sequence() < session.expires_at_ledger {
             return Err(ContractError::SessionNotExpired);
@@ -458,6 +514,7 @@ impl UptoSessionContract {
                 SessionStatus::Settled => BatchRecoveryStatus::AlreadySettled,
                 SessionStatus::Cancelled => BatchRecoveryStatus::AlreadyCancelled,
                 SessionStatus::Expired => BatchRecoveryStatus::AlreadyRecovered,
+                SessionStatus::Rejected => BatchRecoveryStatus::AlreadyRejected,
                 SessionStatus::Open if env.ledger().sequence() < session.expires_at_ledger => {
                     BatchRecoveryStatus::NotExpired
                 }
@@ -508,9 +565,10 @@ impl UptoSessionContract {
                 storage::extend_session_and_liability_ttl(&env, &session);
                 Ok(())
             }
-            SessionStatus::Settled | SessionStatus::Cancelled | SessionStatus::Expired => {
-                Err(ContractError::TtlExtensionFailed)
-            }
+            SessionStatus::Settled
+            | SessionStatus::Cancelled
+            | SessionStatus::Expired
+            | SessionStatus::Rejected => Err(ContractError::TtlExtensionFailed),
         }
     }
 }

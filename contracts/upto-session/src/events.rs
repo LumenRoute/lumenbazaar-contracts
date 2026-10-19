@@ -97,6 +97,17 @@ pub struct SessionCancelled {
 }
 
 #[contractevent]
+pub struct SessionRejected {
+    #[topic]
+    pub session_id: BytesN<32>,
+    pub seller: Address,
+    pub buyer: Address,
+    pub asset: Address,
+    pub event_version: u32,
+    pub refunded_amount: i128,
+}
+
+#[contractevent]
 pub struct SessionRecovered {
     #[topic]
     pub session_id: BytesN<32>,
@@ -234,6 +245,25 @@ pub fn publish_session_cancelled(
 ) {
     SessionCancelled {
         session_id: session_id.clone(),
+        buyer: buyer.clone(),
+        asset: asset.clone(),
+        event_version: 2,
+        refunded_amount,
+    }
+    .publish(env);
+}
+
+pub fn publish_session_rejected(
+    env: &Env,
+    session_id: &BytesN<32>,
+    seller: &Address,
+    buyer: &Address,
+    asset: &Address,
+    refunded_amount: i128,
+) {
+    SessionRejected {
+        session_id: session_id.clone(),
+        seller: seller.clone(),
         buyer: buyer.clone(),
         asset: asset.clone(),
         event_version: 2,
