@@ -53,7 +53,7 @@ administrator-rotation events use version `3`.
 | `set_asset_max_session_amount(asset, max_session_amount)` | Authenticated administrator update for future sessions only. |
 | `get_admin()` | Read the active administrator. |
 | `get_admin_rotation()` | Read the optional pending administrator and expiry ledger. |
-| `propose_admin(pending_admin, expires_at_ledger)` | Current-admin-authorized proposal; does not transfer privileges. |
+| `propose_admin(pending_admin, expires_at_ledger)` | Current-admin-authorized proposal with a lifetime bounded between 1 and 17,280 ledgers; does not transfer privileges. |
 | `accept_admin()` | Pending-admin-authorized acceptance before expiry. |
 | `cancel_admin_rotation()` | Current-admin-authorized removal of a pending or expired proposal. |
 | `get_configuration()` | Read response/interface/storage versions, administrator, bounded supported assets, operational state, and instance TTL policy without authorization. |

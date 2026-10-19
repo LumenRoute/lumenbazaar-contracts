@@ -2,6 +2,7 @@ use crate::{ContractError, Session};
 use soroban_sdk::{token, Address, BytesN, Env};
 
 pub const MAX_SESSION_DURATION_LEDGERS: u32 = 518_400;
+pub const MIN_ADMIN_ROTATION_DURATION_LEDGERS: u32 = 1;
 pub const MAX_ADMIN_ROTATION_DURATION_LEDGERS: u32 = 17_280;
 pub const MAX_TOKEN_DECIMALS: u32 = 38;
 pub const MAX_TOKEN_NAME_BYTES: u32 = 64;
@@ -17,9 +18,15 @@ pub fn validate_admin_rotation(
         return Err(ContractError::InvalidAdmin);
     }
     let current_ledger = env.ledger().sequence();
-    if expires_at_ledger <= current_ledger
-        || expires_at_ledger - current_ledger > MAX_ADMIN_ROTATION_DURATION_LEDGERS
-    {
+    let min_allowed = match current_ledger.checked_add(MIN_ADMIN_ROTATION_DURATION_LEDGERS) {
+        Some(val) => val,
+        None => return Err(ContractError::InvalidAdminRotationExpiry),
+    };
+    let max_allowed = match current_ledger.checked_add(MAX_ADMIN_ROTATION_DURATION_LEDGERS) {
+        Some(val) => val,
+        None => return Err(ContractError::InvalidAdminRotationExpiry),
+    };
+    if expires_at_ledger < min_allowed || expires_at_ledger > max_allowed {
         return Err(ContractError::InvalidAdminRotationExpiry);
     }
     Ok(())
@@ -170,25 +177,61 @@ mod tests {
         let current_admin = Address::generate(&env);
         let pending_admin = Address::generate(&env);
 
-        assert_eq!(
-            validate_admin_rotation(&env, &current_admin, &pending_admin, 11),
-            Ok(())
-        );
-        assert_eq!(
-            validate_admin_rotation(&env, &current_admin, &current_admin, 11),
-            Err(ContractError::InvalidAdmin)
-        );
-        assert_eq!(
-            validate_admin_rotation(&env, &current_admin, &pending_admin, 10),
-            Err(ContractError::InvalidAdminRotationExpiry)
-        );
+        // Exact minimum lifetime (10 + 1 = 11) passes
         assert_eq!(
             validate_admin_rotation(
                 &env,
                 &current_admin,
                 &pending_admin,
-                11 + MAX_ADMIN_ROTATION_DURATION_LEDGERS
+                10 + MIN_ADMIN_ROTATION_DURATION_LEDGERS
             ),
+            Ok(())
+        );
+        // Exact maximum lifetime (10 + 17280 = 17290) passes
+        assert_eq!(
+            validate_admin_rotation(
+                &env,
+                &current_admin,
+                &pending_admin,
+                10 + MAX_ADMIN_ROTATION_DURATION_LEDGERS
+            ),
+            Ok(())
+        );
+        // Self-rotation rejected
+        assert_eq!(
+            validate_admin_rotation(&env, &current_admin, &current_admin, 11),
+            Err(ContractError::InvalidAdmin)
+        );
+        // Below minimum lifetime rejected
+        assert_eq!(
+            validate_admin_rotation(&env, &current_admin, &pending_admin, 10),
+            Err(ContractError::InvalidAdminRotationExpiry)
+        );
+        assert_eq!(
+            validate_admin_rotation(&env, &current_admin, &pending_admin, 9),
+            Err(ContractError::InvalidAdminRotationExpiry)
+        );
+        // Beyond maximum lifetime rejected
+        assert_eq!(
+            validate_admin_rotation(
+                &env,
+                &current_admin,
+                &pending_admin,
+                10 + MAX_ADMIN_ROTATION_DURATION_LEDGERS + 1
+            ),
+            Err(ContractError::InvalidAdminRotationExpiry)
+        );
+
+        // Overflow-adjacent tests
+        env.ledger().set_sequence_number(u32::MAX - 5);
+        // Proposal with u32::MAX overflow
+        assert_eq!(
+            validate_admin_rotation(&env, &current_admin, &pending_admin, u32::MAX),
+            Err(ContractError::InvalidAdminRotationExpiry)
+        );
+        env.ledger().set_sequence_number(u32::MAX);
+        assert_eq!(
+            validate_admin_rotation(&env, &current_admin, &pending_admin, u32::MAX),
             Err(ContractError::InvalidAdminRotationExpiry)
         );
     }

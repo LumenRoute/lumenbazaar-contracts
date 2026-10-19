@@ -28,7 +28,7 @@ read the active value with `get_asset_max_session_amount(asset)`.
 The current administrator calls `propose_admin(pending_admin,
 expires_at_ledger)` to create one pending rotation. The proposal cannot target
 the current administrator, cannot overwrite another pending rotation, and must
-expire within 17,280 ledgers.
+have an expiry lifetime between 1 and 17,280 ledgers from the current ledger.
 
 Only the stored pending administrator can call `accept_admin()` before the
 expiry ledger. Acceptance changes the active administrator and removes the
