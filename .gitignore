@@ -7,3 +7,5 @@ bindings/*/dist/
 .env.testnet
 !.cargo/
 !.github/
+.stellar/
+.soroban/

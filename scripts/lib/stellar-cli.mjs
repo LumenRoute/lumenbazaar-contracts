@@ -1,5 +1,6 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -43,6 +44,91 @@ export function runStellar(args, { capture = false, dryRun = false } = {}) {
   });
 
   return typeof output === "string" ? output.trim() : "";
+}
+
+// Runs a transaction-submitting command and returns stdout plus the submitted transaction hash.
+// CLI diagnostics are never echoed verbatim because they can include local identity aliases.
+export function runStellarTransaction(args, { dryRun = false, redact = [] } = {}) {
+  if (dryRun) {
+    console.log(formatCommand("stellar", args));
+    return { stdout: "", transactionHash: null, skipped: false };
+  }
+
+  const result = spawnSync("stellar", args, { cwd: repoRoot, encoding: "utf8" });
+  const stderr = result.stderr ?? "";
+  if (result.status !== 0) {
+    throw new Error(`stellar ${args[0]} ${args[1] ?? ""} failed: ${sanitizeCliOutput(stderr, redact)}`);
+  }
+  return {
+    stdout: (result.stdout ?? "").trim(),
+    // Stellar CLI 28 logs `Signing transaction: <hash>`; some paths also log `Transaction hash is <hash>`.
+    transactionHash:
+      [...stderr.matchAll(/(?:Transaction hash is|Signing transaction:) ([a-f0-9]{64})/g)].pop()?.[1] ?? null,
+    skipped: /Skipping install because wasm already installed/.test(stderr),
+  };
+}
+
+export function sanitizeCliOutput(text, redact = []) {
+  let output = text
+    .split(/\r?\n/)
+    .filter((line) => /error|failed|missing|invalid/i.test(line))
+    .join(" ")
+    .trim();
+  for (const value of [homedir(), ...redact].filter((entry) => typeof entry === "string" && entry.length >= 3)) {
+    output = output.split(value).join("<redacted>");
+  }
+  return output.replace(/\bS[A-Z2-7]{55}\b/g, "<redacted>") || "no error details";
+}
+
+export function publicKey(identity) {
+  if (/^G[A-Z2-7]{55}$/.test(identity)) {
+    return identity;
+  }
+  const address = runStellar(["keys", "public-key", identity], { capture: true });
+  if (!/^G[A-Z2-7]{55}$/.test(address)) {
+    throw new Error("Could not resolve a public account for a local identity.");
+  }
+  return address;
+}
+
+export function uploadContract({ name, wasm, source, network = "testnet", dryRun = false }) {
+  const { stdout, transactionHash, skipped } = runStellarTransaction(
+    ["contract", "upload", "--wasm", wasm, "--source-account", source, ...networkArgs(network)],
+    { dryRun, redact: [source] },
+  );
+  if (dryRun) {
+    return { wasmHash: "dry-run", transactionHash: null, skipped: false };
+  }
+  if (!skipped && !transactionHash) {
+    throw new Error(`Uploading ${name} returned no transaction hash.`);
+  }
+  // When the CLI skips an already-installed WASM, `skipped` is true and no transaction was sent.
+  return { wasmHash: stdout.split(/\r?\n/).pop().trim(), transactionHash, skipped };
+}
+
+export function deployUploadedContract({ name, wasmHash, alias, source, network = "testnet", dryRun = false }) {
+  const { stdout, transactionHash } = runStellarTransaction(
+    [
+      "contract",
+      "deploy",
+      "--wasm-hash",
+      wasmHash,
+      "--source-account",
+      source,
+      ...networkArgs(network),
+      "--alias",
+      alias,
+    ],
+    { dryRun, redact: [source, alias] },
+  );
+  if (dryRun) {
+    return { contractId: `dry-run-${name}`, transactionHash: null };
+  }
+  const contractId = findContractId(stdout);
+  if (!contractId || !transactionHash) {
+    throw new Error(`Deploying ${name} returned no contract ID or transaction hash.`);
+  }
+  return { contractId, transactionHash };
 }
 
 export function buildContracts({ dryRun = false } = {}) {
@@ -103,6 +189,33 @@ export function invokeContract({
   );
 }
 
+export function invokeContractTransaction({
+  contractId,
+  source,
+  network = "testnet",
+  args,
+  send = "default",
+  dryRun = false,
+  redact = [],
+}) {
+  return runStellarTransaction(
+    [
+      "contract",
+      "invoke",
+      "--id",
+      contractId,
+      "--source-account",
+      source,
+      ...networkArgs(network),
+      "--send",
+      send,
+      "--",
+      ...args,
+    ],
+    { dryRun, redact: [source, ...redact] },
+  );
+}
+
 export function readManifest(path) {
   if (!existsSync(path)) {
     return { contracts: {} };
@@ -126,17 +239,22 @@ export function writeManifest(path, manifest, { dryRun = false } = {}) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
-export function mergeContracts(manifestPath, contractEntries, { dryRun = false } = {}) {
+export function mergeContracts(
+  manifestPath,
+  contractEntries,
+  { dryRun = false, fields = {}, mergeEntries = false } = {},
+) {
   const manifest = readManifest(manifestPath);
   const contracts = { ...(manifest.contracts || {}) };
   for (const entry of contractEntries) {
-    contracts[entry.name] = entry;
+    contracts[entry.name] = mergeEntries ? { ...(contracts[entry.name] || {}), ...entry } : entry;
   }
 
   writeManifest(
     manifestPath,
     {
       ...manifest,
+      ...fields,
       contracts,
     },
     { dryRun },
