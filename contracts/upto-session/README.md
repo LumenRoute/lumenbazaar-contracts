@@ -37,6 +37,22 @@ invocation. The current administrator can call `cancel_admin_rotation()` before
 or after expiry; cancellation never transfers privileges. `get_admin()` and
 `get_admin_rotation()` expose the current state without granting authority.
 
+## Emergency Creation Pause
+
+The stored administrator can stop new exposure without trapping existing funds.
+`pause_creation()` moves the operational state from `Active` to `Paused`, and
+`resume_creation()` moves it back. Both are administrator-authorized, reject a
+call that would leave the state unchanged with `OperationalStateUnchanged`, and
+emit a versioned `CreationPaused` or `CreationResumed` event.
+
+While paused, `create_session` returns `CreationPaused` before buyer
+authorization or any token transfer, so no new escrow or liability is recorded.
+Settlement, cancellation, expiry recovery, single and batch recovery, TTL
+extension, and all read-only queries remain available, so a pause can never trap
+an already funded session. `get_configuration().operational_state` reports the
+current value; `Deprecated` is reserved and is not reachable through this
+interface.
+
 ## Escrow Liability Query
 
 `get_escrow_liability(asset)` returns the checked aggregate amount recorded as
@@ -100,6 +116,20 @@ Data: `previous_admin` and `event_version` (`3`).
 Topics: `pending_admin`.
 
 Data: `current_admin` and `event_version` (`3`).
+
+### `CreationPaused`
+
+Topics: `admin`.
+
+Data: `event_version` (`3`). Emitted by `pause_creation()` when the operational
+state transitions from `Active` to `Paused`.
+
+### `CreationResumed`
+
+Topics: `admin`.
+
+Data: `event_version` (`3`). Emitted by `resume_creation()` when the operational
+state transitions from `Paused` to `Active`.
 
 ### `SessionCreated`
 

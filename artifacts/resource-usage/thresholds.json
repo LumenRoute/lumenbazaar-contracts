@@ -1,0 +1,83 @@
+{
+  "reviewedBy": "release-tooling",
+  "reviewedAt": "2026-10-16",
+  "headroomPercent": 25,
+  "methodology": "Ceilings are the reviewed native baseline plus headroom. A zero ceiling means the field must stay zero. Update only when a change to the measured behaviour is intentional and reviewed.",
+  "operations": {
+    "cancel": {
+      "instructions": 704459,
+      "mem_bytes": 116322,
+      "disk_read_entries": 0,
+      "memory_read_entries": 10,
+      "write_entries": 7,
+      "disk_read_bytes": 0,
+      "write_bytes": 1655,
+      "contract_events_size_bytes": 695,
+      "persistent_rent_ledger_bytes": 10000000,
+      "persistent_entry_rent_bumps": 2,
+      "temporary_rent_ledger_bytes": 568079910,
+      "temporary_entry_rent_bumps": 2,
+      "estimated_fee_stroops": 2873087
+    },
+    "create_session": {
+      "instructions": 790230,
+      "mem_bytes": 143228,
+      "disk_read_entries": 2,
+      "memory_read_entries": 10,
+      "write_entries": 8,
+      "disk_read_bytes": 115,
+      "write_bytes": 2440,
+      "contract_events_size_bytes": 935,
+      "persistent_rent_ledger_bytes": 1205152000,
+      "persistent_entry_rent_bumps": 5,
+      "temporary_rent_ledger_bytes": 568079910,
+      "temporary_entry_rent_bumps": 2,
+      "estimated_fee_stroops": 14418917
+    },
+    "extend_ttl": {
+      "instructions": 73960,
+      "mem_bytes": 11464,
+      "disk_read_entries": 0,
+      "memory_read_entries": 4,
+      "write_entries": 0,
+      "disk_read_bytes": 0,
+      "write_bytes": 0,
+      "contract_events_size_bytes": 0,
+      "persistent_rent_ledger_bytes": 0,
+      "persistent_entry_rent_bumps": 0,
+      "temporary_rent_ledger_bytes": 0,
+      "temporary_entry_rent_bumps": 0,
+      "estimated_fee_stroops": 53
+    },
+    "recover_expired": {
+      "instructions": 681678,
+      "mem_bytes": 111139,
+      "disk_read_entries": 0,
+      "memory_read_entries": 8,
+      "write_entries": 5,
+      "disk_read_bytes": 0,
+      "write_bytes": 1560,
+      "contract_events_size_bytes": 785,
+      "persistent_rent_ledger_bytes": 4999750,
+      "persistent_entry_rent_bumps": 2,
+      "temporary_rent_ledger_bytes": 0,
+      "temporary_entry_rent_bumps": 0,
+      "estimated_fee_stroops": 77362
+    },
+    "settle": {
+      "instructions": 1046715,
+      "mem_bytes": 170047,
+      "disk_read_entries": 2,
+      "memory_read_entries": 12,
+      "write_entries": 8,
+      "disk_read_bytes": 115,
+      "write_bytes": 1975,
+      "contract_events_size_bytes": 1115,
+      "persistent_rent_ledger_bytes": 195152000,
+      "persistent_entry_rent_bumps": 3,
+      "temporary_rent_ledger_bytes": 568079910,
+      "temporary_entry_rent_bumps": 2,
+      "estimated_fee_stroops": 4671714
+    }
+  }
+}
