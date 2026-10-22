@@ -5,6 +5,7 @@ use soroban_sdk::{contracttype, Address, BytesN, Vec};
 pub struct AssetPolicy {
     pub asset: Address,
     pub max_session_amount: i128,
+    pub min_session_amount: i128,
 }
 
 #[contracttype]
@@ -99,4 +100,22 @@ pub struct BatchRecoveryResult {
     pub session_id: BytesN<32>,
     pub status: BatchRecoveryStatus,
     pub refunded_amount: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CommitmentDomainMetadata {
+    pub response_version: u32,
+    pub interface_version: u32,
+    pub receipt_schema_version: u32,
+    pub session_id_domain: BytesN<32>,
+    pub usage_commitment_domain: BytesN<32>,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SessionStatusResponse {
+    pub exists: bool,
+    pub status: SessionStatus,
+    pub expires_at_ledger: u32,
 }

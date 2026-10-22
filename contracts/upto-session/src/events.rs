@@ -54,6 +54,7 @@ pub struct AssetDeprecated {
     #[topic]
     pub asset: Address,
     pub admin: Address,
+    pub reason_commitment: BytesN<32>,
     pub event_version: u32,
 }
 
@@ -95,6 +96,7 @@ pub struct AssetRemoved {
     #[topic]
     pub asset: Address,
     pub admin: Address,
+    pub reason_commitment: BytesN<32>,
     pub event_version: u32,
 }
 
@@ -204,6 +206,12 @@ pub fn publish_asset_session_cap_updated(
     .publish(env);
 }
 
+pub fn publish_asset_deprecated(
+    env: &Env,
+    asset: &Address,
+    admin: &Address,
+    reason_commitment: &BytesN<32>,
+) {
 pub fn publish_cap_increase_proposed(
     env: &Env,
     asset: &Address,
@@ -281,6 +289,7 @@ pub fn publish_asset_deprecated(env: &Env, asset: &Address, admin: &Address) {
     AssetDeprecated {
         asset: asset.clone(),
         admin: admin.clone(),
+        reason_commitment: reason_commitment.clone(),
         event_version: 3,
     }
     .publish(env);
@@ -332,10 +341,16 @@ pub fn publish_asset_activated(env: &Env, asset: &Address, decimals: u32) {
     .publish(env);
 }
 
-pub fn publish_asset_removed(env: &Env, asset: &Address, admin: &Address) {
+pub fn publish_asset_removed(
+    env: &Env,
+    asset: &Address,
+    admin: &Address,
+    reason_commitment: &BytesN<32>,
+) {
     AssetRemoved {
         asset: asset.clone(),
         admin: admin.clone(),
+        reason_commitment: reason_commitment.clone(),
         event_version: 3,
     }
     .publish(env);

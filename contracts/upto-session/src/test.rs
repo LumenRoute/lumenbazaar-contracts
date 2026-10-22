@@ -65,6 +65,7 @@ fn asset_policy(asset: &Address, max_session_amount: i128) -> AssetPolicy {
     AssetPolicy {
         asset: asset.clone(),
         max_session_amount,
+        min_session_amount: 1,
     }
 }
 
@@ -824,6 +825,36 @@ fn configuration_query_decodes_paused_and_deprecated_states() {
         OperationalState::Deprecated
     );
     assert_eq!(client.interface_version(), INTERFACE_VERSION);
+}
+
+#[test]
+fn commitment_domain_metadata_query_returns_authoritative_constants() {
+    let env = Env::default();
+    env.ledger().set_network_id([7; 32]);
+    let contract_id = Address::generate(&env);
+    env.register_at(&contract_id, UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+
+    // Call without initialization or authorization
+    let metadata = client.get_commitment_domain_metadata();
+
+    assert_eq!(
+        metadata.response_version,
+        COMMITMENT_DOMAIN_METADATA_RESPONSE_VERSION
+    );
+    assert_eq!(metadata.interface_version, INTERFACE_VERSION);
+    assert_eq!(metadata.receipt_schema_version, RECEIPT_SCHEMA_VERSION);
+
+    let (expected_session_domain, expected_usage_domain) = env.as_contract(&contract_id, || {
+        (
+            ids::session_id_domain_hash(&env),
+            ids::usage_commitment_domain_hash(&env),
+        )
+    });
+
+    assert_eq!(metadata.session_id_domain, expected_session_domain);
+    assert_eq!(metadata.usage_commitment_domain, expected_usage_domain);
+    assert_ne!(metadata.session_id_domain, metadata.usage_commitment_domain);
 }
 
 #[test]
@@ -1716,6 +1747,104 @@ fn get_session_returns_not_found_for_missing_session() {
         client.try_get_session(&missing_id),
         Err(Ok(ContractError::SessionNotFound))
     );
+    assert_eq!(
+        client.try_get_session_status(&missing_id),
+        Err(Ok(ContractError::SessionNotFound))
+    );
+}
+
+#[test]
+fn session_status_query_decodes_open_and_all_terminal_states_compatibly() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 1000);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let open_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &50,
+        &BytesN::from_array(&env, &[101; 32]),
+    );
+    let settled_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &50,
+        &BytesN::from_array(&env, &[102; 32]),
+    );
+    let cancelled_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &50,
+        &BytesN::from_array(&env, &[103; 32]),
+    );
+    let expired_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &30,
+        &BytesN::from_array(&env, &[104; 32]),
+    );
+
+    // Verify open state
+    let open_full = client.get_session(&open_id);
+    let open_status = client.get_session_status(&open_id);
+    assert!(open_status.exists);
+    assert_eq!(open_status.status, SessionStatus::Open);
+    assert_eq!(open_status.status, open_full.status);
+    assert_eq!(open_status.expires_at_ledger, 50);
+    assert_eq!(open_status.expires_at_ledger, open_full.expires_at_ledger);
+
+    // Settle settled_id
+    client.settle(&settled_id, &50, &BytesN::from_array(&env, &[105; 32]));
+    let settled_full = client.get_session(&settled_id);
+    let settled_status = client.get_session_status(&settled_id);
+    assert!(settled_status.exists);
+    assert_eq!(settled_status.status, SessionStatus::Settled);
+    assert_eq!(settled_status.status, settled_full.status);
+    assert_eq!(settled_status.expires_at_ledger, 50);
+    assert_eq!(
+        settled_status.expires_at_ledger,
+        settled_full.expires_at_ledger
+    );
+
+    // Cancel cancelled_id
+    client.cancel(&cancelled_id);
+    let cancelled_full = client.get_session(&cancelled_id);
+    let cancelled_status = client.get_session_status(&cancelled_id);
+    assert!(cancelled_status.exists);
+    assert_eq!(cancelled_status.status, SessionStatus::Cancelled);
+    assert_eq!(cancelled_status.status, cancelled_full.status);
+    assert_eq!(cancelled_status.expires_at_ledger, 50);
+    assert_eq!(
+        cancelled_status.expires_at_ledger,
+        cancelled_full.expires_at_ledger
+    );
+
+    // Expire expired_id
+    env.ledger().set_sequence_number(35);
+    client.recover_expired(&expired_id);
+    let expired_full = client.get_session(&expired_id);
+    let expired_status = client.get_session_status(&expired_id);
+    assert!(expired_status.exists);
+    assert_eq!(expired_status.status, SessionStatus::Expired);
+    assert_eq!(expired_status.status, expired_full.status);
+    assert_eq!(expired_status.expires_at_ledger, 30);
+    assert_eq!(
+        expired_status.expires_at_ledger,
+        expired_full.expires_at_ledger
+    );
 }
 
 #[test]
@@ -2006,17 +2135,25 @@ fn asset_deprecation_requires_admin_and_blocks_new_sessions() {
         }])
         .initialize(&admin, &asset_policies);
 
+    let deprecate_reason = BytesN::from_array(&env, &[70; 32]);
+    let empty_reason = BytesN::from_array(&env, &[0; 32]);
+
+    assert_eq!(
+        client.try_deprecate_asset(&asset, &empty_reason),
+        Err(Ok(ContractError::InvalidResourceHash))
+    );
+
     let unauthorized = client
         .mock_auths(&[MockAuth {
             address: &attacker,
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "deprecate_asset",
-                args: (asset.clone(),).into_val(&env),
+                args: (asset.clone(), deprecate_reason.clone()).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .try_deprecate_asset(&asset);
+        .try_deprecate_asset(&asset, &deprecate_reason);
     assert!(unauthorized.is_err());
     env.as_contract(&contract_id, || {
         assert_eq!(
@@ -2031,16 +2168,17 @@ fn asset_deprecation_requires_admin_and_blocks_new_sessions() {
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "deprecate_asset",
-                args: (asset.clone(),).into_val(&env),
+                args: (asset.clone(), deprecate_reason.clone()).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .deprecate_asset(&asset);
+        .deprecate_asset(&asset, &deprecate_reason);
     assert_eq!(
         env.events().all().filter_by_contract(&contract_id),
         std::vec![events::AssetDeprecated {
             asset: asset.clone(),
             admin: admin.clone(),
+            reason_commitment: deprecate_reason.clone(),
             event_version: 3,
         }
         .to_xdr(&env, &contract_id)]
@@ -2058,11 +2196,11 @@ fn asset_deprecation_requires_admin_and_blocks_new_sessions() {
                 invoke: &MockAuthInvoke {
                     contract: &contract_id,
                     fn_name: "deprecate_asset",
-                    args: (asset.clone(),).into_val(&env),
+                    args: (asset.clone(), deprecate_reason.clone()).into_val(&env),
                     sub_invokes: &[],
                 },
             }])
-            .try_deprecate_asset(&asset),
+            .try_deprecate_asset(&asset, &deprecate_reason),
         Err(Ok(ContractError::AssetNotActive))
     );
 
@@ -2112,9 +2250,17 @@ fn deprecated_asset_terminal_paths_clear_liability_before_removal() {
         &BytesN::from_array(&env, &[74; 32]),
     );
 
-    client.deprecate_asset(&asset);
+    let deprecate_reason = BytesN::from_array(&env, &[77; 32]);
+    let remove_reason = BytesN::from_array(&env, &[78; 32]);
+    let empty_reason = BytesN::from_array(&env, &[0; 32]);
+
+    client.deprecate_asset(&asset, &deprecate_reason);
     assert_eq!(
-        client.try_remove_asset(&asset),
+        client.try_remove_asset(&asset, &empty_reason),
+        Err(Ok(ContractError::InvalidResourceHash))
+    );
+    assert_eq!(
+        client.try_remove_asset(&asset, &remove_reason),
         Err(Ok(ContractError::AssetLiabilityOutstanding))
     );
 
@@ -2139,10 +2285,11 @@ fn deprecated_asset_terminal_paths_clear_liability_before_removal() {
         assert_eq!(storage::read_liability(&env, &asset), 0);
     });
 
-    client.remove_asset(&asset);
+    client.remove_asset(&asset, &remove_reason);
     let expected = events::AssetRemoved {
         asset: asset.clone(),
         admin: admin.clone(),
+        reason_commitment: remove_reason.clone(),
         event_version: 3,
     }
     .to_xdr(&env, &contract_id);
@@ -2158,7 +2305,7 @@ fn deprecated_asset_terminal_paths_clear_liability_before_removal() {
         assert_eq!(storage::read_asset_status(&env, &asset), None);
     });
     assert_eq!(
-        client.try_remove_asset(&asset),
+        client.try_remove_asset(&asset, &remove_reason),
         Err(Ok(ContractError::AssetNotDeprecated))
     );
 }
@@ -3143,6 +3290,7 @@ fn extend_ttl_rejects_missing_session() {
 }
 
 #[test]
+fn per_asset_minimum_enforces_boundaries_and_policy_invariants() {
 fn seller_exposure_ceiling_enforces_limits_and_releases_exposure() {
     let env = Env::default();
     env.mock_all_auths();
@@ -3353,6 +3501,65 @@ fn creation_pause_rejects_repeated_calls_and_resume_restores_creation() {
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
     let asset = create_test_asset(&env, &buyer, 1_000);
+    let other = create_test_asset(&env, &buyer, 1_000);
+
+    let bad = |min: i128, max: i128| AssetPolicy {
+        asset: asset.clone(),
+        max_session_amount: max,
+        min_session_amount: min,
+    };
+    for policy in [bad(0, 100), bad(-1, 100), bad(101, 100)] {
+        assert_eq!(
+            client.try_initialize(&admin, &soroban_sdk::vec![&env, policy]),
+            Err(Ok(ContractError::InvalidAssetCap))
+        );
+    }
+
+    client.initialize(
+        &admin,
+        &soroban_sdk::vec![
+            &env,
+            AssetPolicy {
+                asset: asset.clone(),
+                max_session_amount: 100,
+                min_session_amount: 10,
+            },
+            AssetPolicy {
+                asset: other.clone(),
+                max_session_amount: 500,
+                min_session_amount: 50,
+            }
+        ],
+    );
+    assert_eq!(client.get_asset_min_session_amount(&asset), 10);
+    assert_eq!(client.get_asset_min_session_amount(&other), 50);
+
+    let hash = |n: u8| BytesN::from_array(&env, &[n; 32]);
+    assert_eq!(
+        client.try_create_session(&buyer, &seller, &asset, &9, &50, &hash(90)),
+        Err(Ok(ContractError::InvalidAmount))
+    );
+    assert_eq!(
+        client.try_create_session(&buyer, &seller, &asset, &101, &50, &hash(91)),
+        Err(Ok(ContractError::AmountExceedsCap))
+    );
+    // Same amount is valid for one asset and below the other asset's minimum.
+    assert_eq!(
+        client.try_create_session(&buyer, &seller, &other, &10, &50, &hash(92)),
+        Err(Ok(ContractError::InvalidAmount))
+    );
+    let at_min = client.create_session(&buyer, &seller, &asset, &10, &50, &hash(93));
+    let at_max = client.create_session(&buyer, &seller, &asset, &100, &50, &hash(94));
+
+    // The cap cannot be moved below the minimum; a valid update leaves sessions intact.
+    assert_eq!(
+        client.try_set_asset_max_session_amount(&asset, &9),
+        Err(Ok(ContractError::InvalidAssetCap))
+    );
+    client.set_asset_max_session_amount(&asset, &10);
+    assert_eq!(client.get_session(&at_min).max_amount, 10);
+    assert_eq!(client.get_session(&at_max).max_amount, 100);
+    assert_eq!(client.get_asset_min_session_amount(&asset), 10);
     let resource_hash = BytesN::from_array(&env, &[72; 32]);
     initialize_for_asset(&env, &client, &admin, &asset);
 

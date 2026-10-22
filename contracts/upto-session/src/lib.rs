@@ -10,6 +10,8 @@ pub mod validation;
 pub use errors::ContractError;
 pub use types::{
     AdminRotation, AssetPolicy, AssetStatus, BatchRecoveryResult, BatchRecoveryStatus,
+    CommitmentDomainMetadata, ContractConfiguration, OperationalState, Session, SessionStatus,
+    SessionStatusResponse,
     CapIncreaseProposal, ContractConfiguration, OperationalState, Session, SessionStatus,
 };
 
@@ -20,6 +22,8 @@ pub struct UptoSessionContract;
 
 pub const INTERFACE_VERSION: u32 = 3;
 pub const CONFIGURATION_RESPONSE_VERSION: u32 = 1;
+pub const COMMITMENT_DOMAIN_METADATA_RESPONSE_VERSION: u32 = 1;
+pub const RECEIPT_SCHEMA_VERSION: u32 = 1;
 pub const MAX_SUPPORTED_ASSETS: u32 = 16;
 pub const MAX_RECOVERY_BATCH_SIZE: u32 = 8;
 
@@ -44,7 +48,10 @@ impl UptoSessionContract {
         }
         let mut supported_assets = Vec::new(&env);
         for policy in asset_policies.iter() {
-            validation::validate_asset_cap(policy.max_session_amount)?;
+            validation::validate_asset_policy(
+                policy.min_session_amount,
+                policy.max_session_amount,
+            )?;
             if supported_assets.iter().any(|asset| asset == policy.asset) {
                 return Err(ContractError::InvalidSupportedAssets);
             }
@@ -54,6 +61,7 @@ impl UptoSessionContract {
             let probe = validation::validate_supported_asset(&env, &policy.asset, &admin)?;
             storage::write_supported_asset(&env, &policy.asset);
             storage::write_asset_max_session_amount(&env, &policy.asset, policy.max_session_amount);
+            storage::write_asset_min_session_amount(&env, &policy.asset, policy.min_session_amount);
             events::publish_asset_activated(&env, &policy.asset, probe.decimals);
         }
         storage::write_supported_assets(&env, &supported_assets);
@@ -77,6 +85,9 @@ impl UptoSessionContract {
         validation::validate_asset_cap(max_session_amount)?;
         admin.require_auth();
 
+        let min_session_amount = storage::read_asset_min_session_amount(&env, &asset)
+            .ok_or(ContractError::AssetCapNotConfigured)?;
+        validation::validate_asset_policy(min_session_amount, max_session_amount)?;
         let previous_max_session_amount = storage::read_asset_max_session_amount(&env, &asset)
             .ok_or(ContractError::AssetCapNotConfigured)?;
 
@@ -289,6 +300,14 @@ impl UptoSessionContract {
             .ok_or(ContractError::AssetCapNotConfigured)
     }
 
+    pub fn get_asset_min_session_amount(env: Env, asset: Address) -> Result<i128, ContractError> {
+        if !storage::is_supported_asset(&env, &asset) {
+            return Err(ContractError::UnsupportedAsset);
+        }
+        storage::read_asset_min_session_amount(&env, &asset)
+            .ok_or(ContractError::AssetCapNotConfigured)
+    }
+
     pub fn propose_admin(
         env: Env,
         pending_admin: Address,
@@ -375,6 +394,16 @@ impl UptoSessionContract {
         })
     }
 
+    pub fn get_commitment_domain_metadata(env: Env) -> CommitmentDomainMetadata {
+        CommitmentDomainMetadata {
+            response_version: COMMITMENT_DOMAIN_METADATA_RESPONSE_VERSION,
+            interface_version: INTERFACE_VERSION,
+            receipt_schema_version: RECEIPT_SCHEMA_VERSION,
+            session_id_domain: ids::session_id_domain_hash(&env),
+            usage_commitment_domain: ids::usage_commitment_domain_hash(&env),
+        }
+    }
+
     pub fn create_session(
         env: Env,
         buyer: Address,
@@ -408,6 +437,11 @@ impl UptoSessionContract {
         }
         let asset_cap = storage::read_asset_max_session_amount(&env, &asset)
             .ok_or(ContractError::AssetCapNotConfigured)?;
+        let asset_min = storage::read_asset_min_session_amount(&env, &asset)
+            .ok_or(ContractError::AssetCapNotConfigured)?;
+        if max_amount < asset_min {
+            return Err(ContractError::InvalidAmount);
+        }
         if max_amount > asset_cap {
             return Err(ContractError::AmountExceedsCap);
         }
@@ -495,7 +529,12 @@ impl UptoSessionContract {
         Ok(session_id)
     }
 
-    pub fn deprecate_asset(env: Env, asset: Address) -> Result<(), ContractError> {
+    pub fn deprecate_asset(
+        env: Env,
+        asset: Address,
+        reason_commitment: BytesN<32>,
+    ) -> Result<(), ContractError> {
+        validation::validate_reason_commitment(&env, &reason_commitment)?;
         let admin = require_admin(&env)?;
         match storage::read_asset_status(&env, &asset) {
             Some(AssetStatus::Active) => {}
@@ -504,11 +543,16 @@ impl UptoSessionContract {
 
         storage::write_asset_status(&env, &asset, &AssetStatus::Deprecated);
         storage::extend_instance_ttl(&env);
-        events::publish_asset_deprecated(&env, &asset, &admin);
+        events::publish_asset_deprecated(&env, &asset, &admin, &reason_commitment);
         Ok(())
     }
 
-    pub fn remove_asset(env: Env, asset: Address) -> Result<(), ContractError> {
+    pub fn remove_asset(
+        env: Env,
+        asset: Address,
+        reason_commitment: BytesN<32>,
+    ) -> Result<(), ContractError> {
+        validation::validate_reason_commitment(&env, &reason_commitment)?;
         let admin = require_admin(&env)?;
         if storage::read_asset_status(&env, &asset) != Some(AssetStatus::Deprecated) {
             return Err(ContractError::AssetNotDeprecated);
@@ -519,7 +563,7 @@ impl UptoSessionContract {
 
         storage::remove_asset_status(&env, &asset);
         storage::extend_instance_ttl(&env);
-        events::publish_asset_removed(&env, &asset, &admin);
+        events::publish_asset_removed(&env, &asset, &admin, &reason_commitment);
         Ok(())
     }
 
@@ -833,6 +877,19 @@ impl UptoSessionContract {
 
     pub fn get_session(env: Env, session_id: BytesN<32>) -> Result<Session, ContractError> {
         storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)
+    }
+
+    pub fn get_session_status(
+        env: Env,
+        session_id: BytesN<32>,
+    ) -> Result<SessionStatusResponse, ContractError> {
+        let session =
+            storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
+        Ok(SessionStatusResponse {
+            exists: true,
+            status: session.status,
+            expires_at_ledger: session.expires_at_ledger,
+        })
     }
 
     pub fn get_escrow_liability(env: Env, asset: Address) -> Result<i128, ContractError> {

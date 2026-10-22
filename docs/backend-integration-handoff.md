@@ -48,7 +48,7 @@ administrator-rotation, and creation pause/resume events use version `3`.
 | Function | Backend use |
 | --- | --- |
 | `interface_version()` | Require result `3` before encoding v3 initialization, configuration, cap-policy, administrator-rotation, liability, or batch-recovery calls. |
-| `initialize(admin, asset_policies)` | One-time deployment setup with one to 16 unique assets and positive explicit session caps. Every asset must pass the bounded read-only probe. Do not call from request handlers. |
+| `initialize(admin, asset_policies)` | One-time deployment setup with one to 16 unique assets and explicit positive session bounds (`min_session_amount` <= `max_session_amount`). Every asset must pass the bounded read-only probe. Do not call from request handlers. |
 | `get_asset_max_session_amount(asset)` | Read the active creation cap for a supported asset. |
 | `set_asset_max_session_amount(asset, max_session_amount)` | Authenticated administrator update for future sessions only; immediate for cap decreases, rejects cap increases with `CapIncreasePending`. |
 | `propose_asset_cap_increase(asset, proposed_max_amount, active_at_ledger, expires_at_ledger)` | Admin-authorized proposal to increase an asset cap after a bounded delay between 100 and 17,280 ledgers. |
@@ -61,10 +61,12 @@ administrator-rotation, and creation pause/resume events use version `3`.
 | `accept_admin()` | Pending-admin-authorized acceptance before expiry. |
 | `cancel_admin_rotation()` | Current-admin-authorized removal of a pending or expired proposal. |
 | `get_configuration()` | Read response/interface/storage versions, administrator, bounded supported assets, operational state, and instance TTL policy without authorization. |
+| `get_commitment_domain_metadata()` | Read versioned commitment domain metadata, interface version, receipt schema version, and domain hash constants without authorization. |
 | `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash)` | Create a buyer-authorized spending cap and escrow the full cap for a resource. |
-| `deprecate_asset(asset)` | Admin-authorized transition from active to deprecated; blocks new sessions without changing existing sessions. |
-| `remove_asset(asset)` | Admin-authorized final removal after deprecation and only when recorded liability is exactly zero. |
+| `deprecate_asset(asset, reason_commitment)` | Admin-authorized transition from active to deprecated with fixed-size reason commitment; blocks new sessions without changing existing sessions. |
+| `remove_asset(asset, reason_commitment)` | Admin-authorized final removal with fixed-size reason commitment after deprecation and only when recorded liability is exactly zero. |
 | `get_session(session_id)` | Read current session state for API responses, reconciliation, and settlement guards. |
+| `get_session_status(session_id)` | Read lightweight session status (exists, status, expires_at_ledger) without decoding commitment fields. |
 | `get_escrow_liability(asset)` | Read aggregate open-session escrow accounting for a supported asset and compare it with contract token custody. |
 | `settle(session_id, actual_amount, usage_hash)` | Seller-authorized settlement for actual usage. |
 | `cancel(session_id)` | Buyer-authorized cancellation before settlement. |
@@ -221,7 +223,7 @@ codes 23 through 32 without changing the earlier mappings.
 | 20 | `NotInitialized` | Initialize a new deployment before creating sessions. |
 | 21 | `SessionExpired` | Treat as finalized by expiry recovery. |
 | 22 | `SessionNotExpired` | Do not recover before the exact expiry ledger. |
-| 23 | `InvalidAssetCap` | Reject zero or negative configured session caps. |
+| 23 | `InvalidAssetCap` | Reject zero or negative caps or minimums, a minimum above the maximum, or a cap update below the minimum. |
 | 24 | `AssetCapNotConfigured` | Stop creation and investigate incomplete asset policy state. |
 | 25 | `InvalidAdmin` | Reject proposals that target the active administrator. |
 | 26 | `InvalidAdminRotationExpiry` | Reject expired or excessively long proposal windows. |
@@ -322,6 +324,34 @@ customer identifiers, access tokens, IP addresses, URLs containing private
 parameters, and fine-grained usage logs must remain in access-controlled
 off-chain storage. Use opaque `receiptId` values and coarse measurement units
 that do not reveal private activity.
+
+## Asset Lifecycle Reason Commitments
+
+Asset deprecation and removal invocations accept a 32-byte reason commitment
+(`reason_commitment: BytesN<32>`). Empty commitments (`[0; 32]`) fail closed
+before any state mutation.
+
+The on-chain contract stores and emits only the 32-byte digest in the
+`AssetDeprecated` and `AssetRemoved` events, preserving auditability while
+preventing private incident text, governance discussions, or unbounded data
+from entering ledger state.
+
+Backends and operators should generate reason commitments by hashing the UTF-8
+canonical representation of an off-chain record (such as an incident report,
+governance decision, or review record) using SHA-256:
+
+```json
+{
+  "action": "deprecate_asset",
+  "asset": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+  "reason": "Security deprecation following provider key rotation",
+  "referenceId": "INC-2026-10-19-01",
+  "timestamp": 1792437600
+}
+```
+
+Off-chain audit logs retain the full record preimage to prove integrity against
+the emitted event's `reason_commitment`.
 
 ## Settlement Guardrails
 

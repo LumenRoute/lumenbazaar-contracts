@@ -90,6 +90,17 @@ pub fn validate_asset_cap(max_session_amount: i128) -> Result<(), ContractError>
     Ok(())
 }
 
+pub fn validate_asset_policy(
+    min_session_amount: i128,
+    max_session_amount: i128,
+) -> Result<(), ContractError> {
+    validate_asset_cap(max_session_amount)?;
+    if min_session_amount <= 0 || min_session_amount > max_session_amount {
+        return Err(ContractError::InvalidAssetCap);
+    }
+    Ok(())
+}
+
 pub struct AssetProbe {
     pub decimals: u32,
 }
@@ -179,6 +190,17 @@ pub fn validate_settlement_amount(
 pub fn validate_usage_hash(env: &Env, usage_hash: &BytesN<32>) -> Result<(), ContractError> {
     if usage_hash == &BytesN::from_array(env, &[0; 32]) {
         return Err(ContractError::InvalidUsageHash);
+    }
+
+    Ok(())
+}
+
+pub fn validate_reason_commitment(
+    env: &Env,
+    reason_commitment: &BytesN<32>,
+) -> Result<(), ContractError> {
+    if reason_commitment == &BytesN::from_array(env, &[0; 32]) {
+        return Err(ContractError::InvalidResourceHash);
     }
 
     Ok(())
