@@ -39,6 +39,12 @@ pub enum ContractError {
     AssetNotActive = 33,
     AssetNotDeprecated = 34,
     AssetLiabilityOutstanding = 35,
+    SellerExposureCeilingExceeded = 36,
+    SellerExposureCeilingNotConfigured = 37,
+    BuyerOpenSessionsExceeded = 38,
+    InvalidSessionCountLimit = 39,
+    SellerOpenSessionsExceeded = 40,
+    InvalidCapReduction = 41,
     CreationPaused = 36,
     OperationalStateUnchanged = 37,
 }
@@ -84,6 +90,12 @@ mod tests {
         assert_eq!(ContractError::AssetNotActive as u32, 33);
         assert_eq!(ContractError::AssetNotDeprecated as u32, 34);
         assert_eq!(ContractError::AssetLiabilityOutstanding as u32, 35);
+        assert_eq!(ContractError::SellerExposureCeilingExceeded as u32, 36);
+        assert_eq!(ContractError::SellerExposureCeilingNotConfigured as u32, 37);
+        assert_eq!(ContractError::BuyerOpenSessionsExceeded as u32, 38);
+        assert_eq!(ContractError::InvalidSessionCountLimit as u32, 39);
+        assert_eq!(ContractError::SellerOpenSessionsExceeded as u32, 40);
+        assert_eq!(ContractError::InvalidCapReduction as u32, 41);
         assert_eq!(ContractError::CreationPaused as u32, 36);
         assert_eq!(ContractError::OperationalStateUnchanged as u32, 37);
     }

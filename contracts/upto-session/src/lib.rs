@@ -91,6 +91,103 @@ impl UptoSessionContract {
         Ok(())
     }
 
+    pub fn set_seller_exposure_ceiling(
+        env: Env,
+        asset: Address,
+        ceiling: i128,
+    ) -> Result<(), ContractError> {
+        let admin = storage::read_admin(&env).ok_or(ContractError::NotInitialized)?;
+        if !storage::is_supported_asset(&env, &asset) {
+            return Err(ContractError::UnsupportedAsset);
+        }
+        validation::validate_asset_cap(ceiling)?;
+        admin.require_auth();
+
+        let previous_ceiling = storage::read_seller_exposure_ceiling(&env, &asset).unwrap_or(0);
+        storage::write_seller_exposure_ceiling(&env, &asset, ceiling);
+        storage::extend_instance_ttl(&env);
+        events::publish_seller_exposure_ceiling_updated(
+            &env,
+            &asset,
+            &admin,
+            previous_ceiling,
+            ceiling,
+        );
+        Ok(())
+    }
+
+    pub fn get_seller_exposure_ceiling(env: Env, asset: Address) -> Result<i128, ContractError> {
+        if !storage::is_supported_asset(&env, &asset) {
+            return Err(ContractError::UnsupportedAsset);
+        }
+        storage::read_seller_exposure_ceiling(&env, &asset)
+            .ok_or(ContractError::SellerExposureCeilingNotConfigured)
+    }
+
+    pub fn get_seller_exposure(
+        env: Env,
+        seller: Address,
+        asset: Address,
+    ) -> Result<i128, ContractError> {
+        if !storage::has_admin(&env) {
+            return Err(ContractError::NotInitialized);
+        }
+        if !storage::is_supported_asset(&env, &asset) {
+            return Err(ContractError::UnsupportedAsset);
+        }
+        Ok(storage::read_seller_exposure(&env, &seller, &asset))
+    }
+
+    pub fn set_max_buyer_open_sessions(env: Env, limit: u32) -> Result<(), ContractError> {
+        let admin = storage::read_admin(&env).ok_or(ContractError::NotInitialized)?;
+        if limit == 0 {
+            return Err(ContractError::InvalidSessionCountLimit);
+        }
+        admin.require_auth();
+
+        let previous_limit = storage::read_max_buyer_open_sessions(&env).unwrap_or(0);
+        storage::write_max_buyer_open_sessions(&env, limit);
+        storage::extend_instance_ttl(&env);
+        events::publish_max_buyer_open_sessions_updated(&env, &admin, previous_limit, limit);
+        Ok(())
+    }
+
+    pub fn get_max_buyer_open_sessions(env: Env) -> Option<u32> {
+        storage::read_max_buyer_open_sessions(&env)
+    }
+
+    pub fn get_buyer_open_sessions(env: Env, buyer: Address) -> Result<u32, ContractError> {
+        if !storage::has_admin(&env) {
+            return Err(ContractError::NotInitialized);
+        }
+        Ok(storage::read_buyer_open_sessions(&env, &buyer))
+    }
+
+    pub fn set_max_seller_open_sessions(env: Env, limit: u32) -> Result<(), ContractError> {
+        let admin = storage::read_admin(&env).ok_or(ContractError::NotInitialized)?;
+        if limit == 0 {
+            return Err(ContractError::InvalidSessionCountLimit);
+        }
+        admin.require_auth();
+
+        let previous_limit = storage::read_max_seller_open_sessions(&env).unwrap_or(0);
+        storage::write_max_seller_open_sessions(&env, limit);
+        storage::extend_instance_ttl(&env);
+        events::publish_max_seller_open_sessions_updated(&env, &admin, previous_limit, limit);
+        Ok(())
+    }
+
+    pub fn get_max_seller_open_sessions(env: Env) -> Option<u32> {
+        storage::read_max_seller_open_sessions(&env)
+    }
+
+    pub fn get_seller_open_sessions(env: Env, seller: Address) -> Result<u32, ContractError> {
+        if !storage::has_admin(&env) {
+            return Err(ContractError::NotInitialized);
+        }
+        Ok(storage::read_seller_open_sessions(&env, &seller))
+    }
+
     pub fn get_asset_max_session_amount(env: Env, asset: Address) -> Result<i128, ContractError> {
         if !storage::is_supported_asset(&env, &asset) {
             return Err(ContractError::UnsupportedAsset);
@@ -218,6 +315,30 @@ impl UptoSessionContract {
             return Err(ContractError::AmountExceedsCap);
         }
 
+        if let Some(ceiling) = storage::read_seller_exposure_ceiling(&env, &asset) {
+            let current_exposure = storage::read_seller_exposure(&env, &seller, &asset);
+            let projected_exposure = current_exposure
+                .checked_add(max_amount)
+                .ok_or(ContractError::LiabilityOverflow)?;
+            if projected_exposure > ceiling {
+                return Err(ContractError::SellerExposureCeilingExceeded);
+            }
+        }
+
+        if let Some(limit) = storage::read_max_buyer_open_sessions(&env) {
+            let current_sessions = storage::read_buyer_open_sessions(&env, &buyer);
+            if current_sessions >= limit {
+                return Err(ContractError::BuyerOpenSessionsExceeded);
+            }
+        }
+
+        if let Some(limit) = storage::read_max_seller_open_sessions(&env) {
+            let current_sessions = storage::read_seller_open_sessions(&env, &seller);
+            if current_sessions >= limit {
+                return Err(ContractError::SellerOpenSessionsExceeded);
+            }
+        }
+
         buyer.require_auth();
         let sequence = storage::take_next_session_sequence(&env);
         let session_id = ids::derive_session_id(
@@ -245,6 +366,9 @@ impl UptoSessionContract {
             max_amount,
         )?;
         let liability = storage::increase_liability(&env, &asset, max_amount)?;
+        storage::increase_seller_exposure(&env, &seller, &asset, max_amount)?;
+        storage::increment_buyer_open_sessions(&env, &buyer)?;
+        storage::increment_seller_open_sessions(&env, &seller)?;
         if escrow.balance(&contract) < liability {
             return Err(ContractError::EscrowUnderfunded);
         }
@@ -357,6 +481,9 @@ impl UptoSessionContract {
         let seller_balance_before = asset.balance(&session.seller);
         let buyer_balance_before = asset.balance(&session.buyer);
         storage::decrease_liability(&env, &session.asset, escrowed_amount)?;
+        storage::decrease_seller_exposure(&env, &session.seller, &session.asset, escrowed_amount)?;
+        storage::decrement_buyer_open_sessions(&env, &session.buyer)?;
+        storage::decrement_seller_open_sessions(&env, &session.seller)?;
         asset.transfer(&contract, &session.seller, &actual_amount);
         if refunded_amount > 0 {
             asset.transfer(&contract, &session.buyer, &refunded_amount);
@@ -420,6 +547,9 @@ impl UptoSessionContract {
         let contract_balance_before = asset.balance(&contract);
         let buyer_balance_before = asset.balance(&session.buyer);
         storage::decrease_liability(&env, &session.asset, refunded_amount)?;
+        storage::decrease_seller_exposure(&env, &session.seller, &session.asset, refunded_amount)?;
+        storage::decrement_buyer_open_sessions(&env, &session.buyer)?;
+        storage::decrement_seller_open_sessions(&env, &session.seller)?;
         asset.transfer(&contract, &session.buyer, &refunded_amount);
         verify_debit(
             contract_balance_before,
@@ -440,6 +570,82 @@ impl UptoSessionContract {
             &session.buyer,
             &session.asset,
             refunded_amount,
+        );
+
+        Ok(())
+    }
+
+    pub fn reduce_session_cap(
+        env: Env,
+        session_id: BytesN<32>,
+        new_max_amount: i128,
+    ) -> Result<(), ContractError> {
+        let mut session =
+            storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
+
+        match &session.status {
+            SessionStatus::Open => {}
+            SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
+            SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
+            SessionStatus::Expired => return Err(ContractError::SessionExpired),
+        }
+
+        if env.ledger().sequence() >= session.expires_at_ledger {
+            return Err(ContractError::ExpiredSession);
+        }
+
+        if new_max_amount <= 0 || new_max_amount >= session.max_amount {
+            return Err(ContractError::InvalidCapReduction);
+        }
+
+        session.buyer.require_auth();
+
+        let previous_max_amount = session.max_amount;
+        let refund_difference = previous_max_amount - new_max_amount;
+        let asset = token::Client::new(&env, &session.asset);
+        let contract = env.current_contract_address();
+
+        if session.escrowed_amount != previous_max_amount
+            || asset.balance(&contract) < storage::read_liability(&env, &session.asset)
+        {
+            return Err(ContractError::EscrowUnderfunded);
+        }
+
+        let contract_balance_before = asset.balance(&contract);
+        let buyer_balance_before = asset.balance(&session.buyer);
+
+        storage::decrease_liability(&env, &session.asset, refund_difference)?;
+        storage::decrease_seller_exposure(
+            &env,
+            &session.seller,
+            &session.asset,
+            refund_difference,
+        )?;
+        asset.transfer(&contract, &session.buyer, &refund_difference);
+
+        verify_debit(
+            contract_balance_before,
+            asset.balance(&contract),
+            refund_difference,
+        )?;
+        verify_credit(
+            buyer_balance_before,
+            asset.balance(&session.buyer),
+            refund_difference,
+        )?;
+
+        session.max_amount = new_max_amount;
+        session.escrowed_amount = new_max_amount;
+        storage::write_session(&env, &session);
+
+        events::publish_session_cap_reduced(
+            &env,
+            &session_id,
+            &session.buyer,
+            &session.asset,
+            previous_max_amount,
+            new_max_amount,
+            refund_difference,
         );
 
         Ok(())
@@ -570,6 +776,9 @@ fn recover_open_session(env: &Env, session: &mut Session) -> Result<(), Contract
     let contract_balance_before = asset.balance(&contract);
     let buyer_balance_before = asset.balance(&session.buyer);
     storage::decrease_liability(env, &session.asset, refunded_amount)?;
+    storage::decrease_seller_exposure(env, &session.seller, &session.asset, refunded_amount)?;
+    storage::decrement_buyer_open_sessions(env, &session.buyer)?;
+    storage::decrement_seller_open_sessions(env, &session.seller)?;
     asset.transfer(&contract, &session.buyer, &refunded_amount);
     verify_debit(
         contract_balance_before,
