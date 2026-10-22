@@ -1,0 +1,47 @@
+# cargo-mutants configuration for lumenbazaar-contracts
+# Issue: #17 – Add mutation tests for authorization and cap checks
+#
+# Scope: Only mutate security-critical production code in the two contract
+# crates.  Bindings, test-only helpers, formal models, and scripts are
+# excluded so the mutation run stays within the documented time budget.
+
+# ── packages to mutate ────────────────────────────────────────────────────────
+# Only production code in these two crates is in scope.
+workspace = true
+packages = [
+    "upto-session",
+    "policy-wallet-example",
+]
+
+# ── source files to exclude from mutation ─────────────────────────────────────
+# Matches are checked against the file path relative to the workspace root.
+exclude_re = [
+    # Test-only modules – mutating tests cannot kill real bugs
+    "mutation_test\\.rs$",
+    "auth_test\\.rs$",
+    "property_test\\.rs$",
+    "receipt_test\\.rs$",
+    "test\\.rs$",
+    # Generated TypeScript bindings
+    "bindings/",
+    # Formal / model-checking code
+    "formal/",
+    # Build and CI scripts
+    "scripts/",
+]
+
+# ── test command ──────────────────────────────────────────────────────────────
+# Run only the two in-scope crates so each mutant is evaluated quickly.
+test_args = [
+    "--workspace",
+    "--all-features",
+    "--",
+    "--test-threads=1",
+]
+
+# ── resource budget ────────────────────────────────────────────────────────────
+# Maximum wall-clock seconds per mutant before it is declared "timed out".
+# Kept conservatively high because Soroban contract tests compile from scratch
+# for every mutant.  See artifacts/mutation-budget.md for the documented budget.
+timeout_multiplier = 3.0
+minimum_test_timeout = 60

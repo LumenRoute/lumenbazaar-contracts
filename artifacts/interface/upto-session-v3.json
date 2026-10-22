@@ -2,6 +2,7 @@
   "contractVersion": "0.3.0",
   "interfaceVersion": 3,
   "sourceSpecSha256": "026dc59bcfe7c3993a8609b60250049d125371d8b5cca7b7b981aa580c044086",
+  "sourceSpecSha256": "fc603a096025df811f1cb31384595dbf334a35353d7ff03e300447eaa8368bf1",
   "methods": [
     "accept_admin",
     "cancel",
@@ -20,11 +21,13 @@
     "initialize",
     "interface_version",
     "preview_settle",
+    "pause_creation",
     "propose_admin",
     "recover_expired",
     "recover_expired_batch",
     "reject",
     "remove_asset",
+    "resume_creation",
     "set_asset_max_session_amount",
     "settle"
   ],
@@ -197,6 +200,42 @@
           "name": "new_max_session_amount",
           "location": "data",
           "type": "i128"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "CreationPaused",
+      "prefixTopics": [
+        "creation_paused"
+      ],
+      "fields": [
+        {
+          "name": "admin",
+          "location": "topic_list",
+          "type": "address"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "CreationResumed",
+      "prefixTopics": [
+        "creation_resumed"
+      ],
+      "fields": [
+        {
+          "name": "admin",
+          "location": "topic_list",
+          "type": "address"
         },
         {
           "name": "event_version",
@@ -588,6 +627,12 @@
     {
       "name": "SessionRejected",
       "value": 36
+      "name": "CreationPaused",
+      "value": 36
+    },
+    {
+      "name": "OperationalStateUnchanged",
+      "value": 37
     }
   ]
 }

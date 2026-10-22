@@ -5,6 +5,7 @@
     {
       "path": "contracts/upto-session/src/lib.rs",
       "sha256": "83d9f6917b67ffb0c85e6213f502d5f03532ce68a1b32588e6608cbaea8c2ff6"
+      "sha256": "f93cd9644ae83c6d8df0b7ba9c984d0393c707c3d548e4109ff4362bec5ecf08"
     },
     {
       "path": "contracts/upto-session/src/types.rs",
@@ -25,6 +26,19 @@
     {
       "path": "bindings/upto-session/src/index.ts",
       "sha256": "9a6e71f465c9453a155e03ce7bbd63ba677124a3f5347650468eb109cc7d85b4"
+      "sha256": "de9b274ee3992e35bec8878578856c8262c6a8ffa4c7f1cb27a9a30399c3d5fe"
+    },
+    {
+      "path": "contracts/upto-session/src/events.rs",
+      "sha256": "3d815831e48585d67f2b7a495be45459e5ce8734d914d764038f532766a1017c"
+    },
+    {
+      "path": "artifacts/spec/upto-session.json",
+      "sha256": "fc603a096025df811f1cb31384595dbf334a35353d7ff03e300447eaa8368bf1"
+    },
+    {
+      "path": "bindings/upto-session/src/index.ts",
+      "sha256": "d1e7ee1e28130456d71625cdbe0a9cde7ef3c33140ff565eea3eb90d2135b036"
     },
     {
       "path": "bindings/upto-session/package.json",
@@ -33,6 +47,7 @@
     {
       "path": "artifacts/interface/upto-session-v3.json",
       "sha256": "659ea156d0e3d62600cb68b0b68ad9015f6e875dc501bb63f392cb026925a4fe"
+      "sha256": "571caa8b25ee84272e32c5c0c11cd8f22f5101c13df19fcadbc9ae2a55d1fe97"
     }
   ]
 }

@@ -239,6 +239,56 @@
       "data_format": "map",
       "doc": "",
       "lib": "",
+      "name": "CreationPaused",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "admin",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "creation_paused"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
+      "name": "CreationResumed",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "admin",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "creation_resumed"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
       "name": "SessionCancelled",
       "params": [
         {
@@ -965,6 +1015,25 @@
   {
     "function_v0": {
       "doc": "",
+      "inputs": [],
+      "name": "pause_creation",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
       "inputs": [
         {
           "doc": "",
@@ -1131,6 +1200,25 @@
         }
       ],
       "name": "remove_asset",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [],
+      "name": "resume_creation",
       "outputs": [
         {
           "result": {
@@ -1400,6 +1488,13 @@
           "doc": "",
           "name": "SessionRejected",
           "value": 36
+          "name": "CreationPaused",
+          "value": 36
+        },
+        {
+          "doc": "",
+          "name": "OperationalStateUnchanged",
+          "value": 37
         }
       ],
       "doc": "",

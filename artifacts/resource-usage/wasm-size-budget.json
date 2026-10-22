@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "5e91e53ed8fde6cf6b8d35d50629c274101a8013",
+  "sourceCommit": "a8ac359ae155a85b5d71f16d5476aa26d3310cd3",
   "build": {
     "command": "stellar contract build --locked",
     "optimized": true,
@@ -19,6 +19,8 @@
       "artifact": "target/wasm32v1-none/release/upto_session.wasm",
       "baselineBytes": 42208,
       "maxBytes": 50650,
+      "baselineBytes": 33977,
+      "maxBytes": 40772,
       "maxIncreasePercent": 20
     },
     {

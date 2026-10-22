@@ -44,6 +44,8 @@ const requiredFunctions = [
   "get_recoverability",
   "recover_expired_batch",
   "extend_ttl",
+  "pause_creation",
+  "resume_creation",
 ];
 const requiredErrors = [
   "AlreadyInitialized",
@@ -82,6 +84,8 @@ const requiredErrors = [
   "AssetNotDeprecated",
   "AssetLiabilityOutstanding",
   "SessionRejected",
+  "CreationPaused",
+  "OperationalStateUnchanged",
 ];
 
 for (const item of [...requiredFunctions, ...requiredErrors]) {

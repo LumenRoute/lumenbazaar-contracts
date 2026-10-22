@@ -34,6 +34,8 @@ const requiredMethods = [
   "get_recoverability",
   "recover_expired_batch",
   "extend_ttl",
+  "pause_creation",
+  "resume_creation",
 ];
 
 if (typeof bindings.Client !== "function") {
@@ -63,6 +65,8 @@ if (bindings.ContractError?.[35]?.message !== "AssetLiabilityOutstanding") {
 }
 if (bindings.ContractError?.[36]?.message !== "SessionRejected") {
   throw new Error("Expected SessionRejected error mapping");
+if (bindings.ContractError?.[37]?.message !== "OperationalStateUnchanged") {
+  throw new Error("Expected complete operational state error mapping");
 }
 if (packageJson.version !== "3.0.0") {
   throw new Error("Expected generated binding package version 3.0.0");
