@@ -3,8 +3,10 @@ import { homedir } from "node:os";
 // Only values of secret-bearing variables are collected; environment contents are never logged.
 export function configuredSecrets(env = process.env) {
   return Object.entries(env)
-    .filter(([name]) => /(?:SECRET|PRIVATE[_-]?KEY|MNEMONIC|SEED|PASSWORD|TOKEN)/i.test(name))
-    .map(([, value]) => value);
+    .filter(([name]) => /(?:SECRET|PRIVATE[_-]?KEY|MNEMONIC|SEED|PASSWORD|TOKEN)/i.test(name)
+      || ["STELLAR_ACCOUNT", "LUMENBAZAAR_SOURCE_ACCOUNT"].includes(name))
+    .map(([, value]) => value)
+    .filter((value) => !/^G[A-Z2-7]{55}$/.test(value ?? ""));
 }
 
 export function redactText(text, values = []) {
@@ -29,11 +31,12 @@ export function redactText(text, values = []) {
 
 export function signerValues(args) {
   const flags = new Set(["--source-account", "--sign-with-key", "--secret-key", "--seed", "--mnemonic"]);
-  return args.flatMap((arg, index) => {
+  const positional = args[0] === "keys" && args[1] === "public-key" ? [args[2]] : [];
+  return [...positional, ...args.flatMap((arg, index) => {
     if (flags.has(arg)) return [args[index + 1]];
     const separator = arg.indexOf("=");
     return separator > 0 && flags.has(arg.slice(0, separator)) ? [arg.slice(separator + 1)] : [];
-  }).filter((value) => !/^G[A-Z2-7]{55}$/.test(value ?? ""));
+  })].filter((value) => !/^G[A-Z2-7]{55}$/.test(value ?? ""));
 }
 
 export function logDeployment(event, fields, { redact = [], sink = console.log } = {}) {

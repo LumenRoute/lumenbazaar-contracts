@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { logDeployment, redactText, signerValues } from "./deployment-logging.mjs";
-import { runStellar, runStellarTransaction } from "./stellar-cli.mjs";
+import { runStellar, runStellarTransaction, writeManifest } from "./stellar-cli.mjs";
 
 const seed = `S${"A".repeat(55)}`; // Synthetic, never a funded signer.
 const publicId = `G${"B".repeat(55)}`;
@@ -10,6 +10,26 @@ const phrase = "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda 
 
 test("public source accounts remain visible; private signer arguments are redacted", () => {
   assert.deepEqual(signerValues(["--source-account", publicId, "--seed", seed]), [seed]);
+});
+
+test("dry-run command and manifest snapshots cannot leak source signer values", (t) => {
+  const logs = [];
+  t.mock.method(console, "log", (line) => logs.push(line));
+  const previous = process.env.STELLAR_ACCOUNT;
+  process.env.STELLAR_ACCOUNT = phrase;
+  try {
+    runStellar(["contract", "deploy", "--source-account", phrase, "--network", "testnet"], { dryRun: true });
+    writeManifest("dry-run.json", { deployer: phrase, publicId, transactionHash: hash }, { dryRun: true });
+    assert.ok(logs.length === 2);
+    for (const line of logs) assert.ok(!line.includes(phrase));
+    const snapshot = JSON.parse(logs[1]);
+    assert.equal(snapshot.manifest.deployer, "<redacted>");
+    assert.equal(snapshot.manifest.publicId, publicId);
+    assert.equal(snapshot.manifest.transactionHash, hash);
+  } finally {
+    if (previous === undefined) delete process.env.STELLAR_ACCOUNT;
+    else process.env.STELLAR_ACCOUNT = previous;
+  }
 });
 
 test("redacts multiline, encoded and repeated configured secrets while retaining public evidence", () => {

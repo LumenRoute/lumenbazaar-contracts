@@ -228,8 +228,7 @@ export function writeManifest(path, manifest, { dryRun = false } = {}) {
   };
 
   if (dryRun) {
-    console.log(`write ${relative(repoRoot, path)}`);
-    console.log(JSON.stringify(value, null, 2));
+    logDeployment("manifest.dry-run", { path: relative(repoRoot, path), manifest: value });
     return;
   }
 
