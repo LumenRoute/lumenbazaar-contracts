@@ -34,8 +34,8 @@ const methods = spec
   .map((entry) => entry.function_v0.name)
   .sort(compareAscii);
 
-if (events.length !== 13 || errorEntry === undefined) {
-  throw new Error("Expected thirteen public events and ContractError in the canonical spec.");
+if (events.length !== 19 || errorEntry === undefined) {
+  throw new Error("Expected nineteen public events and ContractError in the canonical spec.");
 }
 const expectedEventNames = [
   "AdminRotationAccepted",
@@ -45,9 +45,15 @@ const expectedEventNames = [
   "AssetDeprecated",
   "AssetRemoved",
   "AssetSessionCapUpdated",
+  "CapIncreaseCancelled",
+  "CapIncreaseProposed",
   "CreationPaused",
   "CreationResumed",
+  "MaxBuyerOpenSessionsUpdated",
+  "MaxSellerOpenSessionsUpdated",
+  "SellerExposureCeilingUpdated",
   "SessionCancelled",
+  "SessionCapReduced",
   "SessionCreated",
   "SessionRecovered",
   "SessionSettled",
@@ -56,10 +62,11 @@ if (events.map((event) => event.name).join(",") !== expectedEventNames.join(",")
   throw new Error("Canonical spec public event set changed.");
 }
 if (
-  errorEntry.udt_error_enum_v0.cases.length !== 37 ||
-  errorEntry.udt_error_enum_v0.cases.some((entry, index) => entry.value !== index + 1)
+  errorEntry.udt_error_enum_v0.cases.length !== 49 ||
+  errorEntry.udt_error_enum_v0.cases.map((entry) => entry.value)
+    .sort((left, right) => left - right).some((value, index) => value !== index + 1)
 ) {
-  throw new Error("ContractError golden mapping must contain contiguous codes 1 through 37.");
+  throw new Error("ContractError golden mapping must contain contiguous codes 1 through 49.");
 }
 for (const event of events) {
   const version = event.fields.find((field) => field.name === "event_version");

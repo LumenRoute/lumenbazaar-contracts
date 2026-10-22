@@ -52,6 +52,7 @@ fn initialized_contract<'a>(
         AssetPolicy {
             asset: asset.clone(),
             max_session_amount: cap,
+            min_session_amount: 1,
         }
     ];
     client
@@ -274,6 +275,10 @@ fn mutation_seller_auth_removal_in_settle_is_caught() {
                 resource_hash,
                 usage_hash: None,
                 status: SessionStatus::Open,
+                creation_ledger: 1,
+                finalized_ledger: None,
+                resource_scheme_version: 1,
+                usage_scheme_version: None,
             },
         );
     });
@@ -328,6 +333,10 @@ fn mutation_seller_auth_wrong_party_in_settle_is_caught() {
                 resource_hash,
                 usage_hash: None,
                 status: SessionStatus::Open,
+                creation_ledger: 1,
+                finalized_ledger: None,
+                resource_scheme_version: 1,
+                usage_scheme_version: None,
             },
         );
     });
@@ -384,6 +393,10 @@ fn mutation_buyer_auth_removal_in_cancel_is_caught() {
                 resource_hash,
                 usage_hash: None,
                 status: SessionStatus::Open,
+                creation_ledger: 1,
+                finalized_ledger: None,
+                resource_scheme_version: 1,
+                usage_scheme_version: None,
             },
         );
     });
@@ -430,6 +443,10 @@ fn mutation_buyer_auth_seller_cannot_cancel_session() {
                 resource_hash,
                 usage_hash: None,
                 status: SessionStatus::Open,
+                creation_ledger: 1,
+                finalized_ledger: None,
+                resource_scheme_version: 1,
+                usage_scheme_version: None,
             },
         );
     });
