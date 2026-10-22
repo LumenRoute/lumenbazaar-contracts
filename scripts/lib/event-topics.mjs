@@ -17,6 +17,30 @@ export const MAX_TOPIC_BYTES = 32;
 // is asserted from Rust (`lifecycle_events_expose_indexable_topics_and_versions`);
 // the spec and fixture only expose the field type, not the value.
 export const EXPECTED_EVENT_LAYOUT = {
+  CapIncreaseProposed: {
+    prefix: "cap_increase_proposed", topic: "asset", topicType: "address", version: 3,
+  },
+  CapIncreaseCancelled: {
+    prefix: "cap_increase_cancelled", topic: "asset", topicType: "address", version: 3,
+  },
+  SellerExposureCeilingUpdated: {
+    prefix: "seller_exposure_ceiling_updated", topic: "asset", topicType: "address", version: 1,
+  },
+  MaxBuyerOpenSessionsUpdated: {
+    prefix: "max_buyer_open_sessions_updated", topic: "admin", topicType: "address", version: 1,
+  },
+  MaxSellerOpenSessionsUpdated: {
+    prefix: "max_seller_open_sessions_updated", topic: "admin", topicType: "address", version: 1,
+  },
+  SessionCapReduced: {
+    prefix: "session_cap_reduced", topic: "session_id", topicType: "bytes_n:32", version: 1,
+  },
+  CreationPaused: {
+    prefix: "creation_paused", topic: "admin", topicType: "address", version: 3,
+  },
+  CreationResumed: {
+    prefix: "creation_resumed", topic: "admin", topicType: "address", version: 3,
+  },
   AdminRotationAccepted: {
     prefix: "admin_rotation_accepted",
     topic: "new_admin",
