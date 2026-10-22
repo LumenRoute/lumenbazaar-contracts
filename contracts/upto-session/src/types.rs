@@ -5,6 +5,7 @@ use soroban_sdk::{contracttype, Address, BytesN, Vec};
 pub struct AssetPolicy {
     pub asset: Address,
     pub max_session_amount: i128,
+    pub min_session_amount: i128,
 }
 
 #[contracttype]
@@ -32,6 +33,14 @@ pub enum SessionStatus {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CapIncreaseProposal {
+    pub proposed_max_amount: i128,
+    pub active_at_ledger: u32,
+    pub expires_at_ledger: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Session {
     pub id: BytesN<32>,
     pub buyer: Address,
@@ -44,6 +53,10 @@ pub struct Session {
     pub resource_hash: BytesN<32>,
     pub usage_hash: Option<BytesN<32>>,
     pub status: SessionStatus,
+    pub creation_ledger: u32,
+    pub finalized_ledger: Option<u32>,
+    pub resource_scheme_version: u32,
+    pub usage_scheme_version: Option<u32>,
 }
 
 #[contracttype]
@@ -87,6 +100,24 @@ pub struct BatchRecoveryResult {
     pub session_id: BytesN<32>,
     pub status: BatchRecoveryStatus,
     pub refunded_amount: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CommitmentDomainMetadata {
+    pub response_version: u32,
+    pub interface_version: u32,
+    pub receipt_schema_version: u32,
+    pub session_id_domain: BytesN<32>,
+    pub usage_commitment_domain: BytesN<32>,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SessionStatusResponse {
+    pub exists: bool,
+    pub status: SessionStatus,
+    pub expires_at_ledger: u32,
 }
 
 #[contracttype]

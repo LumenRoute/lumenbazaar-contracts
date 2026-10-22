@@ -2,10 +2,62 @@ use crate::{ContractError, Session};
 use soroban_sdk::{token, Address, BytesN, Env};
 
 pub const MAX_SESSION_DURATION_LEDGERS: u32 = 518_400;
+pub const MIN_ADMIN_ROTATION_DURATION_LEDGERS: u32 = 1;
 pub const MAX_ADMIN_ROTATION_DURATION_LEDGERS: u32 = 17_280;
+pub const MIN_CAP_INCREASE_DELAY_LEDGERS: u32 = 100;
+pub const MAX_CAP_INCREASE_DELAY_LEDGERS: u32 = 17_280;
 pub const MAX_TOKEN_DECIMALS: u32 = 38;
 pub const MAX_TOKEN_NAME_BYTES: u32 = 64;
 pub const MAX_TOKEN_SYMBOL_BYTES: u32 = 12;
+
+pub const SUPPORTED_RESOURCE_SCHEME_VERSION: u32 = 1;
+pub const SUPPORTED_USAGE_SCHEME_VERSION: u32 = 1;
+
+pub fn validate_commitment_scheme(
+    scheme_version: u32,
+    expected_version: u32,
+) -> Result<(), ContractError> {
+    if scheme_version != expected_version {
+        return Err(ContractError::UnsupportedCommitmentScheme);
+    }
+    Ok(())
+}
+
+pub fn validate_cap_increase_proposal(
+    env: &Env,
+    current_cap: i128,
+    proposed_max_amount: i128,
+    active_at_ledger: u32,
+    expires_at_ledger: u32,
+) -> Result<(), ContractError> {
+    validate_asset_cap(proposed_max_amount)?;
+    if proposed_max_amount <= current_cap {
+        return Err(ContractError::InvalidAssetCap);
+    }
+    let current_ledger = env.ledger().sequence();
+    let min_active = match current_ledger.checked_add(MIN_CAP_INCREASE_DELAY_LEDGERS) {
+        Some(val) => val,
+        None => return Err(ContractError::InvalidCapIncreaseDelay),
+    };
+    let max_active = match current_ledger.checked_add(MAX_CAP_INCREASE_DELAY_LEDGERS) {
+        Some(val) => val,
+        None => return Err(ContractError::InvalidCapIncreaseDelay),
+    };
+    if active_at_ledger < min_active || active_at_ledger > max_active {
+        return Err(ContractError::InvalidCapIncreaseDelay);
+    }
+    if expires_at_ledger <= active_at_ledger {
+        return Err(ContractError::InvalidCapIncreaseDelay);
+    }
+    let max_expiry = match active_at_ledger.checked_add(MAX_CAP_INCREASE_DELAY_LEDGERS) {
+        Some(val) => val,
+        None => return Err(ContractError::InvalidCapIncreaseDelay),
+    };
+    if expires_at_ledger > max_expiry {
+        return Err(ContractError::InvalidCapIncreaseDelay);
+    }
+    Ok(())
+}
 
 pub fn validate_admin_rotation(
     env: &Env,
@@ -17,9 +69,15 @@ pub fn validate_admin_rotation(
         return Err(ContractError::InvalidAdmin);
     }
     let current_ledger = env.ledger().sequence();
-    if expires_at_ledger <= current_ledger
-        || expires_at_ledger - current_ledger > MAX_ADMIN_ROTATION_DURATION_LEDGERS
-    {
+    let min_allowed = match current_ledger.checked_add(MIN_ADMIN_ROTATION_DURATION_LEDGERS) {
+        Some(val) => val,
+        None => return Err(ContractError::InvalidAdminRotationExpiry),
+    };
+    let max_allowed = match current_ledger.checked_add(MAX_ADMIN_ROTATION_DURATION_LEDGERS) {
+        Some(val) => val,
+        None => return Err(ContractError::InvalidAdminRotationExpiry),
+    };
+    if expires_at_ledger < min_allowed || expires_at_ledger > max_allowed {
         return Err(ContractError::InvalidAdminRotationExpiry);
     }
     Ok(())
@@ -27,6 +85,17 @@ pub fn validate_admin_rotation(
 
 pub fn validate_asset_cap(max_session_amount: i128) -> Result<(), ContractError> {
     if max_session_amount <= 0 {
+        return Err(ContractError::InvalidAssetCap);
+    }
+    Ok(())
+}
+
+pub fn validate_asset_policy(
+    min_session_amount: i128,
+    max_session_amount: i128,
+) -> Result<(), ContractError> {
+    validate_asset_cap(max_session_amount)?;
+    if min_session_amount <= 0 || min_session_amount > max_session_amount {
         return Err(ContractError::InvalidAssetCap);
     }
     Ok(())
@@ -126,6 +195,17 @@ pub fn validate_usage_hash(env: &Env, usage_hash: &BytesN<32>) -> Result<(), Con
     Ok(())
 }
 
+pub fn validate_reason_commitment(
+    env: &Env,
+    reason_commitment: &BytesN<32>,
+) -> Result<(), ContractError> {
+    if reason_commitment == &BytesN::from_array(env, &[0; 32]) {
+        return Err(ContractError::InvalidResourceHash);
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     extern crate std;
@@ -170,25 +250,61 @@ mod tests {
         let current_admin = Address::generate(&env);
         let pending_admin = Address::generate(&env);
 
-        assert_eq!(
-            validate_admin_rotation(&env, &current_admin, &pending_admin, 11),
-            Ok(())
-        );
-        assert_eq!(
-            validate_admin_rotation(&env, &current_admin, &current_admin, 11),
-            Err(ContractError::InvalidAdmin)
-        );
-        assert_eq!(
-            validate_admin_rotation(&env, &current_admin, &pending_admin, 10),
-            Err(ContractError::InvalidAdminRotationExpiry)
-        );
+        // Exact minimum lifetime (10 + 1 = 11) passes
         assert_eq!(
             validate_admin_rotation(
                 &env,
                 &current_admin,
                 &pending_admin,
-                11 + MAX_ADMIN_ROTATION_DURATION_LEDGERS
+                10 + MIN_ADMIN_ROTATION_DURATION_LEDGERS
             ),
+            Ok(())
+        );
+        // Exact maximum lifetime (10 + 17280 = 17290) passes
+        assert_eq!(
+            validate_admin_rotation(
+                &env,
+                &current_admin,
+                &pending_admin,
+                10 + MAX_ADMIN_ROTATION_DURATION_LEDGERS
+            ),
+            Ok(())
+        );
+        // Self-rotation rejected
+        assert_eq!(
+            validate_admin_rotation(&env, &current_admin, &current_admin, 11),
+            Err(ContractError::InvalidAdmin)
+        );
+        // Below minimum lifetime rejected
+        assert_eq!(
+            validate_admin_rotation(&env, &current_admin, &pending_admin, 10),
+            Err(ContractError::InvalidAdminRotationExpiry)
+        );
+        assert_eq!(
+            validate_admin_rotation(&env, &current_admin, &pending_admin, 9),
+            Err(ContractError::InvalidAdminRotationExpiry)
+        );
+        // Beyond maximum lifetime rejected
+        assert_eq!(
+            validate_admin_rotation(
+                &env,
+                &current_admin,
+                &pending_admin,
+                10 + MAX_ADMIN_ROTATION_DURATION_LEDGERS + 1
+            ),
+            Err(ContractError::InvalidAdminRotationExpiry)
+        );
+
+        // Overflow-adjacent tests
+        env.ledger().set_sequence_number(u32::MAX - 5);
+        // Proposal with u32::MAX overflow
+        assert_eq!(
+            validate_admin_rotation(&env, &current_admin, &pending_admin, u32::MAX),
+            Err(ContractError::InvalidAdminRotationExpiry)
+        );
+        env.ledger().set_sequence_number(u32::MAX);
+        assert_eq!(
+            validate_admin_rotation(&env, &current_admin, &pending_admin, u32::MAX),
             Err(ContractError::InvalidAdminRotationExpiry)
         );
     }
@@ -266,6 +382,10 @@ mod tests {
             resource_hash,
             usage_hash: None,
             status: crate::SessionStatus::Open,
+            creation_ledger: 10,
+            finalized_ledger: None,
+            resource_scheme_version: 1,
+            usage_scheme_version: None,
         };
 
         assert_eq!(
@@ -299,6 +419,10 @@ mod tests {
             resource_hash,
             usage_hash: None,
             status: crate::SessionStatus::Open,
+            creation_ledger: 10,
+            finalized_ledger: None,
+            resource_scheme_version: 1,
+            usage_scheme_version: None,
         };
 
         assert_eq!(

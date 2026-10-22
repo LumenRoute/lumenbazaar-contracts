@@ -1,7 +1,10 @@
 import { join } from "node:path";
+import { recordReceipt, requireTestnet } from "../lib/network-receipts.mjs";
 import {
   hasFlag,
-  invokeContract,
+  invokeContractTransaction,
+  mergeContracts,
+  publicKey,
   readManifest,
   repoRoot,
   sourceAccount,
@@ -9,8 +12,13 @@ import {
 
 const dryRun = hasFlag("--dry-run");
 const source = sourceAccount("testnet-deployer");
-const manifest = readManifest(join(repoRoot, "deployments", "testnet.json"));
+const manifestPath = join(repoRoot, "deployments", "testnet.json");
+const manifest = readManifest(manifestPath);
 const contracts = manifest.contracts || {};
+
+if (!dryRun) {
+  requireTestnet();
+}
 
 const admin = process.env.LUMENBAZAAR_ADMIN || source;
 const tokenAdmin = process.env.LUMENBAZAAR_TEST_TOKEN_ADMIN || admin;
@@ -19,53 +27,75 @@ const maxSessionAmount = process.env.LUMENBAZAAR_MAX_SESSION_AMOUNT || "10000000
 if (!/^[1-9][0-9]*$/.test(maxSessionAmount)) {
   throw new Error("LUMENBAZAAR_MAX_SESSION_AMOUNT must be a positive integer");
 }
-const uptoSessionContract =
-  process.env.LUMENBAZAAR_UPTO_SESSION_CONTRACT_ID ||
-  contracts["upto-session"]?.contractId ||
-  "dry-run-upto-session";
-const testTokenContract =
-  process.env.LUMENBAZAAR_TEST_TOKEN_CONTRACT_ID ||
-  contracts["test-token"]?.contractId ||
-  "dry-run-test-token";
-const policyWalletContract =
-  process.env.LUMENBAZAAR_POLICY_WALLET_CONTRACT_ID ||
-  contracts["policy-wallet-example"]?.contractId ||
-  "dry-run-policy-wallet";
+const uptoSessionContract = contractId("upto-session", "LUMENBAZAAR_UPTO_SESSION_CONTRACT_ID");
+const testTokenContract = contractId("test-token", "LUMENBAZAAR_TEST_TOKEN_CONTRACT_ID");
+const policyWalletContract = contractId("policy-wallet-example", "LUMENBAZAAR_POLICY_WALLET_CONTRACT_ID");
 
-invokeContract({
-  contractId: testTokenContract,
-  source: tokenAdmin,
-  network: "testnet",
-  args: ["initialize", "--admin", tokenAdmin],
+const initialized = [];
+
+await initialize("test-token", testTokenContract, tokenAdmin, [
+  "initialize",
+  "--admin",
+  dryRun ? tokenAdmin : publicKey(tokenAdmin),
+]);
+
+await initialize("upto-session", uptoSessionContract, admin, [
+  "initialize",
+  "--admin",
+  dryRun ? admin : publicKey(admin),
+  "--asset_policies",
+  JSON.stringify([{ asset: testTokenContract, max_session_amount: maxSessionAmount }]),
+]);
+
+await initialize("policy-wallet-example", policyWalletContract, policyOwner, [
+  "initialize",
+  "--owner",
+  dryRun ? policyOwner : publicKey(policyOwner),
+  "--upto_session_contract",
+  uptoSessionContract,
+]);
+
+if (!dryRun && contracts["upto-session"]) {
+  const version = invokeContractTransaction({
+    contractId: uptoSessionContract,
+    source: admin,
+    args: ["interface_version"],
+    send: "no",
+  }).stdout;
+  initialized.push({ name: "upto-session", interfaceVersion: Number(version) });
+}
+
+mergeContracts(manifestPath, initialized, {
   dryRun,
+  mergeEntries: true,
+  fields: { admin: dryRun ? admin : publicKey(admin) },
 });
 
-invokeContract({
-  contractId: uptoSessionContract,
-  source: admin,
-  network: "testnet",
-  args: [
-    "initialize",
-    "--admin",
-    admin,
-    "--asset_policies",
-    JSON.stringify([
-      { asset: testTokenContract, max_session_amount: maxSessionAmount },
-    ]),
-  ],
-  dryRun,
-});
+async function initialize(name, id, signer, args) {
+  if (!dryRun && !contracts[name] && !process.env[envName(name)]) {
+    console.log(`skipped ${name}: not deployed in deployments/testnet.json`);
+    return;
+  }
+  const { transactionHash } = invokeContractTransaction({ contractId: id, source: signer, args, dryRun });
+  if (dryRun) {
+    return;
+  }
+  if (!transactionHash) {
+    throw new Error(`Initializing ${name} returned no transaction hash.`);
+  }
+  await recordReceipt(transactionHash);
+  initialized.push({ name, initialize: { transactionHash } });
+  console.log(`initialized ${name}`);
+}
 
-invokeContract({
-  contractId: policyWalletContract,
-  source: policyOwner,
-  network: "testnet",
-  args: [
-    "initialize",
-    "--owner",
-    policyOwner,
-    "--upto_session_contract",
-    uptoSessionContract,
-  ],
-  dryRun,
-});
+function contractId(name, variable) {
+  return process.env[variable] || contracts[name]?.contractId || `dry-run-${name}`;
+}
+
+function envName(name) {
+  return {
+    "upto-session": "LUMENBAZAAR_UPTO_SESSION_CONTRACT_ID",
+    "test-token": "LUMENBAZAAR_TEST_TOKEN_CONTRACT_ID",
+    "policy-wallet-example": "LUMENBAZAAR_POLICY_WALLET_CONTRACT_ID",
+  }[name];
+}

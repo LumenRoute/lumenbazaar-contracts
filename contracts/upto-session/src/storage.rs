@@ -1,4 +1,6 @@
-use crate::{AdminRotation, AssetStatus, ContractError, OperationalState, Session};
+use crate::{
+    AdminRotation, AssetStatus, CapIncreaseProposal, ContractError, OperationalState, Session,
+};
 use soroban_sdk::{contracttype, Address, BytesN, Env, Vec};
 
 pub const STORAGE_LAYOUT_VERSION: u32 = 3;
@@ -15,9 +17,17 @@ pub enum DataKey {
     StorageLayoutVersion,
     SupportedAsset(Address),
     AssetMaxSessionAmount(Address),
+    AssetMinSessionAmount(Address),
+    CapIncreaseProposal(Address),
     SupportedAssets,
     OperationalState,
     Liability(Address),
+    SellerExposureCeiling(Address),
+    SellerExposure(Address, Address),
+    MaxBuyerOpenSessions,
+    BuyerOpenSessions(Address),
+    MaxSellerOpenSessions,
+    SellerOpenSessions(Address),
 }
 
 pub fn write_storage_layout_version(env: &Env) {
@@ -95,6 +105,34 @@ pub fn read_asset_max_session_amount(env: &Env, asset: &Address) -> Option<i128>
         .get(&DataKey::AssetMaxSessionAmount(asset.clone()))
 }
 
+pub fn write_asset_min_session_amount(env: &Env, asset: &Address, amount: i128) {
+    env.storage()
+        .instance()
+        .set(&DataKey::AssetMinSessionAmount(asset.clone()), &amount);
+}
+
+pub fn read_asset_min_session_amount(env: &Env, asset: &Address) -> Option<i128> {
+    env.storage()
+        .instance()
+        .get(&DataKey::AssetMinSessionAmount(asset.clone()))
+pub fn write_cap_increase_proposal(env: &Env, asset: &Address, proposal: &CapIncreaseProposal) {
+    env.storage()
+        .instance()
+        .set(&DataKey::CapIncreaseProposal(asset.clone()), proposal);
+}
+
+pub fn read_cap_increase_proposal(env: &Env, asset: &Address) -> Option<CapIncreaseProposal> {
+    env.storage()
+        .instance()
+        .get(&DataKey::CapIncreaseProposal(asset.clone()))
+}
+
+pub fn remove_cap_increase_proposal(env: &Env, asset: &Address) {
+    env.storage()
+        .instance()
+        .remove(&DataKey::CapIncreaseProposal(asset.clone()));
+}
+
 pub fn write_supported_assets(env: &Env, assets: &Vec<Address>) {
     env.storage()
         .instance()
@@ -149,6 +187,140 @@ pub fn decrease_liability(env: &Env, asset: &Address, amount: i128) -> Result<i1
     Ok(updated)
 }
 
+pub fn write_seller_exposure_ceiling(env: &Env, asset: &Address, ceiling: i128) {
+    env.storage()
+        .instance()
+        .set(&DataKey::SellerExposureCeiling(asset.clone()), &ceiling);
+}
+
+pub fn read_seller_exposure_ceiling(env: &Env, asset: &Address) -> Option<i128> {
+    env.storage()
+        .instance()
+        .get(&DataKey::SellerExposureCeiling(asset.clone()))
+}
+
+pub fn read_seller_exposure(env: &Env, seller: &Address, asset: &Address) -> i128 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::SellerExposure(seller.clone(), asset.clone()))
+        .unwrap_or(0)
+}
+
+pub fn increase_seller_exposure(
+    env: &Env,
+    seller: &Address,
+    asset: &Address,
+    amount: i128,
+) -> Result<i128, ContractError> {
+    let current = read_seller_exposure(env, seller, asset);
+    let updated = current
+        .checked_add(amount)
+        .ok_or(ContractError::LiabilityOverflow)?;
+    env.storage().persistent().set(
+        &DataKey::SellerExposure(seller.clone(), asset.clone()),
+        &updated,
+    );
+    Ok(updated)
+}
+
+pub fn decrease_seller_exposure(
+    env: &Env,
+    seller: &Address,
+    asset: &Address,
+    amount: i128,
+) -> Result<i128, ContractError> {
+    let current = read_seller_exposure(env, seller, asset);
+    let updated = current
+        .checked_sub(amount)
+        .filter(|value| *value >= 0)
+        .ok_or(ContractError::LiabilityUnderflow)?;
+    env.storage().persistent().set(
+        &DataKey::SellerExposure(seller.clone(), asset.clone()),
+        &updated,
+    );
+    Ok(updated)
+}
+
+pub fn write_max_buyer_open_sessions(env: &Env, limit: u32) {
+    env.storage()
+        .instance()
+        .set(&DataKey::MaxBuyerOpenSessions, &limit);
+}
+
+pub fn read_max_buyer_open_sessions(env: &Env) -> Option<u32> {
+    env.storage().instance().get(&DataKey::MaxBuyerOpenSessions)
+}
+
+pub fn read_buyer_open_sessions(env: &Env, buyer: &Address) -> u32 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::BuyerOpenSessions(buyer.clone()))
+        .unwrap_or(0)
+}
+
+pub fn increment_buyer_open_sessions(env: &Env, buyer: &Address) -> Result<u32, ContractError> {
+    let current = read_buyer_open_sessions(env, buyer);
+    let updated = current
+        .checked_add(1)
+        .ok_or(ContractError::LiabilityOverflow)?;
+    env.storage()
+        .persistent()
+        .set(&DataKey::BuyerOpenSessions(buyer.clone()), &updated);
+    Ok(updated)
+}
+
+pub fn decrement_buyer_open_sessions(env: &Env, buyer: &Address) -> Result<u32, ContractError> {
+    let current = read_buyer_open_sessions(env, buyer);
+    let updated = current
+        .checked_sub(1)
+        .ok_or(ContractError::LiabilityUnderflow)?;
+    env.storage()
+        .persistent()
+        .set(&DataKey::BuyerOpenSessions(buyer.clone()), &updated);
+    Ok(updated)
+}
+
+pub fn write_max_seller_open_sessions(env: &Env, limit: u32) {
+    env.storage()
+        .instance()
+        .set(&DataKey::MaxSellerOpenSessions, &limit);
+}
+
+pub fn read_max_seller_open_sessions(env: &Env) -> Option<u32> {
+    env.storage()
+        .instance()
+        .get(&DataKey::MaxSellerOpenSessions)
+}
+
+pub fn read_seller_open_sessions(env: &Env, seller: &Address) -> u32 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::SellerOpenSessions(seller.clone()))
+        .unwrap_or(0)
+}
+
+pub fn increment_seller_open_sessions(env: &Env, seller: &Address) -> Result<u32, ContractError> {
+    let current = read_seller_open_sessions(env, seller);
+    let updated = current
+        .checked_add(1)
+        .ok_or(ContractError::LiabilityOverflow)?;
+    env.storage()
+        .persistent()
+        .set(&DataKey::SellerOpenSessions(seller.clone()), &updated);
+    Ok(updated)
+}
+
+pub fn decrement_seller_open_sessions(env: &Env, seller: &Address) -> Result<u32, ContractError> {
+    let current = read_seller_open_sessions(env, seller);
+    let updated = current
+        .checked_sub(1)
+        .ok_or(ContractError::LiabilityUnderflow)?;
+    env.storage()
+        .persistent()
+        .set(&DataKey::SellerOpenSessions(seller.clone()), &updated);
+    Ok(updated)
+}
+
 pub fn read_admin(env: &Env) -> Option<Address> {
     env.storage().instance().get(&DataKey::Admin)
 }
@@ -185,6 +357,30 @@ pub fn extend_session_and_liability_ttl(env: &Env, session: &Session) {
     if env.storage().persistent().has(&liability_key) {
         env.storage().persistent().extend_ttl(
             &liability_key,
+            DEFAULT_TTL_THRESHOLD,
+            TTL_EXTENSION_AMOUNT,
+        );
+    }
+    let exposure_key = DataKey::SellerExposure(session.seller.clone(), session.asset.clone());
+    if env.storage().persistent().has(&exposure_key) {
+        env.storage().persistent().extend_ttl(
+            &exposure_key,
+            DEFAULT_TTL_THRESHOLD,
+            TTL_EXTENSION_AMOUNT,
+        );
+    }
+    let buyer_key = DataKey::BuyerOpenSessions(session.buyer.clone());
+    if env.storage().persistent().has(&buyer_key) {
+        env.storage().persistent().extend_ttl(
+            &buyer_key,
+            DEFAULT_TTL_THRESHOLD,
+            TTL_EXTENSION_AMOUNT,
+        );
+    }
+    let seller_key = DataKey::SellerOpenSessions(session.seller.clone());
+    if env.storage().persistent().has(&seller_key) {
+        env.storage().persistent().extend_ttl(
+            &seller_key,
             DEFAULT_TTL_THRESHOLD,
             TTL_EXTENSION_AMOUNT,
         );
@@ -233,6 +429,10 @@ mod tests {
             resource_hash: BytesN::from_array(env, &[2; 32]),
             usage_hash: None,
             status: SessionStatus::Open,
+            creation_ledger: 10,
+            finalized_ledger: None,
+            resource_scheme_version: 1,
+            usage_scheme_version: None,
         }
     }
 
