@@ -1,0 +1,458 @@
+{
+  "actors": {
+    "admin": "GCP2WFPCVRZFIAUY5FQXKTHOZM77QQDRBPUWTH6U3XOUKZJNM6XYTYZE",
+    "buyer": "GBTKTETSC2KTMTB7U7WL5VXRONUBHYGH65AF5GB4PP3BH2RPKX5DVXBT",
+    "seller": "GAHA3T2WSTDHNGMPVXI6ISZD45KGKYWIAR7VDCTO4J5TA722ISMDCPN2",
+    "wrongBuyer": "GA6QZ257A4PPGQO3FM7GTJD2J5YJSOCLNBFD26OF4BQZYGTTN56V3PIJ",
+    "wrongSeller": "GDLLSTY47DAWU5UJP2GO6MP3ZRY7ZYB4FB3TG7S43TEXUAQQNBQXGHYL"
+  },
+  "asset": {
+    "code": "LBT",
+    "contractId": "CBKNETPS3MMCTGNOSLXJE2U2QFNCCTQZ6OEL5FRLJQMTZVDDFKZVKV4R",
+    "decimals": 7,
+    "purpose": "Custom test-only token; not USDC"
+  },
+  "cases": [
+    {
+      "actual": {
+        "error": null,
+        "outcome": "success"
+      },
+      "after": {
+        "balances": {
+          "buyer": "187000000",
+          "escrowContract": "0",
+          "seller": "13000000",
+          "wrongBuyer": "0",
+          "wrongSeller": "0"
+        },
+        "liability": "0",
+        "session": {
+          "escrowedAmount": "0",
+          "maxAmount": "10000000",
+          "settledAmount": "6500000",
+          "status": "Settled"
+        }
+      },
+      "arguments": {
+        "actualAmount": "6500000",
+        "usageHash": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+      },
+      "before": {
+        "balances": {
+          "buyer": "183500000",
+          "escrowContract": "10000000",
+          "seller": "6500000",
+          "wrongBuyer": "0",
+          "wrongSeller": "0"
+        },
+        "liability": "10000000",
+        "session": {
+          "escrowedAmount": "10000000",
+          "maxAmount": "10000000",
+          "settledAmount": "0",
+          "status": "Open"
+        }
+      },
+      "createdAt": "2026-10-20T06:19:22Z",
+      "expected": {
+        "error": null,
+        "outcome": "success"
+      },
+      "expectedSuccessful": true,
+      "expiresAtLedger": 5291709,
+      "invokedBy": "GAHA3T2WSTDHNGMPVXI6ISZD45KGKYWIAR7VDCTO4J5TA722ISMDCPN2",
+      "issue": 6,
+      "ledger": 5290715,
+      "name": "control_settlement_below_cap",
+      "operation": "settle",
+      "recordedOn": "ledger",
+      "sessionId": "3078a5adbdc52eee196061ca4acc7057765bd1b0329cfa9771876c887974e6d1",
+      "sourceAccount": "GAHA3T2WSTDHNGMPVXI6ISZD45KGKYWIAR7VDCTO4J5TA722ISMDCPN2",
+      "stateUnchanged": false,
+      "transactionHash": "ff15324bd866801ecdf1137e478eea7d63758982af4d77cf13a122f393cb49b5"
+    },
+    {
+      "actual": {
+        "error": "Error(Auth, InvalidAction)",
+        "outcome": "failure"
+      },
+      "after": {
+        "balances": {
+          "buyer": "182000000",
+          "escrowContract": "5000000",
+          "seller": "13000000",
+          "wrongBuyer": "0",
+          "wrongSeller": "0"
+        },
+        "liability": "5000000",
+        "session": {
+          "escrowedAmount": "5000000",
+          "maxAmount": "5000000",
+          "settledAmount": "0",
+          "status": "Open"
+        }
+      },
+      "arguments": {
+        "actualAmount": "1000000",
+        "usageHash": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+      },
+      "before": {
+        "balances": {
+          "buyer": "182000000",
+          "escrowContract": "5000000",
+          "seller": "13000000",
+          "wrongBuyer": "0",
+          "wrongSeller": "0"
+        },
+        "liability": "5000000",
+        "session": {
+          "escrowedAmount": "5000000",
+          "maxAmount": "5000000",
+          "settledAmount": "0",
+          "status": "Open"
+        }
+      },
+      "createdAt": "2026-10-20T06:20:12Z",
+      "expected": {
+        "error": "Error(Auth, InvalidAction)",
+        "outcome": "failure"
+      },
+      "expectedSuccessful": false,
+      "expiresAtLedger": 5291717,
+      "invokedBy": "GDLLSTY47DAWU5UJP2GO6MP3ZRY7ZYB4FB3TG7S43TEXUAQQNBQXGHYL",
+      "issue": 5,
+      "ledger": 5290725,
+      "name": "wrong_seller_settle",
+      "operation": "settle",
+      "recordedOn": "ledger",
+      "resultCode": "tx_failed/invoke_host_function_trapped",
+      "sessionId": "77199106a4af79de71522c91dfb7a9ac06841648b69d3e416927874e32e54d22",
+      "sourceAccount": "GDLLSTY47DAWU5UJP2GO6MP3ZRY7ZYB4FB3TG7S43TEXUAQQNBQXGHYL",
+      "stateUnchanged": true,
+      "transactionHash": "08c40a76509df8a8a34bc403f70fb7e758ed2ac6b68351a770b8db22617e1e6c"
+    },
+    {
+      "actual": {
+        "error": "Error(Auth, InvalidAction)",
+        "outcome": "failure"
+      },
+      "after": {
+        "balances": {
+          "buyer": "182000000",
+          "escrowContract": "5000000",
+          "seller": "13000000",
+          "wrongBuyer": "0",
+          "wrongSeller": "0"
+        },
+        "liability": "5000000",
+        "session": {
+          "escrowedAmount": "5000000",
+          "maxAmount": "5000000",
+          "settledAmount": "0",
+          "status": "Open"
+        }
+      },
+      "arguments": {},
+      "before": {
+        "balances": {
+          "buyer": "182000000",
+          "escrowContract": "5000000",
+          "seller": "13000000",
+          "wrongBuyer": "0",
+          "wrongSeller": "0"
+        },
+        "liability": "5000000",
+        "session": {
+          "escrowedAmount": "5000000",
+          "maxAmount": "5000000",
+          "settledAmount": "0",
+          "status": "Open"
+        }
+      },
+      "createdAt": "2026-10-20T06:20:27Z",
+      "expected": {
+        "error": "Error(Auth, InvalidAction)",
+        "outcome": "failure"
+      },
+      "expectedSuccessful": false,
+      "expiresAtLedger": 5291717,
+      "invokedBy": "GA6QZ257A4PPGQO3FM7GTJD2J5YJSOCLNBFD26OF4BQZYGTTN56V3PIJ",
+      "issue": 5,
+      "ledger": 5290728,
+      "name": "wrong_buyer_cancel",
+      "operation": "cancel",
+      "recordedOn": "ledger",
+      "resultCode": "tx_failed/invoke_host_function_trapped",
+      "sessionId": "77199106a4af79de71522c91dfb7a9ac06841648b69d3e416927874e32e54d22",
+      "sourceAccount": "GA6QZ257A4PPGQO3FM7GTJD2J5YJSOCLNBFD26OF4BQZYGTTN56V3PIJ",
+      "stateUnchanged": true,
+      "transactionHash": "5a78eaa23dd1def028b0fc3b77d8d686bed6559fd6cc17baa6f4da991718fe99"
+    },
+    {
+      "actual": {
+        "error": "Error(Contract, #8)",
+        "outcome": "failure"
+      },
+      "after": {
+        "balances": {
+          "buyer": "182000000",
+          "escrowContract": "5000000",
+          "seller": "13000000",
+          "wrongBuyer": "0",
+          "wrongSeller": "0"
+        },
+        "liability": "5000000",
+        "session": {
+          "escrowedAmount": "5000000",
+          "maxAmount": "5000000",
+          "settledAmount": "0",
+          "status": "Open"
+        }
+      },
+      "arguments": {
+        "actualAmount": "5000001",
+        "usageHash": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+      },
+      "before": {
+        "balances": {
+          "buyer": "182000000",
+          "escrowContract": "5000000",
+          "seller": "13000000",
+          "wrongBuyer": "0",
+          "wrongSeller": "0"
+        },
+        "liability": "5000000",
+        "session": {
+          "escrowedAmount": "5000000",
+          "maxAmount": "5000000",
+          "settledAmount": "0",
+          "status": "Open"
+        }
+      },
+      "createdAt": "2026-10-20T06:21:02Z",
+      "expected": {
+        "error": "Error(Contract, #8)",
+        "outcome": "failure"
+      },
+      "expectedSuccessful": false,
+      "expiresAtLedger": 5291717,
+      "invokedBy": "GAHA3T2WSTDHNGMPVXI6ISZD45KGKYWIAR7VDCTO4J5TA722ISMDCPN2",
+      "issue": 6,
+      "ledger": 5290735,
+      "name": "over_cap_settlement",
+      "operation": "settle",
+      "recordedOn": "ledger",
+      "resultCode": "tx_failed/invoke_host_function_trapped",
+      "sessionId": "77199106a4af79de71522c91dfb7a9ac06841648b69d3e416927874e32e54d22",
+      "sourceAccount": "GAHA3T2WSTDHNGMPVXI6ISZD45KGKYWIAR7VDCTO4J5TA722ISMDCPN2",
+      "stateUnchanged": true,
+      "transactionHash": "07bb7c118510a1fbaae89f504a9b1174c4c8baae78809186d640dfb7b7e28e73"
+    },
+    {
+      "actual": {
+        "error": null,
+        "outcome": "success"
+      },
+      "after": {
+        "balances": {
+          "buyer": "186000000",
+          "escrowContract": "0",
+          "seller": "14000000",
+          "wrongBuyer": "0",
+          "wrongSeller": "0"
+        },
+        "liability": "0",
+        "session": {
+          "escrowedAmount": "0",
+          "maxAmount": "2000000",
+          "settledAmount": "1000000",
+          "status": "Settled"
+        }
+      },
+      "arguments": {
+        "actualAmount": "1000000",
+        "usageHash": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+      },
+      "before": {
+        "balances": {
+          "buyer": "185000000",
+          "escrowContract": "2000000",
+          "seller": "13000000",
+          "wrongBuyer": "0",
+          "wrongSeller": "0"
+        },
+        "liability": "2000000",
+        "session": {
+          "escrowedAmount": "2000000",
+          "maxAmount": "2000000",
+          "settledAmount": "0",
+          "status": "Open"
+        }
+      },
+      "createdAt": "2026-10-20T06:23:52Z",
+      "expected": {
+        "error": null,
+        "outcome": "success"
+      },
+      "expectedSuccessful": true,
+      "expiresAtLedger": 5290770,
+      "invokedBy": "GAHA3T2WSTDHNGMPVXI6ISZD45KGKYWIAR7VDCTO4J5TA722ISMDCPN2",
+      "issue": 6,
+      "ledger": 5290769,
+      "name": "settlement_last_valid_ledger",
+      "operation": "settle",
+      "recordedOn": "ledger",
+      "sessionId": "4e8eb3af939c4f76117b73893f4a8c125633b1ed49cbb44965313bf491805916",
+      "sourceAccount": "GAHA3T2WSTDHNGMPVXI6ISZD45KGKYWIAR7VDCTO4J5TA722ISMDCPN2",
+      "stateUnchanged": false,
+      "transactionHash": "596c4cdf087f7ed06581ee3ae692bd1a4ef499248e715658eaad043f305bf0f1"
+    },
+    {
+      "actual": {
+        "error": "Error(Contract, #4)",
+        "outcome": "failure"
+      },
+      "after": {
+        "balances": {
+          "buyer": "184000000",
+          "escrowContract": "2000000",
+          "seller": "14000000",
+          "wrongBuyer": "0",
+          "wrongSeller": "0"
+        },
+        "liability": "2000000",
+        "session": {
+          "escrowedAmount": "2000000",
+          "maxAmount": "2000000",
+          "settledAmount": "0",
+          "status": "Open"
+        }
+      },
+      "arguments": {
+        "actualAmount": "1000000",
+        "usageHash": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+      },
+      "before": {
+        "balances": {
+          "buyer": "184000000",
+          "escrowContract": "2000000",
+          "seller": "14000000",
+          "wrongBuyer": "0",
+          "wrongSeller": "0"
+        },
+        "liability": "2000000",
+        "session": {
+          "escrowedAmount": "2000000",
+          "maxAmount": "2000000",
+          "settledAmount": "0",
+          "status": "Open"
+        }
+      },
+      "createdAt": "2026-10-20T06:26:27Z",
+      "expected": {
+        "error": "Error(Contract, #4)",
+        "outcome": "failure"
+      },
+      "expectedSuccessful": false,
+      "expiresAtLedger": 5290800,
+      "invokedBy": "GAHA3T2WSTDHNGMPVXI6ISZD45KGKYWIAR7VDCTO4J5TA722ISMDCPN2",
+      "issue": 6,
+      "ledger": 5290800,
+      "name": "settlement_at_expiry_boundary",
+      "operation": "settle",
+      "recordedOn": "ledger",
+      "resultCode": "tx_failed/invoke_host_function_trapped",
+      "sessionId": "0fb140b8c4ee2fa5e5fc7488810131886f0ffdf0f75bccd299e6321a959cf052",
+      "sourceAccount": "GAHA3T2WSTDHNGMPVXI6ISZD45KGKYWIAR7VDCTO4J5TA722ISMDCPN2",
+      "stateUnchanged": true,
+      "transactionHash": "bcbaa57fcf8bd6c21a9dfff5cc1680d522345490fd6fc52b85132025047c884e"
+    }
+  ],
+  "contractId": "CDI5ZVB4VUQQJ5DJ25M4QBXYI273LN4PHN7TW6BT6VHERELK26SH7YY3",
+  "deploymentManifest": "deployments/testnet-2026-10-20.json",
+  "environment": "testnet",
+  "expiryBoundary": {
+    "lastValidLedger": "expires_at_ledger - 1",
+    "rule": "ledger.sequence >= expires_at_ledger rejects settle and cancel",
+    "source": "contracts/upto-session/src/validation.rs validate_settlement_amount; contracts/upto-session/src/lib.rs cancel"
+  },
+  "kind": "live-rejection-evidence",
+  "limitations": [
+    "LBT is a custom test-only token and must not be represented as Circle USDC.",
+    "This evidence is for Stellar testnet and makes no mainnet claim.",
+    "Rejected cases recorded on ledger were submitted unsimulated with a footprint taken from a valid sibling simulation, so the network rather than the CLI rejected them; their fees were paid in testnet XLM."
+  ],
+  "network": {
+    "horizonUrl": "https://horizon-testnet.stellar.org",
+    "name": "Test SDF Network",
+    "passphrase": "Test SDF Network ; September 2015",
+    "rpcUrl": "https://soroban-testnet.stellar.org"
+  },
+  "schemaVersion": 1,
+  "setupTransactions": [
+    {
+      "createdAt": "2026-10-20T06:18:52Z",
+      "expectedSuccessful": true,
+      "ledger": 5290709,
+      "name": "mint_test_tokens",
+      "sourceAccount": "GCP2WFPCVRZFIAUY5FQXKTHOZM77QQDRBPUWTH6U3XOUKZJNM6XYTYZE",
+      "transactionHash": "00f3021ade19d70ca223c02d44c634cc0deff00ce84604d7ede6e922fb610bc5"
+    },
+    {
+      "createdAt": "2026-10-20T06:19:12Z",
+      "expectedSuccessful": true,
+      "ledger": 5290713,
+      "name": "create_control",
+      "sessionId": "3078a5adbdc52eee196061ca4acc7057765bd1b0329cfa9771876c887974e6d1",
+      "sourceAccount": "GBTKTETSC2KTMTB7U7WL5VXRONUBHYGH65AF5GB4PP3BH2RPKX5DVXBT",
+      "transactionHash": "7680a4ed7e2fb80021b5a2169fde1a10c5ce53497bb6e8aa70504108a15c7741"
+    },
+    {
+      "createdAt": "2026-10-20T06:19:42Z",
+      "expectedSuccessful": true,
+      "ledger": 5290719,
+      "name": "create_rejection_fixture",
+      "sessionId": "77199106a4af79de71522c91dfb7a9ac06841648b69d3e416927874e32e54d22",
+      "sourceAccount": "GBTKTETSC2KTMTB7U7WL5VXRONUBHYGH65AF5GB4PP3BH2RPKX5DVXBT",
+      "transactionHash": "324c01c39e831ae9304011906ae15c20964d652d961d4f1e8b4af54f62ab005b"
+    },
+    {
+      "createdAt": "2026-10-20T06:21:12Z",
+      "expectedSuccessful": true,
+      "ledger": 5290737,
+      "name": "cancel_rejection_fixture",
+      "sessionId": "77199106a4af79de71522c91dfb7a9ac06841648b69d3e416927874e32e54d22",
+      "sourceAccount": "GBTKTETSC2KTMTB7U7WL5VXRONUBHYGH65AF5GB4PP3BH2RPKX5DVXBT",
+      "transactionHash": "b0c0d14337ec4150976da2edbf1266a601d25b4f2a939b645fbbaecda806d8f0"
+    },
+    {
+      "createdAt": "2026-10-20T06:21:37Z",
+      "expectedSuccessful": true,
+      "ledger": 5290742,
+      "name": "create_settlement_last_valid_ledger_1",
+      "sessionId": "4e8eb3af939c4f76117b73893f4a8c125633b1ed49cbb44965313bf491805916",
+      "sourceAccount": "GBTKTETSC2KTMTB7U7WL5VXRONUBHYGH65AF5GB4PP3BH2RPKX5DVXBT",
+      "transactionHash": "8c16f74c29a7cb5f325931e9a5996a18fdd57a0ec95d2ad3578f184354dcb9fc"
+    },
+    {
+      "createdAt": "2026-10-20T06:24:07Z",
+      "expectedSuccessful": true,
+      "ledger": 5290772,
+      "name": "create_settlement_at_expiry_boundary_1",
+      "sessionId": "0fb140b8c4ee2fa5e5fc7488810131886f0ffdf0f75bccd299e6321a959cf052",
+      "sourceAccount": "GBTKTETSC2KTMTB7U7WL5VXRONUBHYGH65AF5GB4PP3BH2RPKX5DVXBT",
+      "transactionHash": "b9e31560ebe5ea8a7cd020fd7ea4bde261063a731d230f93992ed3b50687b80d"
+    },
+    {
+      "createdAt": "2026-10-20T06:27:22Z",
+      "expectedSuccessful": true,
+      "ledger": 5290811,
+      "name": "recover_settlement_at_expiry_boundary_1",
+      "sessionId": "0fb140b8c4ee2fa5e5fc7488810131886f0ffdf0f75bccd299e6321a959cf052",
+      "sourceAccount": "GBTKTETSC2KTMTB7U7WL5VXRONUBHYGH65AF5GB4PP3BH2RPKX5DVXBT",
+      "transactionHash": "c1a5c9f14729d66fd89c6eff0d108fa9ed31d4b6be9c9da61281c47a511b85d7"
+    }
+  ],
+  "sourceCommit": "a8ac359ae155a85b5d71f16d5476aa26d3310cd3"
+}

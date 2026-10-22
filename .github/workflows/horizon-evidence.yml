@@ -1,0 +1,37 @@
+name: Horizon Evidence Verification
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "43 6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.12.0
+
+      - name: Verify published transactions against Horizon
+        shell: bash
+        run: |
+          set +e
+          node scripts/verify-horizon-evidence.mjs
+          code=$?
+          set -e
+          if [ "$code" -eq 2 ]; then
+            echo "::warning::Horizon was unavailable after bounded retries; no published evidence was contradicted. Rerun this workflow."
+            exit 0
+          fi
+          if [ "$code" -eq 1 ]; then
+            echo "::error::Horizon contradicts published testnet evidence at ${GITHUB_SHA}; see the job summary."
+          fi
+          exit "$code"

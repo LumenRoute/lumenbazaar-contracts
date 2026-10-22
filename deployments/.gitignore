@@ -1,2 +1,4 @@
 local.json
 testnet.json
+testnet-evidence.json
+receipts/
