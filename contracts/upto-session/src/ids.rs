@@ -29,6 +29,26 @@ pub fn derive_usage_commitment(env: &Env, input: &UsageCommitmentInput<'_>) -> B
     derive_usage_commitment_for_version(env, input, crate::INTERFACE_VERSION)
 }
 
+pub fn session_id_domain_hash(env: &Env) -> BytesN<32> {
+    env.crypto()
+        .sha256(&domain_preimage(
+            env,
+            SESSION_ID_DOMAIN,
+            crate::INTERFACE_VERSION,
+        ))
+        .to_bytes()
+}
+
+pub fn usage_commitment_domain_hash(env: &Env) -> BytesN<32> {
+    env.crypto()
+        .sha256(&domain_preimage(
+            env,
+            USAGE_COMMITMENT_DOMAIN,
+            crate::INTERFACE_VERSION,
+        ))
+        .to_bytes()
+}
+
 pub fn session_id_preimage(env: &Env, input: &SessionIdInput<'_>) -> Bytes {
     session_id_preimage_for_version(env, input, crate::INTERFACE_VERSION)
 }

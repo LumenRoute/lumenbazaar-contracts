@@ -135,7 +135,9 @@ jobs:
         run: node scripts/check-audit-readiness.mjs
 
       - name: Check public deployment evidence
-        run: node scripts/check-deployment-evidence.mjs
+        run: |
+          node --test scripts/testnet/generate-public-manifest.test.mjs scripts/verify-horizon-evidence.test.mjs
+          node scripts/check-deployment-evidence.mjs
 
       - name: Check public lifecycle evidence
         run: node scripts/check-testnet-lifecycle.mjs

@@ -2,6 +2,7 @@
   "contractVersion": "0.3.0",
   "interfaceVersion": 3,
   "sourceSpecSha256": "026dc59bcfe7c3993a8609b60250049d125371d8b5cca7b7b981aa580c044086",
+  "sourceSpecSha256": "f0e2a98a4ae7d396ad5ed2a87a4f13d28c9658f3ea7cc97b5b07ea47d355f674",
   "sourceSpecSha256": "fc603a096025df811f1cb31384595dbf334a35353d7ff03e300447eaa8368bf1",
   "methods": [
     "accept_admin",
@@ -13,11 +14,14 @@
     "get_admin",
     "get_admin_rotation",
     "get_asset_max_session_amount",
+    "get_asset_min_session_amount",
+    "get_commitment_domain_metadata",
     "get_configuration",
     "get_escrow_liability",
     "get_recoverability",
     "get_session",
     "get_solvency",
+    "get_session_status",
     "initialize",
     "interface_version",
     "preview_settle",
@@ -146,6 +150,15 @@
           "type": "address"
         },
         {
+          "name": "reason_commitment",
+          "location": "data",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
           "name": "event_version",
           "location": "data",
           "type": "u32"
@@ -167,6 +180,15 @@
           "name": "admin",
           "location": "data",
           "type": "address"
+        },
+        {
+          "name": "reason_commitment",
+          "location": "data",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
         },
         {
           "name": "event_version",

@@ -65,7 +65,10 @@ node scripts/testnet/initialize-testnet.mjs
 node scripts/testnet/verify-testnet.mjs
 ```
 
-The scripts write an ignored `deployments/testnet.json`. Sanitized public deployment evidence is in
+The scripts write an ignored `deployments/testnet.json` and ignored network receipts. Publish a
+sanitized manifest with `node scripts/testnet/generate-public-manifest.mjs`; see `deployments/README.md`
+for what it refuses to write, the live rejection runner, and the scheduled Horizon verification.
+Sanitized public deployment evidence is in
 `deployments/testnet-2026-09-06.json`; it records the test-only LBT asset accurately and does not
 claim that deployment alone proves a live payment.
 

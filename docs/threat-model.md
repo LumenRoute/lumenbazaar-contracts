@@ -8,7 +8,9 @@ The accepted funding design is
 The current source implements the selected escrow model. The corrected v2
 testnet deployment and lifecycle evidence are published in
 `deployments/testnet-2026-10-07.json` and
-`artifacts/testnet/lifecycle-2026-10-07.json`.
+`artifacts/testnet/lifecycle-2026-10-07.json`. Live on-ledger rejection evidence for the current
+interface v3 source is published in `deployments/testnet-2026-10-20.json` and
+`artifacts/testnet/live-evidence-2026-10-20.json`.
 
 ## Assets and trust boundaries
 
@@ -47,7 +49,27 @@ testnet deployment and lifecycle evidence are published in
 ## Amount, expiry, and storage risks
 
 - Caps and settlement amounts must be positive, and settlement cannot exceed the stored cap.
-- Settlement at or after the expiry ledger is rejected.
+  Settling exactly the cap is allowed; `actual_amount > max_amount` returns `#8 AmountExceedsCap`
+  (`validate_settlement_amount` in `contracts/upto-session/src/validation.rs`).
+- Expiry is ledger-sequence based, not timestamp based. `settle` and `cancel` reject when
+  `ledger.sequence >= expires_at_ledger` with `#4 ExpiredSession` (`validate_settlement_amount`
+  and `cancel` in `contracts/upto-session/src/lib.rs`), so the last ledger that can settle or cancel
+  is `expires_at_ledger - 1`. `recover_expired` is allowed from `expires_at_ledger` onward.
+- `settle` checks status, amount, cap, expiry, and usage hash before seller authorization, and
+  `cancel` checks status and expiry before buyer authorization. A rejected call therefore reports the
+  first failed rule.
+- Live testnet evidence on contract `CDI5ZVB4VUQQJ5DJ25M4QBXYI273LN4PHN7TW6BT6VHERELK26SH7YY3`
+  (`artifacts/testnet/live-evidence-2026-10-20.json`), all recorded as on-ledger transactions:
+  - control settlement of 6,500,000 under a 10,000,000 cap succeeded at ledger 5290715
+    (`ff15324bd866801ecdf1137e478eea7d63758982af4d77cf13a122f393cb49b5`);
+  - settlement of 5,000,001 under a 5,000,000 cap failed with `Error(Contract, #8)` at ledger 5290735
+    (`07bb7c118510a1fbaae89f504a9b1174c4c8baae78809186d640dfb7b7e28e73`) with identical balances,
+    liability, and session state before and after;
+  - for a session expiring at ledger 5290770, settlement succeeded in the last valid ledger 5290769
+    (`596c4cdf087f7ed06581ee3ae692bd1a4ef499248e715658eaad043f305bf0f1`);
+  - for a session expiring at ledger 5290800, settlement landing exactly in ledger 5290800 failed
+    with `Error(Contract, #4)` (`bcbaa57fcf8bd6c21a9dfff5cc1680d522345490fd6fc52b85132025047c884e`)
+    without mutating state, and the escrow was then recovered permissionlessly.
 - Contract storage TTL can outlive or expire independently of off-chain records. Operators must not
   treat a missing off-chain record as proof that an on-chain session is absent.
 - TTL extension is limited to open sessions. Tests cover missing, settled, and cancelled session
@@ -72,8 +94,12 @@ testnet deployment and lifecycle evidence are published in
 
 - `upto` is a LumenBazaar extension and is not presented as an upstream-standard Stellar x402 scheme.
 - The live evidence uses LBT, a custom test-only token, not Circle USDC or another production asset.
-- Rejected operations fail during simulation and therefore have no submitted transaction hash; the
-  evidence records the observation ledger, exact command, and deterministic rejection instead.
+- The 2026-10-07 lifecycle rejections failed during simulation and therefore have no submitted
+  transaction hash; that evidence records the observation ledger, exact command, and deterministic
+  rejection instead. The 2026-10-20 live evidence submits rejected operations without simulation
+  (using a valid sibling simulation's footprint), so each rejection is a failed transaction on ledger.
+  A scheduled workflow re-verifies every published transaction and its expected outcome against
+  Horizon.
 - Testnet lifecycle evidence does not prove mainnet readiness, production monitoring, or backend
   idempotency.
 - Production use requires an independently reviewed token, a live transaction submission client,

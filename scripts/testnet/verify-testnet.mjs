@@ -19,7 +19,16 @@ const wasmPaths = {
   "policy-wallet-example": "target/wasm32v1-none/release/policy_wallet_example.wasm",
 };
 
-for (const name of ["upto-session", "test-token", "policy-wallet-example"]) {
+const names = ["upto-session", "test-token", "policy-wallet-example"];
+const deployed = dryRun ? names : names.filter((name) => contracts[name]);
+if (deployed.length === 0) {
+  throw new Error("The deployment manifest contains no contracts to verify.");
+}
+for (const name of names.filter((entry) => !deployed.includes(entry))) {
+  console.log(`skipped ${name}: not part of this deployment manifest`);
+}
+
+for (const name of deployed) {
   const contractId = contracts[name]?.contractId || `dry-run-${name}`;
   if (!dryRun && !/^C[A-Z2-7]{55}$/.test(contractId)) {
     throw new Error(`Missing valid testnet contract ID for ${name}`);

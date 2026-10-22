@@ -90,6 +90,7 @@ fn initialize(
         policies.push_back(AssetPolicy {
             asset,
             max_session_amount: i128::MAX,
+            min_session_amount: 1,
         });
     }
     client

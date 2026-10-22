@@ -12,6 +12,13 @@ pub struct AssetSessionCapUpdated {
 }
 
 #[contractevent]
+pub struct CapIncreaseProposed {
+    #[topic]
+    pub asset: Address,
+    pub admin: Address,
+    pub proposed_max_amount: i128,
+    pub active_at_ledger: u32,
+    pub expires_at_ledger: u32,
 pub struct SellerExposureCeilingUpdated {
     #[topic]
     pub asset: Address,
@@ -22,6 +29,11 @@ pub struct SellerExposureCeilingUpdated {
 }
 
 #[contractevent]
+pub struct CapIncreaseCancelled {
+    #[topic]
+    pub asset: Address,
+    pub admin: Address,
+    pub proposed_max_amount: i128,
 pub struct MaxBuyerOpenSessionsUpdated {
     pub admin: Address,
     pub previous_limit: u32,
@@ -42,6 +54,7 @@ pub struct AssetDeprecated {
     #[topic]
     pub asset: Address,
     pub admin: Address,
+    pub reason_commitment: BytesN<32>,
     pub event_version: u32,
 }
 
@@ -83,6 +96,7 @@ pub struct AssetRemoved {
     #[topic]
     pub asset: Address,
     pub admin: Address,
+    pub reason_commitment: BytesN<32>,
     pub event_version: u32,
 }
 
@@ -200,6 +214,27 @@ pub fn publish_asset_session_cap_updated(
     .publish(env);
 }
 
+pub fn publish_asset_deprecated(
+    env: &Env,
+    asset: &Address,
+    admin: &Address,
+    reason_commitment: &BytesN<32>,
+) {
+pub fn publish_cap_increase_proposed(
+    env: &Env,
+    asset: &Address,
+    admin: &Address,
+    proposed_max_amount: i128,
+    active_at_ledger: u32,
+    expires_at_ledger: u32,
+) {
+    CapIncreaseProposed {
+        asset: asset.clone(),
+        admin: admin.clone(),
+        proposed_max_amount,
+        active_at_ledger,
+        expires_at_ledger,
+        event_version: 3,
 pub fn publish_seller_exposure_ceiling_updated(
     env: &Env,
     asset: &Address,
@@ -217,6 +252,17 @@ pub fn publish_seller_exposure_ceiling_updated(
     .publish(env);
 }
 
+pub fn publish_cap_increase_cancelled(
+    env: &Env,
+    asset: &Address,
+    admin: &Address,
+    proposed_max_amount: i128,
+) {
+    CapIncreaseCancelled {
+        asset: asset.clone(),
+        admin: admin.clone(),
+        proposed_max_amount,
+        event_version: 3,
 pub fn publish_max_buyer_open_sessions_updated(
     env: &Env,
     admin: &Address,
@@ -251,6 +297,7 @@ pub fn publish_asset_deprecated(env: &Env, asset: &Address, admin: &Address) {
     AssetDeprecated {
         asset: asset.clone(),
         admin: admin.clone(),
+        reason_commitment: reason_commitment.clone(),
         event_version: 3,
     }
     .publish(env);
@@ -302,10 +349,16 @@ pub fn publish_asset_activated(env: &Env, asset: &Address, decimals: u32) {
     .publish(env);
 }
 
-pub fn publish_asset_removed(env: &Env, asset: &Address, admin: &Address) {
+pub fn publish_asset_removed(
+    env: &Env,
+    asset: &Address,
+    admin: &Address,
+    reason_commitment: &BytesN<32>,
+) {
     AssetRemoved {
         asset: asset.clone(),
         admin: admin.clone(),
+        reason_commitment: reason_commitment.clone(),
         event_version: 3,
     }
     .publish(env);
