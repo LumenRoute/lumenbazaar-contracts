@@ -1,4 +1,6 @@
-use crate::{AdminRotation, AssetStatus, ContractError, OperationalState, Session};
+use crate::{
+    AdminRotation, AssetStatus, CapIncreaseProposal, ContractError, OperationalState, Session,
+};
 use soroban_sdk::{contracttype, Address, BytesN, Env, Vec};
 
 pub const STORAGE_LAYOUT_VERSION: u32 = 3;
@@ -15,6 +17,7 @@ pub enum DataKey {
     StorageLayoutVersion,
     SupportedAsset(Address),
     AssetMaxSessionAmount(Address),
+    CapIncreaseProposal(Address),
     SupportedAssets,
     OperationalState,
     Liability(Address),
@@ -99,6 +102,24 @@ pub fn read_asset_max_session_amount(env: &Env, asset: &Address) -> Option<i128>
     env.storage()
         .instance()
         .get(&DataKey::AssetMaxSessionAmount(asset.clone()))
+}
+
+pub fn write_cap_increase_proposal(env: &Env, asset: &Address, proposal: &CapIncreaseProposal) {
+    env.storage()
+        .instance()
+        .set(&DataKey::CapIncreaseProposal(asset.clone()), proposal);
+}
+
+pub fn read_cap_increase_proposal(env: &Env, asset: &Address) -> Option<CapIncreaseProposal> {
+    env.storage()
+        .instance()
+        .get(&DataKey::CapIncreaseProposal(asset.clone()))
+}
+
+pub fn remove_cap_increase_proposal(env: &Env, asset: &Address) {
+    env.storage()
+        .instance()
+        .remove(&DataKey::CapIncreaseProposal(asset.clone()));
 }
 
 pub fn write_supported_assets(env: &Env, assets: &Vec<Address>) {
@@ -397,6 +418,10 @@ mod tests {
             resource_hash: BytesN::from_array(env, &[2; 32]),
             usage_hash: None,
             status: SessionStatus::Open,
+            creation_ledger: 10,
+            finalized_ledger: None,
+            resource_scheme_version: 1,
+            usage_scheme_version: None,
         }
     }
 

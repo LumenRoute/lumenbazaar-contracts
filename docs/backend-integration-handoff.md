@@ -50,10 +50,14 @@ administrator-rotation, and creation pause/resume events use version `3`.
 | `interface_version()` | Require result `3` before encoding v3 initialization, configuration, cap-policy, administrator-rotation, liability, or batch-recovery calls. |
 | `initialize(admin, asset_policies)` | One-time deployment setup with one to 16 unique assets and positive explicit session caps. Every asset must pass the bounded read-only probe. Do not call from request handlers. |
 | `get_asset_max_session_amount(asset)` | Read the active creation cap for a supported asset. |
-| `set_asset_max_session_amount(asset, max_session_amount)` | Authenticated administrator update for future sessions only. |
+| `set_asset_max_session_amount(asset, max_session_amount)` | Authenticated administrator update for future sessions only; immediate for cap decreases, rejects cap increases with `CapIncreasePending`. |
+| `propose_asset_cap_increase(asset, proposed_max_amount, active_at_ledger, expires_at_ledger)` | Admin-authorized proposal to increase an asset cap after a bounded delay between 100 and 17,280 ledgers. |
+| `accept_asset_cap_increase(asset)` | Admin-authorized acceptance of an active cap increase proposal before expiry. |
+| `cancel_asset_cap_increase(asset)` | Admin-authorized cancellation of a pending cap increase proposal. |
+| `get_asset_cap_increase(asset)` | Read the optional pending cap increase proposal for an asset. |
 | `get_admin()` | Read the active administrator. |
 | `get_admin_rotation()` | Read the optional pending administrator and expiry ledger. |
-| `propose_admin(pending_admin, expires_at_ledger)` | Current-admin-authorized proposal; does not transfer privileges. |
+| `propose_admin(pending_admin, expires_at_ledger)` | Current-admin-authorized proposal with a lifetime bounded between 1 and 17,280 ledgers; does not transfer privileges. |
 | `accept_admin()` | Pending-admin-authorized acceptance before expiry. |
 | `cancel_admin_rotation()` | Current-admin-authorized removal of a pending or expired proposal. |
 | `get_configuration()` | Read response/interface/storage versions, administrator, bounded supported assets, operational state, and instance TTL policy without authorization. |
@@ -170,6 +174,16 @@ Backends must route them there and must not recompute, migrate, or reinterpret
 them under v3. The machine-readable migration record is
 `artifacts/interface/migrations/v2-to-v3.json`.
 
+## Session Audit Ledgers & Commitment Versioning
+
+Every `Session` record includes audit ledger metadata and explicit commitment scheme versions:
+- `creation_ledger: u32`: Set to the ledger sequence at session creation; immutable throughout the session lifecycle.
+- `finalized_ledger: Option<u32>`: `None` while the session is open; set on terminal state transitions (`settle`, `cancel`, or `recover_expired`).
+- `resource_scheme_version: u32`: Set to `1` (the currently supported resource scheme).
+- `usage_scheme_version: Option<u32>`: `None` while open/cancelled/recovered; set to `Some(1)` upon settlement.
+
+Unsupported commitment scheme versions are rejected with `UnsupportedCommitmentScheme` (code 41) before any state or token balance changes occur.
+
 ## V1 To V2 Compatibility
 
 Version 2 is a new deployment, not an in-place upgrade. It changes
@@ -220,6 +234,12 @@ codes 23 through 32 without changing the earlier mappings.
 | 33 | `AssetNotActive` | Do not deprecate an unknown or already deprecated asset. |
 | 34 | `AssetNotDeprecated` | Deprecate the asset before requesting final removal. |
 | 35 | `AssetLiabilityOutstanding` | Settle, cancel, or recover every open session before removal. |
+| 36 | `CapIncreasePending` | A cap increase proposal is already pending or an immediate cap increase was attempted. |
+| 37 | `CapIncreaseNotReady` | Cannot accept proposal before the configured activation ledger. |
+| 38 | `CapIncreaseNotFound` | Proposal does not exist or was already cancelled/accepted. |
+| 39 | `CapIncreaseExpired` | Cannot accept proposal at or after the expiration ledger. |
+| 40 | `InvalidCapIncreaseDelay` | Activation or expiration delay violates minimum (100) or maximum (17,280) ledgers. |
+| 41 | `UnsupportedCommitmentScheme` | Commitment scheme version is unsupported by the contract. |
 | 36 | `CreationPaused` | New sessions are paused by the administrator; surface the operational state and stop submitting `create_session`. |
 | 37 | `OperationalStateUnchanged` | The requested pause or resume already matches the current operational state; refresh `get_configuration` instead of retrying. |
 

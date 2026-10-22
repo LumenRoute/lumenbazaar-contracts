@@ -32,6 +32,14 @@ pub enum SessionStatus {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CapIncreaseProposal {
+    pub proposed_max_amount: i128,
+    pub active_at_ledger: u32,
+    pub expires_at_ledger: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Session {
     pub id: BytesN<32>,
     pub buyer: Address,
@@ -44,6 +52,10 @@ pub struct Session {
     pub resource_hash: BytesN<32>,
     pub usage_hash: Option<BytesN<32>>,
     pub status: SessionStatus,
+    pub creation_ledger: u32,
+    pub finalized_ledger: Option<u32>,
+    pub resource_scheme_version: u32,
+    pub usage_scheme_version: Option<u32>,
 }
 
 #[contracttype]
