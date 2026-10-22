@@ -24,6 +24,9 @@ jobs:
         with:
           node-version: 22.12.0
 
+      - name: Check deterministic transaction finality
+        run: node --test scripts/lib/transaction-finality.test.mjs
+
       - name: Install Stellar CLI
         run: |
           curl -fsSL https://github.com/stellar/stellar-cli/releases/download/v28.0.0/stellar-cli-28.0.0-x86_64-unknown-linux-gnu.tar.gz -o stellar-cli.tar.gz

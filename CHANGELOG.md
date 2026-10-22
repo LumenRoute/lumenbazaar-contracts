@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- Bound transaction finality polling by deadline and attempt budget, preserving distinct
+  success, failure, expiry and timeout evidence. Compatibility: receipt schema unchanged.
+  Migration: none.
+
 - Require a positive maximum session amount for every supported asset.
 - Enforce asset caps before buyer authorization and escrow transfer.
 - Add authenticated cap updates, a public cap query, and versioned update events.

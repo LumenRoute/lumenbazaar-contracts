@@ -1,5 +1,20 @@
 # Release Toolchain
 
+## Transaction finality
+
+`pollTransaction` in `scripts/lib/transaction-finality.mjs` is the shared finality
+definition used by `fetchReceipt`, and therefore deployment, initialization and
+receipt verification. Submission acceptance is not success. NOT_FOUND/PENDING
+are nonterminal; SUCCESS/FAILED require an RPC ledger and close timestamp.
+EXPIRED requires an explicit inclusive `maxLedger` and a later RPC-observed ledger;
+without that evidence the outcome is TIMED_OUT, never guessed expiry. Timeout
+and expiry errors retain a structured `.outcome` containing hash, last ledger,
+elapsed monotonic time and poll count. RPC errors remain distinct protocol or
+transport errors. A poll has both a deadline (120 seconds by default) and an
+attempt cap (121); each RPC request receives the remaining time budget. Success
+returns network ledger/time and result metadata. Receipt files keep schema 1.
+Tests inject RPC fixtures, clock and sleep without making network transactions.
+
 Contract release and audit evidence must use the following exact toolchain:
 
 | Component | Version | Enforcement |
