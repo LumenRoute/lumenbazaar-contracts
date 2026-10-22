@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
 
 jobs:
   contracts:
@@ -23,6 +25,17 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22.12.0
+
+      - name: Check release version consistency
+        run: |
+          node --test scripts/lib/release-versions.test.mjs
+          node scripts/check-release-versions.mjs
+
+      - name: Validate release tag
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/check-release-versions.mjs --tag "$RELEASE_TAG"
 
       - name: Install Stellar CLI
         run: |

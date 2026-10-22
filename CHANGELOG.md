@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- Check explicit release-version mappings across contract crates, bindings, interface,
+  storage and deployment schema before tagging. Compatibility: tooling only. Migration: none.
+
 - Require a positive maximum session amount for every supported asset.
 - Enforce asset caps before buyer authorization and escrow transfer.
 - Add authenticated cap updates, a public cap query, and versioned update events.
