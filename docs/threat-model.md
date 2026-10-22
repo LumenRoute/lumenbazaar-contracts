@@ -58,6 +58,11 @@ testnet deployment and lifecycle evidence are published in
 
 - `upto-session` stores an administrator during one-time initialization but currently exposes no
   contract upgrade entry point.
+- The administrator can authorize an `Active`/`Paused` operational transition with
+  `pause_creation` and `resume_creation`. A pause stops new exposure by rejecting
+  `create_session` before buyer authorization or any token transfer, while settlement,
+  cancellation, expiry recovery, TTL extension, and read-only queries stay available so
+  existing escrow cannot be trapped.
 - Deployed instances are therefore operationally immutable through this interface. A code change
   requires a new deployment and explicit migration or reconfiguration by clients.
 - The policy wallet owner can update its own spending policy. That authority does not grant access to

@@ -45,6 +45,8 @@ pub enum ContractError {
     CapIncreaseExpired = 39,
     InvalidCapIncreaseDelay = 40,
     UnsupportedCommitmentScheme = 41,
+    CreationPaused = 36,
+    OperationalStateUnchanged = 37,
 }
 
 #[cfg(test)]
@@ -94,5 +96,7 @@ mod tests {
         assert_eq!(ContractError::CapIncreaseExpired as u32, 39);
         assert_eq!(ContractError::InvalidCapIncreaseDelay as u32, 40);
         assert_eq!(ContractError::UnsupportedCommitmentScheme as u32, 41);
+        assert_eq!(ContractError::CreationPaused as u32, 36);
+        assert_eq!(ContractError::OperationalStateUnchanged as u32, 37);
     }
 }

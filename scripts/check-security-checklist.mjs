@@ -62,6 +62,15 @@ const controls = [
     ],
   },
   {
+    name: "Emergency creation pause",
+    tests: [
+      "creation_pause_requires_admin_and_fails_closed_before_transfer",
+      "creation_pause_rejects_repeated_calls_and_resume_restores_creation",
+      "paused_creation_preserves_all_exit_paths",
+      "creation_pause_and_resume_require_initialization",
+    ],
+  },
+  {
     name: "Generated state-machine invariants",
     tests: ["generated_sequences_preserve_value_caps_and_isolation"],
   },
