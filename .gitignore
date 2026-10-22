@@ -1,6 +1,7 @@
 /target/
 **/test_snapshots/
 **/*.wasm
+artifacts/provenance/
 bindings/*/dist/
 .env
 .env.local

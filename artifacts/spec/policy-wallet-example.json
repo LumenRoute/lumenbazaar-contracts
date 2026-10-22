@@ -56,6 +56,22 @@
           "doc": "",
           "name": "agent",
           "type": "address"
+        }
+      ],
+      "name": "authorized_count_today",
+      "outputs": [
+        "u32"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type": "address"
         },
         {
           "doc": "",
@@ -254,6 +270,52 @@
     }
   },
   {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "resource_hash",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        }
+      ],
+      "name": "spent_today_resource",
+      "outputs": [
+        "i128"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "agent",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "seller",
+          "type": "address"
+        }
+      ],
+      "name": "spent_today_seller",
+      "outputs": [
+        "i128"
+      ]
+    }
+  },
+  {
     "udt_error_enum_v0": {
       "cases": [
         {
@@ -310,11 +372,73 @@
           "doc": "",
           "name": "ResourceHashNotAllowed",
           "value": 11
+        },
+        {
+          "doc": "",
+          "name": "PolicyNotActive",
+          "value": 12
+        },
+        {
+          "doc": "",
+          "name": "AuthorizationLimitExceeded",
+          "value": 13
         }
       ],
       "doc": "",
       "lib": "",
       "name": "PolicyWalletError"
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "",
+      "fields": [
+        {
+          "doc": "",
+          "name": "max_amount_per_day",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "max_amount_per_payment",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "resource_hash",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        }
+      ],
+      "lib": "",
+      "name": "ResourceSpendingLimit"
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "",
+      "fields": [
+        {
+          "doc": "",
+          "name": "max_amount_per_day",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "max_amount_per_payment",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "seller",
+          "type": "address"
+        }
+      ],
+      "lib": "",
+      "name": "SellerSpendingLimit"
     }
   },
   {
@@ -366,6 +490,42 @@
           "doc": "",
           "name": "max_amount_per_payment",
           "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "max_authorizations_per_day",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "name": "resource_limits",
+          "type": {
+            "vec": {
+              "element_type": {
+                "udt": {
+                  "name": "ResourceSpendingLimit"
+                }
+              }
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "seller_limits",
+          "type": {
+            "vec": {
+              "element_type": {
+                "udt": {
+                  "name": "SellerSpendingLimit"
+                }
+              }
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "valid_from_ledger",
+          "type": "u32"
         },
         {
           "doc": "",

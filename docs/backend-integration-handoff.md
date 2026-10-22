@@ -40,8 +40,8 @@ Backend services should prefer the generated TypeScript package for transaction 
 
 The domain-separated, asset-lifecycle escrow contract and generated package are version `0.3.0`.
 The public `interface_version()` result is `3`; session lifecycle events retain
-event version `2`, while asset activation, asset lifecycle, asset-cap, and
-administrator-rotation events use version `3`.
+event version `2`, while asset activation, asset lifecycle, asset-cap,
+administrator-rotation, and creation pause/resume events use version `3`.
 
 ## Upto Session Functions
 
@@ -70,6 +70,42 @@ administrator-rotation events use version `3`.
 | `recover_expired(session_id)` | Permissionless full refund to the stored buyer at or after expiry. |
 | `recover_expired_batch(session_ids)` | Recover up to eight caller-supplied IDs with ordered per-item results. Missing, premature, terminal, and repeated IDs do not block eligible recoveries. |
 | `extend_ttl(session_id)` | Extend storage TTL for still-open sessions. |
+| `pause_creation()` | Admin-authorized transition to `Paused`; rejects new sessions before buyer authorization or token transfer without affecting existing session exits. |
+| `resume_creation()` | Admin-authorized transition back to `Active`; re-enables new session creation. |
+
+## Indexed Event Topics
+
+Every public event carries exactly one indexed topic so an indexer can subscribe on
+a stable prefix plus a bounded value, then branch on the `event_version` field in the
+data map. Session lifecycle events use the session id (a 32-byte `BytesN<32>`) as the
+topic and event version `2`; asset, cap, and administrator events use the relevant
+32-byte address and event version `3`.
+
+| Event | Prefix topic | Indexed topic | Topic bound | Event version |
+| --- | --- | --- | --- | --- |
+| `SessionCreated` | `session_created` | `session_id` | 32 bytes | 2 |
+| `SessionSettled` | `session_settled` | `session_id` | 32 bytes | 2 |
+| `SessionCancelled` | `session_cancelled` | `session_id` | 32 bytes | 2 |
+| `SessionRecovered` | `session_recovered` | `session_id` | 32 bytes | 2 |
+| `AssetActivated` | `asset_activated` | `asset` | 32-byte address | 3 |
+| `AssetDeprecated` | `asset_deprecated` | `asset` | 32-byte address | 3 |
+| `AssetRemoved` | `asset_removed` | `asset` | 32-byte address | 3 |
+| `AssetSessionCapUpdated` | `asset_session_cap_updated` | `asset` | 32-byte address | 3 |
+| `AdminRotationProposed` | `admin_rotation_proposed` | `pending_admin` | 32-byte address | 3 |
+| `AdminRotationAccepted` | `admin_rotation_accepted` | `new_admin` | 32-byte address | 3 |
+| `AdminRotationCancelled` | `admin_rotation_cancelled` | `pending_admin` | 32-byte address | 3 |
+
+The layout is bounded: at most four topics per event, each topic a 32-byte session
+id or address key, and the `event_version` field is always `u32`. No unbounded or
+private usage data is placed in a topic; buyer, seller, amounts, and hashes stay in
+the data map.
+
+Compatibility is enforced in three places. `contracts/upto-session/src/test.rs`
+publishes every event and asserts the raw XDR topic count, topic kind, and
+`event_version` value. `scripts/check-event-topics.mjs` re-derives the layout from
+`artifacts/spec/upto-session.json` and `artifacts/interface/upto-session-v3.json`,
+decodes both, and fails when the reviewed topic or payload layout changes. Asking the
+indexer to consume the v3 fixture keeps the decode path covered end to end.
 
 ## V2 To V3 Compatibility
 
@@ -84,11 +120,16 @@ The configuration response has its own `response_version` field, currently `1`,
 so backend decoders can fail closed on future schema revisions.
 
 `operational_state` can decode `Active`, `Paused`, or `Deprecated`. This release
-initializes new contracts as `Active` and exposes no public state-transition
-method; pause and deprecation authority remain outside this query-only change.
-Backends must select the v3 fixture before invoking either new method. Version 3
-also emits one `AssetActivated` event per accepted asset. Existing error codes
-1 through 22 retain their names and values; codes 23 through 32 are additive.
+initializes new contracts as `Active`. The stored administrator can move the
+state between `Active` and `Paused` with `pause_creation` and `resume_creation`;
+while `Paused`, `create_session` returns `CreationPaused` before buyer
+authorization or any escrow transfer, and settlement, cancellation, expiry
+recovery, TTL extension, and read-only queries remain available. `Deprecated`
+is reserved and is not reachable through this interface, so pause and deprecation
+authority remain distinct. Backends must select the v3 fixture before invoking
+either new method. Version 3 also emits one `AssetActivated` event per accepted
+asset. Existing error codes 1 through 22 retain their names and values; codes 23
+through 37 are additive.
 Published v2 deployment records remain historical evidence and do not represent
 a deployed v3 contract.
 
@@ -182,6 +223,8 @@ codes 23 through 32 without changing the earlier mappings.
 | 33 | `AssetNotActive` | Do not deprecate an unknown or already deprecated asset. |
 | 34 | `AssetNotDeprecated` | Deprecate the asset before requesting final removal. |
 | 35 | `AssetLiabilityOutstanding` | Settle, cancel, or recover every open session before removal. |
+| 36 | `CreationPaused` | New sessions are paused by the administrator; surface the operational state and stop submitting `create_session`. |
+| 37 | `OperationalStateUnchanged` | The requested pause or resume already matches the current operational state; refresh `get_configuration` instead of retrying. |
 
 ## Hash Inputs
 
