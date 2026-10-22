@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "a8ac359ae155a85b5d71f16d5476aa26d3310cd3",
+  "sourceCommit": "bd1f6fef1f7dfe9ff5970101f61876a5d02a899e",
   "build": {
     "command": "stellar contract build --locked",
     "optimized": true,
@@ -17,23 +17,25 @@
     {
       "name": "upto-session",
       "artifact": "target/wasm32v1-none/release/upto_session.wasm",
-      "baselineBytes": 33977,
-      "maxBytes": 40772,
+      "baselineBytes": 52153,
+      "maxBytes": 62583,
       "maxIncreasePercent": 20
     },
     {
       "name": "policy-wallet-example",
       "artifact": "target/wasm32v1-none/release/policy_wallet_example.wasm",
-      "baselineBytes": 8742,
-      "maxBytes": 10490,
+      "baselineBytes": 15030,
+      "maxBytes": 18036,
       "maxIncreasePercent": 20
     },
     {
       "name": "test-token",
       "artifact": "target/wasm32v1-none/release/test_token.wasm",
       "baselineBytes": 3273,
-      "maxBytes": 4092,
+      "maxBytes": 4091,
       "maxIncreasePercent": 25
     }
-  ]
+  ],
+  "reviewStatus": "proposed; maintainer approval required before merge",
+  "reviewRecord": "docs/wasm-size-reviews/2026-10-22-merged-features.md"
 }

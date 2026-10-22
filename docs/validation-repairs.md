@@ -32,3 +32,7 @@ deployment manifests and the v2 release baseline remain unchanged. Regenerated
 current specifications, bindings and event fixtures must be reviewed alongside
 the restored source. Existing v2 sessions must continue to use the replacement
 routing described in `artifacts/interface/migrations/v2-to-v3.json`.
+
+The [budget proposal](wasm-size-reviews/2026-10-22-merged-features.md) records
+the cost of the previously merged features, fresh measurements, retained
+headroom and pending maintainer approval. It does not claim prior review.

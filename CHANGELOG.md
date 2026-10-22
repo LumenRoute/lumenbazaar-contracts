@@ -12,6 +12,11 @@
 
 ### Fixed
 
+- Refresh stale resource and WASM budgets from the restored merged-feature build,
+  retaining existing percentage headroom and documenting every changed ceiling.
+  Compatibility: no additional wire change; proposed budgets require maintainer review.
+  Migration: none; see [budget proposal](docs/wasm-size-reviews/2026-10-22-merged-features.md).
+
 - Repair interrupted merged contract definitions, restore interleaved regression tests,
   and assign unique codes to unreleased error additions while preserving published codes.
   Compatibility: existing checked-in error meanings retained; new feature errors are additive.
