@@ -3200,6 +3200,125 @@ fn extend_ttl_rejects_missing_session() {
 
 #[test]
 fn per_asset_minimum_enforces_boundaries_and_policy_invariants() {
+fn seller_exposure_ceiling_enforces_limits_and_releases_exposure() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 10_000);
+
+    let policies = soroban_sdk::vec![&env, asset_policy(&asset, 1_000)];
+    client.initialize(&admin, &policies);
+
+    // Set seller exposure ceiling for this asset to 1,500
+    client.set_seller_exposure_ceiling(&asset, &1_500);
+    assert_eq!(client.get_seller_exposure_ceiling(&asset), 1_500);
+    assert_eq!(client.get_seller_exposure(&seller, &asset), 0);
+
+    let resource_hash = BytesN::from_array(&env, &[1; 32]);
+    let usage_hash = BytesN::from_array(&env, &[2; 32]);
+
+    // Create 1st session with max_amount 1,000 -> seller exposure = 1,000
+    let session_1 = client.create_session(&buyer, &seller, &asset, &1_000, &100, &resource_hash);
+    assert_eq!(client.get_seller_exposure(&seller, &asset), 1_000);
+
+    // Attempting 2nd session with 600 would exceed ceiling 1,500 (1000 + 600 > 1500) -> fails before transfer
+    let err = client.try_create_session(&buyer, &seller, &asset, &600, &100, &resource_hash);
+    assert_eq!(err, Err(Ok(ContractError::SellerExposureCeilingExceeded)));
+    assert_eq!(client.get_seller_exposure(&seller, &asset), 1_000);
+
+    // Session with 500 reaches exact ceiling (1000 + 500 = 1500)
+    let session_2 = client.create_session(&buyer, &seller, &asset, &500, &100, &resource_hash);
+    assert_eq!(client.get_seller_exposure(&seller, &asset), 1_500);
+
+    // Settle session 1: releases 1,000 exposure exactly once
+    client.settle(&session_1, &800, &usage_hash);
+    assert_eq!(client.get_seller_exposure(&seller, &asset), 500);
+
+    // Cancel session 2: releases 500 exposure exactly once
+    client.cancel(&session_2);
+    assert_eq!(client.get_seller_exposure(&seller, &asset), 0);
+
+    // Recovery path: test expired session releases exposure
+    let session_3 = client.create_session(&buyer, &seller, &asset, &700, &50, &resource_hash);
+    assert_eq!(client.get_seller_exposure(&seller, &asset), 700);
+    env.ledger().set_sequence_number(55);
+    client.recover_expired(&session_3);
+    assert_eq!(client.get_seller_exposure(&seller, &asset), 0);
+}
+
+#[test]
+fn buyer_open_session_limits_enforces_boundaries_and_maintains_isolation() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let buyer_1 = Address::generate(&env);
+    let buyer_2 = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer_1, 10_000);
+    token::StellarAssetClient::new(&env, &asset).mint(&buyer_2, &10_000);
+
+    let policies = soroban_sdk::vec![&env, asset_policy(&asset, 1_000)];
+    client.initialize(&admin, &policies);
+
+    // Limit buyer to at most 2 concurrent open sessions
+    client.set_max_buyer_open_sessions(&2);
+    assert_eq!(client.get_max_buyer_open_sessions(), Some(2));
+    assert_eq!(client.get_buyer_open_sessions(&buyer_1), 0);
+    assert_eq!(client.get_buyer_open_sessions(&buyer_2), 0);
+
+    let resource_hash = BytesN::from_array(&env, &[1; 32]);
+    let usage_hash = BytesN::from_array(&env, &[2; 32]);
+
+    // Buyer 1 creates 1st session -> count = 1
+    let b1_s1 = client.create_session(&buyer_1, &seller, &asset, &100, &100, &resource_hash);
+    assert_eq!(client.get_buyer_open_sessions(&buyer_1), 1);
+    assert_eq!(client.get_buyer_open_sessions(&buyer_2), 0);
+
+    // Buyer 1 creates 2nd session -> count = 2 (exact limit succeeds)
+    let b1_s2 = client.create_session(&buyer_1, &seller, &asset, &100, &100, &resource_hash);
+    assert_eq!(client.get_buyer_open_sessions(&buyer_1), 2);
+
+    // Limit plus one fails for Buyer 1
+    let err = client.try_create_session(&buyer_1, &seller, &asset, &100, &100, &resource_hash);
+    assert_eq!(err, Err(Ok(ContractError::BuyerOpenSessionsExceeded)));
+    assert_eq!(client.get_buyer_open_sessions(&buyer_1), 2);
+
+    // Buyer 2 remains independent and can create sessions up to their limit
+    let b2_s1 = client.create_session(&buyer_2, &seller, &asset, &100, &100, &resource_hash);
+    assert_eq!(client.get_buyer_open_sessions(&buyer_2), 1);
+    assert_eq!(client.get_buyer_open_sessions(&buyer_1), 2);
+
+    // Settlement releases slot for Buyer 1
+    client.settle(&b1_s1, &50, &usage_hash);
+    assert_eq!(client.get_buyer_open_sessions(&buyer_1), 1);
+
+    // Now Buyer 1 can create another session
+    let b1_s3 = client.create_session(&buyer_1, &seller, &asset, &100, &100, &resource_hash);
+    assert_eq!(client.get_buyer_open_sessions(&buyer_1), 2);
+
+    // Cancellation releases slot for Buyer 1
+    client.cancel(&b1_s2);
+    assert_eq!(client.get_buyer_open_sessions(&buyer_1), 1);
+
+    // Expiry recovery releases slot for Buyer 1
+    env.ledger().set_sequence_number(105);
+    client.recover_expired(&b1_s3);
+    assert_eq!(client.get_buyer_open_sessions(&buyer_1), 0);
+
+    // Batch recovery releases slot for Buyer 2
+    let results = client.recover_expired_batch(&soroban_sdk::vec![&env, b2_s1]);
+    assert_eq!(results.len(), 1);
+    assert_eq!(client.get_buyer_open_sessions(&buyer_2), 0);
+}
+
+#[test]
+fn seller_open_session_limits_enforces_boundaries_and_maintains_isolation() {
 fn creation_pause_requires_admin_and_fails_closed_before_transfer() {
     let env = Env::default();
     let contract_id = env.register(UptoSessionContract, ());
@@ -3414,6 +3533,66 @@ fn paused_creation_preserves_all_exit_paths() {
     let client = UptoSessionContractClient::new(&env, &contract_id);
     let admin = Address::generate(&env);
     let buyer = Address::generate(&env);
+    let seller_1 = Address::generate(&env);
+    let seller_2 = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 10_000);
+
+    let policies = soroban_sdk::vec![&env, asset_policy(&asset, 1_000)];
+    client.initialize(&admin, &policies);
+
+    // Limit seller to at most 2 concurrent open sessions
+    client.set_max_seller_open_sessions(&2);
+    assert_eq!(client.get_max_seller_open_sessions(), Some(2));
+    assert_eq!(client.get_seller_open_sessions(&seller_1), 0);
+    assert_eq!(client.get_seller_open_sessions(&seller_2), 0);
+
+    let resource_hash = BytesN::from_array(&env, &[1; 32]);
+    let usage_hash = BytesN::from_array(&env, &[2; 32]);
+
+    // Seller 1 receives 1st session -> count = 1
+    let s1_sess1 = client.create_session(&buyer, &seller_1, &asset, &100, &100, &resource_hash);
+    assert_eq!(client.get_seller_open_sessions(&seller_1), 1);
+    assert_eq!(client.get_seller_open_sessions(&seller_2), 0);
+
+    // Seller 1 receives 2nd session -> count = 2 (exact limit succeeds)
+    let s1_sess2 = client.create_session(&buyer, &seller_1, &asset, &100, &100, &resource_hash);
+    assert_eq!(client.get_seller_open_sessions(&seller_1), 2);
+
+    // Limit plus one fails for Seller 1
+    let err = client.try_create_session(&buyer, &seller_1, &asset, &100, &100, &resource_hash);
+    assert_eq!(err, Err(Ok(ContractError::SellerOpenSessionsExceeded)));
+    assert_eq!(client.get_seller_open_sessions(&seller_1), 2);
+
+    // Seller 2 remains independent and can receive sessions up to their limit
+    let s2_sess1 = client.create_session(&buyer, &seller_2, &asset, &100, &100, &resource_hash);
+    assert_eq!(client.get_seller_open_sessions(&seller_2), 1);
+    assert_eq!(client.get_seller_open_sessions(&seller_1), 2);
+
+    // Settlement releases slot for Seller 1
+    client.settle(&s1_sess1, &50, &usage_hash);
+    assert_eq!(client.get_seller_open_sessions(&seller_1), 1);
+
+    // Now Seller 1 can receive another session
+    let s1_sess3 = client.create_session(&buyer, &seller_1, &asset, &100, &100, &resource_hash);
+    assert_eq!(client.get_seller_open_sessions(&seller_1), 2);
+
+    // Cancellation releases slot for Seller 1
+    client.cancel(&s1_sess2);
+    assert_eq!(client.get_seller_open_sessions(&seller_1), 1);
+
+    // Expiry recovery releases slot for Seller 1
+    env.ledger().set_sequence_number(105);
+    client.recover_expired(&s1_sess3);
+    assert_eq!(client.get_seller_open_sessions(&seller_1), 0);
+
+    // Batch recovery releases slot for Seller 2
+    let results = client.recover_expired_batch(&soroban_sdk::vec![&env, s2_sess1]);
+    assert_eq!(results.len(), 1);
+    assert_eq!(client.get_seller_open_sessions(&seller_2), 0);
+}
+
+#[test]
+fn reduce_session_cap_lowers_cap_refunds_buyer_and_reduces_liability() {
     let seller = Address::generate(&env);
     let asset = create_test_asset(&env, &buyer, 3_000);
     let resource_hash = BytesN::from_array(&env, &[73; 32]);
@@ -3465,6 +3644,71 @@ fn creation_pause_and_resume_require_initialization() {
     env.mock_all_auths();
     let contract_id = env.register(UptoSessionContract, ());
     let client = UptoSessionContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 10_000);
+    let token = token::Client::new(&env, &asset);
+
+    let policies = soroban_sdk::vec![&env, asset_policy(&asset, 1_000)];
+    client.initialize(&admin, &policies);
+    client.set_seller_exposure_ceiling(&asset, &2_000);
+
+    let resource_hash = BytesN::from_array(&env, &[1; 32]);
+    let usage_hash = BytesN::from_array(&env, &[2; 32]);
+
+    // Create session for 1,000
+    let session_id = client.create_session(&buyer, &seller, &asset, &1_000, &100, &resource_hash);
+    assert_eq!(token.balance(&buyer), 9_000);
+    assert_eq!(client.get_escrow_liability(&asset), 1_000);
+    assert_eq!(client.get_seller_exposure(&seller, &asset), 1_000);
+
+    // Reducing cap to >= current cap or <= 0 fails
+    let err_increase = client.try_reduce_session_cap(&session_id, &1_200);
+    assert_eq!(err_increase, Err(Ok(ContractError::InvalidCapReduction)));
+
+    let err_same = client.try_reduce_session_cap(&session_id, &1_000);
+    assert_eq!(err_same, Err(Ok(ContractError::InvalidCapReduction)));
+
+    let err_zero = client.try_reduce_session_cap(&session_id, &0);
+    assert_eq!(err_zero, Err(Ok(ContractError::InvalidCapReduction)));
+
+    // Valid reduction from 1,000 to 600
+    // Refunds 400 to buyer, reduces liability and seller exposure to 600
+    client.reduce_session_cap(&session_id, &600);
+    assert_eq!(token.balance(&buyer), 9_400);
+    assert_eq!(client.get_escrow_liability(&asset), 600);
+    assert_eq!(client.get_seller_exposure(&seller, &asset), 600);
+
+    let session = client.get_session(&session_id);
+    assert_eq!(session.max_amount, 600);
+    assert_eq!(session.escrowed_amount, 600);
+    assert_eq!(session.seller, seller);
+    assert_eq!(session.resource_hash, resource_hash);
+    assert_eq!(session.expires_at_ledger, 100);
+
+    // Repeated reduction: reduce from 600 to 400
+    client.reduce_session_cap(&session_id, &400);
+    assert_eq!(token.balance(&buyer), 9_600);
+    assert_eq!(client.get_escrow_liability(&asset), 400);
+    assert_eq!(client.get_seller_exposure(&seller, &asset), 400);
+
+    // Settle with actual amount 350 <= 400
+    client.settle(&session_id, &350, &usage_hash);
+    assert_eq!(token.balance(&seller), 350);
+    assert_eq!(token.balance(&buyer), 9_650); // 9,600 + 50 refund
+    assert_eq!(client.get_escrow_liability(&asset), 0);
+    assert_eq!(client.get_seller_exposure(&seller, &asset), 0);
+
+    // Terminal session (Settled) reduction must fail
+    let err_settled = client.try_reduce_session_cap(&session_id, &200);
+    assert_eq!(err_settled, Err(Ok(ContractError::SessionAlreadySettled)));
+
+    // Expired session reduction must fail
+    let s2_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    env.ledger().set_sequence_number(55);
+    let err_expired = client.try_reduce_session_cap(&s2_id, &300);
+    assert_eq!(err_expired, Err(Ok(ContractError::ExpiredSession)));
 
     assert_eq!(
         client.try_pause_creation(),
