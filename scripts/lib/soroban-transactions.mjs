@@ -14,7 +14,7 @@ export async function simulate(xdr) {
 // Authorization entries are attached only when the caller is expected to authorize.
 export function assembleTransaction(xdr, simulation, { includeAuth = false, redact = [] } = {}) {
   if (simulation.error || !simulation.transactionData) {
-    throw new Error(`Cannot assemble a transaction from a failed simulation: ${String(simulation.error).split("\n")[0]}`);
+    throw new Error(`Cannot assemble a transaction from a failed simulation: ${sanitizeCliOutput(simulation.error, redact)}`);
   }
   // Envelopes are passed on stdin: a WASM upload exceeds the Windows command-line length limit.
   const transaction = JSON.parse(stellar(["tx", "decode", "--output", "json"], xdr, redact));

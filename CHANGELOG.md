@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Security
+
+- Redact signer material and configured secret values from CLI diagnostics and dry-run logs.
+  Compatibility: no contract interface change. Migration: none.
+
 - Require a positive maximum session amount for every supported asset.
 - Enforce asset caps before buyer authorization and escrow transfer.
 - Add authenticated cap updates, a public cap query, and versioned update events.
