@@ -19,6 +19,12 @@ pub struct CapIncreaseProposed {
     pub proposed_max_amount: i128,
     pub active_at_ledger: u32,
     pub expires_at_ledger: u32,
+pub struct SellerExposureCeilingUpdated {
+    #[topic]
+    pub asset: Address,
+    pub admin: Address,
+    pub previous_ceiling: i128,
+    pub new_ceiling: i128,
     pub event_version: u32,
 }
 
@@ -28,6 +34,18 @@ pub struct CapIncreaseCancelled {
     pub asset: Address,
     pub admin: Address,
     pub proposed_max_amount: i128,
+pub struct MaxBuyerOpenSessionsUpdated {
+    pub admin: Address,
+    pub previous_limit: u32,
+    pub new_limit: u32,
+    pub event_version: u32,
+}
+
+#[contractevent]
+pub struct MaxSellerOpenSessionsUpdated {
+    pub admin: Address,
+    pub previous_limit: u32,
+    pub new_limit: u32,
     pub event_version: u32,
 }
 
@@ -131,6 +149,18 @@ pub struct SessionCancelled {
 }
 
 #[contractevent]
+pub struct SessionCapReduced {
+    #[topic]
+    pub session_id: BytesN<32>,
+    pub buyer: Address,
+    pub asset: Address,
+    pub previous_max_amount: i128,
+    pub new_max_amount: i128,
+    pub refunded_amount: i128,
+    pub event_version: u32,
+}
+
+#[contractevent]
 pub struct SessionRecovered {
     #[topic]
     pub session_id: BytesN<32>,
@@ -189,6 +219,19 @@ pub fn publish_cap_increase_proposed(
         active_at_ledger,
         expires_at_ledger,
         event_version: 3,
+pub fn publish_seller_exposure_ceiling_updated(
+    env: &Env,
+    asset: &Address,
+    admin: &Address,
+    previous_ceiling: i128,
+    new_ceiling: i128,
+) {
+    SellerExposureCeilingUpdated {
+        asset: asset.clone(),
+        admin: admin.clone(),
+        previous_ceiling,
+        new_ceiling,
+        event_version: 1,
     }
     .publish(env);
 }
@@ -204,6 +247,32 @@ pub fn publish_cap_increase_cancelled(
         admin: admin.clone(),
         proposed_max_amount,
         event_version: 3,
+pub fn publish_max_buyer_open_sessions_updated(
+    env: &Env,
+    admin: &Address,
+    previous_limit: u32,
+    new_limit: u32,
+) {
+    MaxBuyerOpenSessionsUpdated {
+        admin: admin.clone(),
+        previous_limit,
+        new_limit,
+        event_version: 1,
+    }
+    .publish(env);
+}
+
+pub fn publish_max_seller_open_sessions_updated(
+    env: &Env,
+    admin: &Address,
+    previous_limit: u32,
+    new_limit: u32,
+) {
+    MaxSellerOpenSessionsUpdated {
+        admin: admin.clone(),
+        previous_limit,
+        new_limit,
+        event_version: 1,
     }
     .publish(env);
 }
@@ -322,6 +391,27 @@ pub fn publish_session_cancelled(
         asset: asset.clone(),
         event_version: 2,
         refunded_amount,
+    }
+    .publish(env);
+}
+
+pub fn publish_session_cap_reduced(
+    env: &Env,
+    session_id: &BytesN<32>,
+    buyer: &Address,
+    asset: &Address,
+    previous_max_amount: i128,
+    new_max_amount: i128,
+    refunded_amount: i128,
+) {
+    SessionCapReduced {
+        session_id: session_id.clone(),
+        buyer: buyer.clone(),
+        asset: asset.clone(),
+        previous_max_amount,
+        new_max_amount,
+        refunded_amount,
+        event_version: 1,
     }
     .publish(env);
 }
