@@ -115,6 +115,8 @@ pub fn read_asset_min_session_amount(env: &Env, asset: &Address) -> Option<i128>
     env.storage()
         .instance()
         .get(&DataKey::AssetMinSessionAmount(asset.clone()))
+}
+
 pub fn write_cap_increase_proposal(env: &Env, asset: &Address, proposal: &CapIncreaseProposal) {
     env.storage()
         .instance()

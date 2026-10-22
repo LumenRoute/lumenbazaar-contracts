@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Breaking
+
+- Reconcile the unreleased v3 generated interface with merged contract source, including
+  administrative reason commitments and the completed feature definitions.
+  Compatibility: breaking for consumers of stale unreleased v3 bindings; released v2
+  deployments retain their original contract IDs and error meanings.
+  Migration: [v2-to-v3 replacement routing](artifacts/interface/migrations/v2-to-v3.json).
+
+### Fixed
+
+- Refresh stale resource and WASM budgets from the restored merged-feature build,
+  retaining existing percentage headroom and documenting every changed ceiling.
+  Compatibility: no additional wire change; proposed budgets require maintainer review.
+  Migration: none; see [budget proposal](docs/wasm-size-reviews/2026-10-22-merged-features.md).
+
+- Repair interrupted merged contract definitions, restore interleaved regression tests,
+  and assign unique codes to unreleased error additions while preserving published codes.
+  Compatibility: existing checked-in error meanings retained; new feature errors are additive.
+  Migration: none for existing deployments; see [validation repairs](docs/validation-repairs.md).
+
 ### Security
 
 - Redact signer material and configured secret values from CLI diagnostics and dry-run logs.

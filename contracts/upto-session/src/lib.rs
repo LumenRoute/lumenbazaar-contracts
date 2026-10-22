@@ -10,9 +10,8 @@ pub mod validation;
 pub use errors::ContractError;
 pub use types::{
     AdminRotation, AssetPolicy, AssetStatus, BatchRecoveryResult, BatchRecoveryStatus,
-    CommitmentDomainMetadata, ContractConfiguration, OperationalState, Session, SessionStatus,
-    SessionStatusResponse,
-    CapIncreaseProposal, ContractConfiguration, OperationalState, Session, SessionStatus,
+    CapIncreaseProposal, CommitmentDomainMetadata, ContractConfiguration, OperationalState,
+    Session, SessionStatus, SessionStatusResponse,
 };
 
 use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
@@ -146,6 +145,10 @@ impl UptoSessionContract {
             proposed_max_amount,
             active_at_ledger,
             expires_at_ledger,
+        );
+        Ok(())
+    }
+
     pub fn set_seller_exposure_ceiling(
         env: Env,
         asset: Address,
@@ -220,6 +223,8 @@ impl UptoSessionContract {
 
     pub fn get_asset_cap_increase(env: Env, asset: Address) -> Option<CapIncreaseProposal> {
         storage::read_cap_increase_proposal(&env, &asset)
+    }
+
     pub fn get_seller_exposure_ceiling(env: Env, asset: Address) -> Result<i128, ContractError> {
         if !storage::is_supported_asset(&env, &asset) {
             return Err(ContractError::UnsupportedAsset);
