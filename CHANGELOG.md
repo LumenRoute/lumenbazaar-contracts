@@ -22,6 +22,12 @@
   Compatibility: existing checked-in error meanings retained; new feature errors are additive.
   Migration: none for existing deployments; see [validation repairs](docs/validation-repairs.md).
 
+### Fixed
+
+- Bound transaction finality polling by deadline and attempt budget, preserving distinct
+  success, failure, expiry and timeout evidence. Compatibility: receipt schema unchanged.
+  Migration: none.
+
 ### Added
 
 - Check explicit release-version mappings across contract crates, bindings, interface,

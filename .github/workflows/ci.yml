@@ -39,6 +39,9 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
         run: node scripts/check-release-versions.mjs --tag "$RELEASE_TAG"
 
+      - name: Check deterministic transaction finality
+        run: node --test scripts/lib/transaction-finality.test.mjs
+
       - name: Test changelog gate
         run: node --test scripts/lib/changelog-gate.test.mjs
 
