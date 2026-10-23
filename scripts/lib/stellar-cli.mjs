@@ -1,6 +1,6 @@
-import { execFileSync, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { logDeployment, redactText, signerValues } from "./deployment-logging.mjs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,30 +31,36 @@ export function networkArgs(defaultNetwork) {
   return network ? ["--network", network] : [];
 }
 
-export function runStellar(args, { capture = false, dryRun = false } = {}) {
+export function runStellar(args, { capture = false, dryRun = false, execute = spawnSync } = {}) {
+  const redact = signerValues(args);
   if (dryRun) {
-    console.log(formatCommand("stellar", args));
+    logDeployment("stellar.dry-run", { command: formatCommand("stellar", args) }, { redact });
     return "";
   }
 
-  const output = execFileSync("stellar", args, {
+  const result = execute("stellar", args, {
     cwd: repoRoot,
     encoding: "utf8",
-    stdio: capture ? ["ignore", "pipe", "inherit"] : "inherit",
+    stdio: ["ignore", "pipe", "pipe"],
   });
-
-  return typeof output === "string" ? output.trim() : "";
+  if (result.status !== 0 || result.error) {
+    throw new Error(`stellar ${args[0]} failed: ${sanitizeCliOutput(result.stderr || result.error?.message, redact)}`);
+  }
+  if (result.stderr) logDeployment("stellar.diagnostics", { stderr: result.stderr }, { redact, sink: console.error });
+  if (!capture && result.stdout) logDeployment("stellar.output", { stdout: result.stdout }, { redact });
+  return capture ? String(result.stdout ?? "").trim() : "";
 }
 
 // Runs a transaction-submitting command and returns stdout plus the submitted transaction hash.
 // CLI diagnostics are never echoed verbatim because they can include local identity aliases.
-export function runStellarTransaction(args, { dryRun = false, redact = [] } = {}) {
+export function runStellarTransaction(args, { dryRun = false, redact = [], execute = spawnSync } = {}) {
+  redact = [...redact, ...signerValues(args)];
   if (dryRun) {
-    console.log(formatCommand("stellar", args));
+    logDeployment("stellar.dry-run", { command: formatCommand("stellar", args) }, { redact });
     return { stdout: "", transactionHash: null, skipped: false };
   }
 
-  const result = spawnSync("stellar", args, { cwd: repoRoot, encoding: "utf8" });
+  const result = execute("stellar", args, { cwd: repoRoot, encoding: "utf8" });
   const stderr = result.stderr ?? "";
   if (result.status !== 0) {
     throw new Error(`stellar ${args[0]} ${args[1] ?? ""} failed: ${sanitizeCliOutput(stderr, redact)}`);
@@ -69,15 +75,7 @@ export function runStellarTransaction(args, { dryRun = false, redact = [] } = {}
 }
 
 export function sanitizeCliOutput(text, redact = []) {
-  let output = text
-    .split(/\r?\n/)
-    .filter((line) => /error|failed|missing|invalid/i.test(line))
-    .join(" ")
-    .trim();
-  for (const value of [homedir(), ...redact].filter((entry) => typeof entry === "string" && entry.length >= 3)) {
-    output = output.split(value).join("<redacted>");
-  }
-  return output.replace(/\bS[A-Z2-7]{55}\b/g, "<redacted>") || "no error details";
+  return redactText(text, redact).trim() || "no error details";
 }
 
 export function publicKey(identity) {
@@ -230,8 +228,7 @@ export function writeManifest(path, manifest, { dryRun = false } = {}) {
   };
 
   if (dryRun) {
-    console.log(`write ${relative(repoRoot, path)}`);
-    console.log(JSON.stringify(value, null, 2));
+    logDeployment("manifest.dry-run", { path: relative(repoRoot, path), manifest: value });
     return;
   }
 

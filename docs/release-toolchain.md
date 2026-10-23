@@ -26,6 +26,16 @@ Before creating a tag, finalize its exact `## v...` changelog heading and run
 an Unreleased heading alone is insufficient for a tag. Changing the plan is a
 reviewed release decision, not an automatic way to bless arbitrary version drift.
 
+## Deployment logging
+
+CLI subprocess output is piped through `scripts/lib/deployment-logging.mjs` before
+logging. Secret-bearing environment variables (SECRET, PRIVATE_KEY, MNEMONIC,
+SEED, PASSWORD, TOKEN) and explicit signer values are redacted, including JSON,
+URL, and base64 encodings. Never pass signer material as an unconfigured argument.
+Raw captured stdout is for internal parsing only; do not log it directly. Public
+account IDs, transaction hashes and contract error codes remain diagnostic evidence.
+Long word sequences are conservatively treated as possible mnemonic phrases.
+
 ## Transaction finality
 
 `pollTransaction` in `scripts/lib/transaction-finality.mjs` is the shared finality
