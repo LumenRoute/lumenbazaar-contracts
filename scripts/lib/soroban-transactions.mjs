@@ -14,7 +14,7 @@ export async function simulate(xdr) {
 // Authorization entries are attached only when the caller is expected to authorize.
 export function assembleTransaction(xdr, simulation, { includeAuth = false, redact = [] } = {}) {
   if (simulation.error || !simulation.transactionData) {
-    throw new Error(`Cannot assemble a transaction from a failed simulation: ${String(simulation.error).split("\n")[0]}`);
+    throw new Error(`Cannot assemble a transaction from a failed simulation: ${sanitizeCliOutput(simulation.error, redact)}`);
   }
   // Envelopes are passed on stdin: a WASM upload exceeds the Windows command-line length limit.
   const transaction = JSON.parse(stellar(["tx", "decode", "--output", "json"], xdr, redact));
@@ -44,8 +44,10 @@ export async function submitSigned(signed, { redact = [] } = {}) {
   let receipt;
   try {
     receipt = await fetchReceipt(transactionHash, { timeoutMs: sent.status === 0 ? 120_000 : 30_000 });
-  } catch {
-    throw new Error(`Transaction was not accepted by the network: ${sanitizeCliOutput(sent.stderr ?? "", redact)}`);
+  } catch (error) {
+    // Preserve timeout/expiry evidence. A CLI exit code cannot establish finality.
+    error.message = `${sanitizeCliOutput(error.message, redact)}; CLI context: ${sanitizeCliOutput(sent.stderr ?? "", redact)}`;
+    throw error;
   }
   writeReceipt(receipt);
   return receipt;

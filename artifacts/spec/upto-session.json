@@ -259,6 +259,92 @@
       "data_format": "map",
       "doc": "",
       "lib": "",
+      "name": "CapIncreaseCancelled",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "admin",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "proposed_max_amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "cap_increase_cancelled"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
+      "name": "CapIncreaseProposed",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "admin",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "proposed_max_amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "active_at_ledger",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "expires_at_ledger",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "cap_increase_proposed"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
       "name": "CreationPaused",
       "params": [
         {
@@ -309,6 +395,123 @@
       "data_format": "map",
       "doc": "",
       "lib": "",
+      "name": "MaxBuyerOpenSessionsUpdated",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "admin",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "previous_limit",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "new_limit",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "max_buyer_open_sessions_updated"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
+      "name": "MaxSellerOpenSessionsUpdated",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "admin",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "previous_limit",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "new_limit",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "max_seller_open_sessions_updated"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
+      "name": "SellerExposureCeilingUpdated",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "admin",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "previous_ceiling",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "new_ceiling",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "seller_exposure_ceiling_updated"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
       "name": "SessionCancelled",
       "params": [
         {
@@ -348,6 +551,65 @@
       ],
       "prefix_topics": [
         "session_cancelled"
+      ]
+    }
+  },
+  {
+    "event_v0": {
+      "data_format": "map",
+      "doc": "",
+      "lib": "",
+      "name": "SessionCapReduced",
+      "params": [
+        {
+          "doc": "",
+          "location": "topic_list",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "buyer",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "previous_max_amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "new_max_amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "refunded_amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "location": "data",
+          "name": "event_version",
+          "type": "u32"
+        }
+      ],
+      "prefix_topics": [
+        "session_cap_reduced"
       ]
     }
   },
@@ -573,6 +835,31 @@
       "inputs": [
         {
           "doc": "",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
+      "name": "accept_asset_cap_increase",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
           "name": "session_id",
           "type": {
             "bytes_n": {
@@ -601,6 +888,31 @@
       "doc": "",
       "inputs": [],
       "name": "cancel_admin_rotation",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
+      "name": "cancel_asset_cap_increase",
       "outputs": [
         {
           "result": {
@@ -783,6 +1095,30 @@
           "type": "address"
         }
       ],
+      "name": "get_asset_cap_increase",
+      "outputs": [
+        {
+          "option": {
+            "value_type": {
+              "udt": {
+                "name": "CapIncreaseProposal"
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
       "name": "get_asset_max_session_amount",
       "outputs": [
         {
@@ -818,6 +1154,31 @@
               }
             },
             "ok_type": "i128"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "buyer",
+          "type": "address"
+        }
+      ],
+      "name": "get_buyer_open_sessions",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "u32"
           }
         }
       ]
@@ -880,6 +1241,114 @@
               }
             },
             "ok_type": "i128"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [],
+      "name": "get_max_buyer_open_sessions",
+      "outputs": [
+        {
+          "option": {
+            "value_type": "u32"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [],
+      "name": "get_max_seller_open_sessions",
+      "outputs": [
+        {
+          "option": {
+            "value_type": "u32"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "seller",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
+      "name": "get_seller_exposure",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "i128"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        }
+      ],
+      "name": "get_seller_exposure_ceiling",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "i128"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "seller",
+          "type": "address"
+        }
+      ],
+      "name": "get_seller_open_sessions",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "u32"
           }
         }
       ]
@@ -1095,6 +1564,46 @@
       "inputs": [
         {
           "doc": "",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "proposed_max_amount",
+          "type": "i128"
+        },
+        {
+          "doc": "",
+          "name": "active_at_ledger",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "name": "expires_at_ledger",
+          "type": "u32"
+        }
+      ],
+      "name": "propose_asset_cap_increase",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
           "name": "session_id",
           "type": {
             "bytes_n": {
@@ -1154,6 +1663,40 @@
                 }
               }
             }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "session_id",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "new_max_amount",
+          "type": "i128"
+        }
+      ],
+      "name": "reduce_session_cap",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
           }
         }
       ]
@@ -1228,6 +1771,86 @@
         }
       ],
       "name": "set_asset_max_session_amount",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "limit",
+          "type": "u32"
+        }
+      ],
+      "name": "set_max_buyer_open_sessions",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "limit",
+          "type": "u32"
+        }
+      ],
+      "name": "set_max_seller_open_sessions",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "ContractError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "asset",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "ceiling",
+          "type": "i128"
+        }
+      ],
+      "name": "set_seller_exposure_ceiling",
       "outputs": [
         {
           "result": {
@@ -1465,6 +2088,66 @@
         },
         {
           "doc": "",
+          "name": "CapIncreasePending",
+          "value": 38
+        },
+        {
+          "doc": "",
+          "name": "CapIncreaseNotReady",
+          "value": 39
+        },
+        {
+          "doc": "",
+          "name": "CapIncreaseNotFound",
+          "value": 40
+        },
+        {
+          "doc": "",
+          "name": "CapIncreaseExpired",
+          "value": 41
+        },
+        {
+          "doc": "",
+          "name": "InvalidCapIncreaseDelay",
+          "value": 42
+        },
+        {
+          "doc": "",
+          "name": "UnsupportedCommitmentScheme",
+          "value": 43
+        },
+        {
+          "doc": "",
+          "name": "SellerExposureCeilingExceeded",
+          "value": 44
+        },
+        {
+          "doc": "",
+          "name": "SellerExposureCeilingNotConfigured",
+          "value": 45
+        },
+        {
+          "doc": "",
+          "name": "BuyerOpenSessionsExceeded",
+          "value": 46
+        },
+        {
+          "doc": "",
+          "name": "InvalidSessionCountLimit",
+          "value": 47
+        },
+        {
+          "doc": "",
+          "name": "SellerOpenSessionsExceeded",
+          "value": 48
+        },
+        {
+          "doc": "",
+          "name": "InvalidCapReduction",
+          "value": 49
+        },
+        {
+          "doc": "",
           "name": "CreationPaused",
           "value": 36
         },
@@ -1587,6 +2270,30 @@
       "fields": [
         {
           "doc": "",
+          "name": "active_at_ledger",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "name": "expires_at_ledger",
+          "type": "u32"
+        },
+        {
+          "doc": "",
+          "name": "proposed_max_amount",
+          "type": "i128"
+        }
+      ],
+      "lib": "",
+      "name": "CapIncreaseProposal"
+    }
+  },
+  {
+    "udt_struct_v0": {
+      "doc": "",
+      "fields": [
+        {
+          "doc": "",
           "name": "interface_version",
           "type": "u32"
         },
@@ -1687,116 +2394,6 @@
   },
   {
     "udt_struct_v0": {
-      "doc": "Authorization context of a single contract call.\\n\\nThis struct corresponds to a `require_auth_for_args` call for an address\\nfrom `contract` function with `fn_name` name and `args` arguments.",
-      "fields": [
-        {
-          "doc": "",
-          "name": "args",
-          "type": {
-            "vec": {
-              "element_type": "val"
-            }
-          }
-        },
-        {
-          "doc": "",
-          "name": "contract",
-          "type": "address"
-        },
-        {
-          "doc": "",
-          "name": "fn_name",
-          "type": "symbol"
-        }
-      ],
-      "lib": "",
-      "name": "ContractContext"
-    }
-  },
-  {
-    "udt_struct_v0": {
-      "doc": "Executable referenced via a persistent storage entry owned by a contract,\\neither this contract or another contract.\\n\\nThe persistent storage entry owned by the `owner` has the `tag` as its key.",
-      "fields": [
-        {
-          "doc": "",
-          "name": "owner",
-          "type": "address"
-        },
-        {
-          "doc": "",
-          "name": "tag",
-          "type": "string"
-        }
-      ],
-      "lib": "",
-      "name": "ContractExecutableRef"
-    }
-  },
-  {
-    "udt_struct_v0": {
-      "doc": "Authorization context for `create_contract` host function that creates a\\nnew contract on behalf of authorizer address.",
-      "fields": [
-        {
-          "doc": "",
-          "name": "executable",
-          "type": {
-            "udt": {
-              "name": "ContractExecutable"
-            }
-          }
-        },
-        {
-          "doc": "",
-          "name": "salt",
-          "type": {
-            "bytes_n": {
-              "n": 32
-            }
-          }
-        }
-      ],
-      "lib": "",
-      "name": "CreateContractHostFnContext"
-    }
-  },
-  {
-    "udt_struct_v0": {
-      "doc": "Authorization context for `create_contract` host function that creates a\\nnew contract on behalf of authorizer address.\\nThis is the same as `CreateContractHostFnContext`, but also has\\ncontract constructor arguments.",
-      "fields": [
-        {
-          "doc": "",
-          "name": "constructor_args",
-          "type": {
-            "vec": {
-              "element_type": "val"
-            }
-          }
-        },
-        {
-          "doc": "",
-          "name": "executable",
-          "type": {
-            "udt": {
-              "name": "ContractExecutable"
-            }
-          }
-        },
-        {
-          "doc": "",
-          "name": "salt",
-          "type": {
-            "bytes_n": {
-              "n": 32
-            }
-          }
-        }
-      ],
-      "lib": "",
-      "name": "CreateContractWithConstructorHostFnContext"
-    }
-  },
-  {
-    "udt_struct_v0": {
       "doc": "",
       "fields": [
         {
@@ -1811,6 +2408,11 @@
         },
         {
           "doc": "",
+          "name": "creation_ledger",
+          "type": "u32"
+        },
+        {
+          "doc": "",
           "name": "escrowed_amount",
           "type": "i128"
         },
@@ -1818,6 +2420,15 @@
           "doc": "",
           "name": "expires_at_ledger",
           "type": "u32"
+        },
+        {
+          "doc": "",
+          "name": "finalized_ledger",
+          "type": {
+            "option": {
+              "value_type": "u32"
+            }
+          }
         },
         {
           "doc": "",
@@ -1841,6 +2452,11 @@
               "n": 32
             }
           }
+        },
+        {
+          "doc": "",
+          "name": "resource_scheme_version",
+          "type": "u32"
         },
         {
           "doc": "",
@@ -1871,6 +2487,15 @@
                   "n": 32
                 }
               }
+            }
+          }
+        },
+        {
+          "doc": "",
+          "name": "usage_scheme_version",
+          "type": {
+            "option": {
+              "value_type": "u32"
             }
           }
         }
@@ -1905,58 +2530,6 @@
       ],
       "lib": "",
       "name": "SessionStatusResponse"
-    }
-  },
-  {
-    "udt_struct_v0": {
-      "doc": "Value of contract node in InvokerContractAuthEntry tree.",
-      "fields": [
-        {
-          "doc": "",
-          "name": "context",
-          "type": {
-            "udt": {
-              "name": "ContractContext"
-            }
-          }
-        },
-        {
-          "doc": "",
-          "name": "sub_invocations",
-          "type": {
-            "vec": {
-              "element_type": {
-                "udt": {
-                  "name": "InvokerContractAuthEntry"
-                }
-              }
-            }
-          }
-        }
-      ],
-      "lib": "",
-      "name": "SubContractInvocation"
-    }
-  },
-  {
-    "udt_union_v0": {
-      "cases": [
-        {
-          "void_v0": {
-            "doc": "",
-            "name": "Active"
-          }
-        },
-        {
-          "void_v0": {
-            "doc": "",
-            "name": "Deprecated"
-          }
-        }
-      ],
-      "doc": "",
-      "lib": "",
-      "name": "AssetStatus"
     }
   },
   {
@@ -2042,265 +2615,6 @@
       "doc": "",
       "lib": "",
       "name": "BatchSessionStatus"
-    }
-  },
-  {
-    "udt_union_v0": {
-      "cases": [
-        {
-          "tuple_v0": {
-            "doc": "Contract invocation.",
-            "name": "Contract",
-            "type": [
-              {
-                "udt": {
-                  "name": "ContractContext"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "tuple_v0": {
-            "doc": "Contract that has a constructor with no arguments is created.",
-            "name": "CreateContractHostFn",
-            "type": [
-              {
-                "udt": {
-                  "name": "CreateContractHostFnContext"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "tuple_v0": {
-            "doc": "Contract that has a constructor with 1 or more arguments is created.",
-            "name": "CreateContractWithCtorHostFn",
-            "type": [
-              {
-                "udt": {
-                  "name": "CreateContractWithConstructorHostFnContext"
-                }
-              }
-            ]
-          }
-        }
-      ],
-      "doc": "Context of a single authorized call performed by an address.\\n\\nCustom account contracts that implement `__check_auth` special function\\nreceive a list of `Context` values corresponding to all the calls that\\nneed to be authorized.",
-      "lib": "",
-      "name": "Context"
-    }
-  },
-  {
-    "udt_union_v0": {
-      "cases": [
-        {
-          "tuple_v0": {
-            "doc": "Executable specified by the contract instance as a specific Wasm contract code entry identified by its Wasm sha256 hash.",
-            "name": "Wasm",
-            "type": [
-              {
-                "bytes_n": {
-                  "n": 32
-                }
-              }
-            ]
-          }
-        },
-        {
-          "tuple_v0": {
-            "doc": "Executable reference via a persistent storage entry owned by this contract or another contract.",
-            "name": "ExternalRef",
-            "type": [
-              {
-                "udt": {
-                  "name": "ContractExecutableRef"
-                }
-              }
-            ]
-          }
-        }
-      ],
-      "doc": "Contract executable used for creating a new contract and used in\\n`CreateContractHostFnContext`.",
-      "lib": "",
-      "name": "ContractExecutable"
-    }
-  },
-  {
-    "udt_union_v0": {
-      "cases": [
-        {
-          "void_v0": {
-            "doc": "",
-            "name": "Admin"
-          }
-        },
-        {
-          "void_v0": {
-            "doc": "",
-            "name": "AdminRotation"
-          }
-        },
-        {
-          "void_v0": {
-            "doc": "",
-            "name": "NextSessionSequence"
-          }
-        },
-        {
-          "tuple_v0": {
-            "doc": "",
-            "name": "Session",
-            "type": [
-              {
-                "bytes_n": {
-                  "n": 32
-                }
-              }
-            ]
-          }
-        },
-        {
-          "void_v0": {
-            "doc": "",
-            "name": "StorageLayoutVersion"
-          }
-        },
-        {
-          "tuple_v0": {
-            "doc": "",
-            "name": "SupportedAsset",
-            "type": [
-              "address"
-            ]
-          }
-        },
-        {
-          "tuple_v0": {
-            "doc": "",
-            "name": "AssetMaxSessionAmount",
-            "type": [
-              "address"
-            ]
-          }
-        },
-        {
-          "tuple_v0": {
-            "doc": "",
-            "name": "AssetMinSessionAmount",
-            "type": [
-              "address"
-            ]
-          }
-        },
-        {
-          "void_v0": {
-            "doc": "",
-            "name": "SupportedAssets"
-          }
-        },
-        {
-          "void_v0": {
-            "doc": "",
-            "name": "OperationalState"
-          }
-        },
-        {
-          "tuple_v0": {
-            "doc": "",
-            "name": "Liability",
-            "type": [
-              "address"
-            ]
-          }
-        }
-      ],
-      "doc": "",
-      "lib": "",
-      "name": "DataKey"
-    }
-  },
-  {
-    "udt_union_v0": {
-      "cases": [
-        {
-          "tuple_v0": {
-            "doc": "",
-            "name": "Wasm",
-            "type": [
-              {
-                "bytes_n": {
-                  "n": 32
-                }
-              }
-            ]
-          }
-        },
-        {
-          "void_v0": {
-            "doc": "",
-            "name": "StellarAsset"
-          }
-        },
-        {
-          "void_v0": {
-            "doc": "",
-            "name": "Account"
-          }
-        }
-      ],
-      "doc": "",
-      "lib": "",
-      "name": "Executable"
-    }
-  },
-  {
-    "udt_union_v0": {
-      "cases": [
-        {
-          "tuple_v0": {
-            "doc": "Invoke a contract.",
-            "name": "Contract",
-            "type": [
-              {
-                "udt": {
-                  "name": "SubContractInvocation"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "tuple_v0": {
-            "doc": "Create a contract passing 0 arguments to constructor.",
-            "name": "CreateContractHostFn",
-            "type": [
-              {
-                "udt": {
-                  "name": "CreateContractHostFnContext"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "tuple_v0": {
-            "doc": "Create a contract passing 0 or more arguments to constructor.",
-            "name": "CreateContractWithCtorHostFn",
-            "type": [
-              {
-                "udt": {
-                  "name": "CreateContractWithConstructorHostFnContext"
-                }
-              }
-            ]
-          }
-        }
-      ],
-      "doc": "A node in the tree of authorizations performed on behalf of the current\\ncontract as invoker of the contracts deeper in the call stack.\\n\\nThis is used as an argument of `authorize_as_current_contract` host function.\\n\\nThis tree corresponds `require_auth[_for_args]` calls on behalf of the\\ncurrent contract.",
-      "lib": "",
-      "name": "InvokerContractAuthEntry"
     }
   },
   {

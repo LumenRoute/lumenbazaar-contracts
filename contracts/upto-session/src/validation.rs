@@ -250,7 +250,6 @@ mod tests {
         let current_admin = Address::generate(&env);
         let pending_admin = Address::generate(&env);
 
-        // Exact minimum lifetime (10 + 1 = 11) passes
         assert_eq!(
             validate_admin_rotation(
                 &env,
@@ -260,7 +259,6 @@ mod tests {
             ),
             Ok(())
         );
-        // Exact maximum lifetime (10 + 17280 = 17290) passes
         assert_eq!(
             validate_admin_rotation(
                 &env,
@@ -270,12 +268,10 @@ mod tests {
             ),
             Ok(())
         );
-        // Self-rotation rejected
         assert_eq!(
             validate_admin_rotation(&env, &current_admin, &current_admin, 11),
             Err(ContractError::InvalidAdmin)
         );
-        // Below minimum lifetime rejected
         assert_eq!(
             validate_admin_rotation(&env, &current_admin, &pending_admin, 10),
             Err(ContractError::InvalidAdminRotationExpiry)
@@ -284,7 +280,6 @@ mod tests {
             validate_admin_rotation(&env, &current_admin, &pending_admin, 9),
             Err(ContractError::InvalidAdminRotationExpiry)
         );
-        // Beyond maximum lifetime rejected
         assert_eq!(
             validate_admin_rotation(
                 &env,
@@ -295,9 +290,7 @@ mod tests {
             Err(ContractError::InvalidAdminRotationExpiry)
         );
 
-        // Overflow-adjacent tests
         env.ledger().set_sequence_number(u32::MAX - 5);
-        // Proposal with u32::MAX overflow
         assert_eq!(
             validate_admin_rotation(&env, &current_admin, &pending_admin, u32::MAX),
             Err(ContractError::InvalidAdminRotationExpiry)
