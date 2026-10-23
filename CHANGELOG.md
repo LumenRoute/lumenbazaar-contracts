@@ -18,6 +18,11 @@
 
 ### Fixed
 
+- Optimize release WASM for size with link-time optimization, one codegen unit and
+  stripped compiler symbols, retaining checked arithmetic and all contract APIs.
+  Compatibility: contract behavior, storage and wire interfaces are unchanged.
+  Migration: none; the existing WASM size limits remain unchanged.
+
 - Repair SDK conformance test registration, authorization probes, and decimal fixtures,
   and preserve handwritten binding helpers and tests during generation.
   Compatibility: test and generation tooling only; contract behavior is unchanged.
