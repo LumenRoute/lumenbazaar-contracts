@@ -6,8 +6,8 @@ These are local Soroban SDK native estimates from test invocations. They are use
 
 | Operation | Instructions | Memory bytes | Disk reads | Memory reads | Writes | Disk read bytes | Write bytes | Event bytes | Rent ledger bytes | Rent bumps | Estimated fee stroops |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| cancel | 563567 | 93057 | 0 | 8 | 5 | 0 | 1324 | 556 | 8000000 | 1 | 2298469 |
-| create_session | 632184 | 114582 | 1 | 8 | 6 | 92 | 1952 | 748 | 964121600 | 4 | 11535133 |
-| extend_ttl | 59168 | 9171 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 42 |
-| recover_expired | 545342 | 88911 | 0 | 6 | 4 | 0 | 1248 | 628 | 3999800 | 1 | 61889 |
-| settle | 837372 | 136037 | 1 | 9 | 6 | 92 | 1580 | 892 | 156121600 | 2 | 3737371 |
+| cancel | 740343 | 115938 | 0 | 11 | 8 | 0 | 1940 | 556 | 12000000 | 1 | 2349888 |
+| create_session | 812828 | 142036 | 1 | 11 | 9 | 92 | 2668 | 748 | 1576121600 | 7 | 17458461 |
+| extend_ttl | 117438 | 14793 | 0 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 83 |
+| recover_expired | 721086 | 110955 | 0 | 9 | 7 | 0 | 1864 | 628 | 7999600 | 1 | 113305 |
+| settle | 1012057 | 161054 | 1 | 12 | 9 | 92 | 2200 | 892 | 164121600 | 2 | 3827371 |
