@@ -1,5 +1,31 @@
 # Release Toolchain
 
+## Release version mapping
+
+`artifacts/interface/release-plan.json` records the previous release, intended
+release class, and exact independently versioned artifacts. Run
+`node scripts/check-release-versions.mjs` before release preparation; CI runs it
+on PRs and tags. It checks contract manifests and Cargo.lock, interface and storage
+constants, binding package/lock/generator versions, public deployment schema, ABI
+classification, migration evidence and changelog presence, with expected/actual
+diffs. Historical deployment manifests remain immutable release evidence.
+
+Mapping policy:
+
+- Patch: next crate patch and binding patch; interface/storage remain stable; no new ABI.
+- Additive: next crate minor and binding minor; interface/storage remain stable; no breaking ABI.
+- Migration: next crate major (next minor before 1.0), binding major, next interface
+  version, and matching migration evidence. Storage stays stable or advances once.
+- Auxiliary contract crates may stay stable or take one reviewed semver bump.
+- Deployment schema stays stable or advances once independently; it does not follow
+  crate/interface numbers. Current mapping is crate 0.3.0, interface/storage 3,
+  bindings 3.0.0 and deployment schema 2.
+
+Before creating a tag, finalize its exact `## v...` changelog heading and run
+`node scripts/check-release-versions.mjs --tag <tag>`. Tag CI reruns this gate;
+an Unreleased heading alone is insufficient for a tag. Changing the plan is a
+reviewed release decision, not an automatic way to bless arbitrary version drift.
+
 ## Deployment logging
 
 CLI subprocess output is piped through `scripts/lib/deployment-logging.mjs` before
