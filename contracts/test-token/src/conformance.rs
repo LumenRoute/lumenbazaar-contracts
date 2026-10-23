@@ -60,8 +60,17 @@ pub const SEP41_CONFORMANCE_EXPECTATIONS: &[(&str, ConformanceExpectation)] = &[
     ("decimal-variant-38", ConformanceExpectation::Conformant),
     ("probe-reverting", ConformanceExpectation::FailedTransfer),
     ("probe-malformed", ConformanceExpectation::FalseBalance),
-    ("adversarial-fail-transfer", ConformanceExpectation::FailedTransfer),
-    ("adversarial-false-balance", ConformanceExpectation::FalseBalance),
-    ("adversarial-partial-transfer", ConformanceExpectation::PartialTransfer),
+    (
+        "adversarial-fail-transfer",
+        ConformanceExpectation::FailedTransfer,
+    ),
+    (
+        "adversarial-false-balance",
+        ConformanceExpectation::FalseBalance,
+    ),
+    (
+        "adversarial-partial-transfer",
+        ConformanceExpectation::PartialTransfer,
+    ),
     ("incompatible", ConformanceExpectation::Incompatible),
 ];

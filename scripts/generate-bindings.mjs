@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,6 +9,12 @@ const wasm = join(repoRoot, "target", "wasm32v1-none", "release", "upto_session.
 const outputDir = join(repoRoot, "bindings", "upto-session");
 const packageLockPath = join(outputDir, "package-lock.json");
 const packageLock = existsSync(packageLockPath) ? readFileSync(packageLockPath, "utf8") : null;
+// The CLI replaces the output directory, including these handwritten sources.
+const preservedSources = [
+  "src/bindings/bigint_helper.ts",
+  "src/tests/binding_integrity.test.ts",
+  "src/tests/bundle_budget.test.ts",
+].map((path) => [path, readFileSync(join(outputDir, path))]);
 
 if (!skipBuild) {
   execFileSync("stellar", ["contract", "build", "--locked"], {
@@ -17,23 +23,31 @@ if (!skipBuild) {
   });
 }
 
-execFileSync(
-  "stellar",
-  [
-    "contract",
-    "bindings",
-    "typescript",
-    "--wasm",
-    wasm,
-    "--output-dir",
-    outputDir,
-    "--overwrite",
-  ],
-  {
-    cwd: repoRoot,
-    stdio: "inherit",
-  },
-);
+try {
+  execFileSync(
+    "stellar",
+    [
+      "contract",
+      "bindings",
+      "typescript",
+      "--wasm",
+      wasm,
+      "--output-dir",
+      outputDir,
+      "--overwrite",
+    ],
+    {
+      cwd: repoRoot,
+      stdio: "inherit",
+    },
+  );
+} finally {
+  for (const [path, content] of preservedSources) {
+    const destination = join(outputDir, path);
+    mkdirSync(dirname(destination), { recursive: true });
+    writeFileSync(destination, content);
+  }
+}
 
 copyFileSync(
   join(repoRoot, "scripts", "templates", "usageReceipt.ts"),
