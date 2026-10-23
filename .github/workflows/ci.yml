@@ -26,6 +26,9 @@ jobs:
         with:
           node-version: 22.12.0
 
+      - name: Check deterministic transaction finality
+        run: node --test scripts/lib/transaction-finality.test.mjs
+
       - name: Test changelog gate
         run: node --test scripts/lib/changelog-gate.test.mjs
 
