@@ -26,6 +26,9 @@ jobs:
         with:
           node-version: 22.12.0
 
+      - name: Check deployment log redaction
+        run: node --test scripts/lib/deployment-logging.test.mjs
+
       - name: Check deterministic transaction finality
         run: node --test scripts/lib/transaction-finality.test.mjs
 

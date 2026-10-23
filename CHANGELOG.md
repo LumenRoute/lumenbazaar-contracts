@@ -22,6 +22,11 @@
   Compatibility: existing checked-in error meanings retained; new feature errors are additive.
   Migration: none for existing deployments; see [validation repairs](docs/validation-repairs.md).
 
+### Security
+
+- Redact signer material and configured secret values from CLI diagnostics and dry-run logs.
+  Compatibility: no contract interface change. Migration: none.
+
 ### Fixed
 
 - Bound transaction finality polling by deadline and attempt budget, preserving distinct
