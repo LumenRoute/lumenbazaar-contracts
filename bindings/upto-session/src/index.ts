@@ -33,77 +33,6 @@ if (typeof window !== "undefined") {
 
 
 
-export const ContractError = {
-  1: {message:"AlreadyInitialized"},
-  2: {message:"Unauthorized"},
-  3: {message:"InvalidAmount"},
-  4: {message:"ExpiredSession"},
-  5: {message:"SessionNotFound"},
-  6: {message:"SessionAlreadySettled"},
-  7: {message:"SessionCancelled"},
-  8: {message:"AmountExceedsCap"},
-  9: {message:"InvalidAsset"},
-  10: {message:"InvalidSeller"},
-  11: {message:"TtlExtensionFailed"},
-  12: {message:"InvalidResourceHash"},
-  13: {message:"InvalidUsageHash"},
-  14: {message:"UnsupportedAsset"},
-  15: {message:"InvalidSupportedAssets"},
-  16: {message:"SessionDurationTooLong"},
-  17: {message:"LiabilityOverflow"},
-  18: {message:"LiabilityUnderflow"},
-  19: {message:"EscrowUnderfunded"},
-  20: {message:"NotInitialized"},
-  21: {message:"SessionExpired"},
-  22: {message:"SessionNotExpired"},
-  23: {message:"InvalidAssetCap"},
-  24: {message:"AssetCapNotConfigured"},
-  25: {message:"InvalidAdmin"},
-  26: {message:"InvalidAdminRotationExpiry"},
-  27: {message:"AdminRotationPending"},
-  28: {message:"AdminRotationNotFound"},
-  29: {message:"AdminRotationExpired"},
-  30: {message:"TokenInvariantViolation"},
-  31: {message:"InvalidBatchSize"},
-  32: {message:"InvalidAssetInterface"},
-  33: {message:"AssetNotActive"},
-  34: {message:"AssetNotDeprecated"},
-  35: {message:"AssetLiabilityOutstanding"},
-  38: {message:"CapIncreasePending"},
-  39: {message:"CapIncreaseNotReady"},
-  40: {message:"CapIncreaseNotFound"},
-  41: {message:"CapIncreaseExpired"},
-  42: {message:"InvalidCapIncreaseDelay"},
-  43: {message:"UnsupportedCommitmentScheme"},
-  44: {message:"SellerExposureCeilingExceeded"},
-  45: {message:"SellerExposureCeilingNotConfigured"},
-  46: {message:"BuyerOpenSessionsExceeded"},
-  47: {message:"InvalidSessionCountLimit"},
-  48: {message:"SellerOpenSessionsExceeded"},
-  49: {message:"InvalidCapReduction"},
-  36: {message:"CreationPaused"},
-  37: {message:"OperationalStateUnchanged"}
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 export interface Session {
   asset: string;
@@ -192,6 +121,77 @@ export interface CommitmentDomainMetadata {
   session_id_domain: Buffer;
   usage_commitment_domain: Buffer;
 }
+
+export const ContractError = {
+  1: {message:"AlreadyInitialized"},
+  2: {message:"Unauthorized"},
+  3: {message:"InvalidAmount"},
+  4: {message:"ExpiredSession"},
+  5: {message:"SessionNotFound"},
+  6: {message:"SessionAlreadySettled"},
+  7: {message:"SessionCancelled"},
+  8: {message:"AmountExceedsCap"},
+  9: {message:"InvalidAsset"},
+  10: {message:"InvalidSeller"},
+  11: {message:"TtlExtensionFailed"},
+  12: {message:"InvalidResourceHash"},
+  13: {message:"InvalidUsageHash"},
+  14: {message:"UnsupportedAsset"},
+  15: {message:"InvalidSupportedAssets"},
+  16: {message:"SessionDurationTooLong"},
+  17: {message:"LiabilityOverflow"},
+  18: {message:"LiabilityUnderflow"},
+  19: {message:"EscrowUnderfunded"},
+  20: {message:"NotInitialized"},
+  21: {message:"SessionExpired"},
+  22: {message:"SessionNotExpired"},
+  23: {message:"InvalidAssetCap"},
+  24: {message:"AssetCapNotConfigured"},
+  25: {message:"InvalidAdmin"},
+  26: {message:"InvalidAdminRotationExpiry"},
+  27: {message:"AdminRotationPending"},
+  28: {message:"AdminRotationNotFound"},
+  29: {message:"AdminRotationExpired"},
+  30: {message:"TokenInvariantViolation"},
+  31: {message:"InvalidBatchSize"},
+  32: {message:"InvalidAssetInterface"},
+  33: {message:"AssetNotActive"},
+  34: {message:"AssetNotDeprecated"},
+  35: {message:"AssetLiabilityOutstanding"},
+  38: {message:"CapIncreasePending"},
+  39: {message:"CapIncreaseNotReady"},
+  40: {message:"CapIncreaseNotFound"},
+  41: {message:"CapIncreaseExpired"},
+  42: {message:"InvalidCapIncreaseDelay"},
+  43: {message:"UnsupportedCommitmentScheme"},
+  44: {message:"SellerExposureCeilingExceeded"},
+  45: {message:"SellerExposureCeilingNotConfigured"},
+  46: {message:"BuyerOpenSessionsExceeded"},
+  47: {message:"InvalidSessionCountLimit"},
+  48: {message:"SellerOpenSessionsExceeded"},
+  49: {message:"InvalidCapReduction"},
+  36: {message:"CreationPaused"},
+  37: {message:"OperationalStateUnchanged"}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 export interface Client {
   /**
