@@ -27,6 +27,12 @@
 - Redact signer material and configured secret values from CLI diagnostics and dry-run logs.
   Compatibility: no contract interface change. Migration: none.
 
+### Fixed
+
+- Bound transaction finality polling by deadline and attempt budget, preserving distinct
+  success, failure, expiry and timeout evidence. Compatibility: receipt schema unchanged.
+  Migration: none.
+
 ### Added
 
 - Require categorized release notes for contract-facing diffs and migration references for

@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { testnetNetwork } from "./deployment-evidence.mjs";
 import { repoRoot } from "./stellar-cli.mjs";
+import { pollTransaction, TransactionFinalityError } from "./transaction-finality.mjs";
 
 export const receiptsDirectory = join(repoRoot, "deployments", "receipts", "testnet");
 
@@ -19,12 +20,12 @@ export function requireTestnet() {
   }
 }
 
-export async function rpcCall(method, params = undefined) {
+export async function rpcCall(method, params = undefined, { timeoutMs = 30_000 } = {}) {
   const response = await fetch(testnetNetwork.rpcUrl, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, ...(params ? { params } : {}) }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(Math.max(1, Math.ceil(Math.min(timeoutMs, 30_000)))),
   });
   if (!response.ok) {
     throw new Error(`${method} returned HTTP ${response.status}.`);
@@ -59,23 +60,13 @@ export async function waitForLedger(target, { timeoutMs = defaultTimeoutMs } = {
   }
 }
 
-export async function fetchReceipt(transactionHash, { timeoutMs = defaultTimeoutMs } = {}) {
+export async function fetchReceipt(transactionHash, options = {}) {
   if (!hashPattern.test(transactionHash ?? "")) {
     throw new Error("A 64-character transaction hash is required to fetch a receipt.");
   }
-  const deadline = Date.now() + timeoutMs;
-  let result;
-  for (;;) {
-    result = await rpcCall("getTransaction", { hash: transactionHash });
-    if (result.status !== "NOT_FOUND") break;
-    if (Date.now() > deadline) {
-      throw new Error(`Transaction ${transactionHash} was not found before the timeout.`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
-  }
-  if (result.status !== "SUCCESS" && result.status !== "FAILED") {
-    throw new Error(`Transaction ${transactionHash} has unsupported status ${result.status}.`);
-  }
+  const outcome = await pollTransaction(transactionHash, { rpc: rpcCall, ...options });
+  if (!["SUCCESS", "FAILED"].includes(outcome.status)) throw new TransactionFinalityError(outcome);
+  const result = outcome.result;
 
   // The envelope is passed on stdin: a WASM upload exceeds the Windows command-line length limit.
   const envelope = decode(["tx", "decode", "--output", "json"], result.envelopeXdr);

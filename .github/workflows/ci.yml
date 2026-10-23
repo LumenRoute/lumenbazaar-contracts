@@ -29,6 +29,9 @@ jobs:
       - name: Check deployment log redaction
         run: node --test scripts/lib/deployment-logging.test.mjs
 
+      - name: Check deterministic transaction finality
+        run: node --test scripts/lib/transaction-finality.test.mjs
+
       - name: Test changelog gate
         run: node --test scripts/lib/changelog-gate.test.mjs
 

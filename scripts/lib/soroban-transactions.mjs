@@ -44,8 +44,10 @@ export async function submitSigned(signed, { redact = [] } = {}) {
   let receipt;
   try {
     receipt = await fetchReceipt(transactionHash, { timeoutMs: sent.status === 0 ? 120_000 : 30_000 });
-  } catch {
-    throw new Error(`Transaction was not accepted by the network: ${sanitizeCliOutput(sent.stderr ?? "", redact)}`);
+  } catch (error) {
+    // Preserve timeout/expiry evidence. A CLI exit code cannot establish finality.
+    error.message = `${sanitizeCliOutput(error.message, redact)}; CLI context: ${sanitizeCliOutput(sent.stderr ?? "", redact)}`;
+    throw error;
   }
   writeReceipt(receipt);
   return receipt;
