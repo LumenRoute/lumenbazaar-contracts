@@ -5,6 +5,10 @@ pub mod adversarial;
 #[cfg(feature = "testutils")]
 pub mod asset_probe;
 #[cfg(feature = "testutils")]
+pub mod conformance;
+#[cfg(feature = "testutils")]
+pub mod decimal_matrix;
+#[cfg(feature = "testutils")]
 pub mod reentry;
 
 use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, Env, String};
@@ -14,6 +18,8 @@ use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, 
 pub enum DataKey {
     Admin,
     Balance(Address),
+    MintCeiling,
+    TotalSupply,
 }
 
 #[contracterror]
@@ -25,7 +31,16 @@ pub enum TokenError {
     InvalidAmount = 3,
     InsufficientBalance = 4,
     BalanceOverflow = 5,
+    MintCeilingExceeded = 6,
 }
+
+/// Default immutable total mint ceiling applied by [`TestTokenContract::initialize`].
+///
+/// The default is `i128::MAX` so legacy callers that only pass `admin`
+/// (deployment scripts, rehearsal tooling, and `upto-session` test helpers)
+/// keep working unchanged. This ceiling is test-only: it bounds accidental
+/// testnet minting and is not an economic guarantee.
+pub const DEFAULT_MINT_CEILING: i128 = i128::MAX;
 
 #[contract]
 pub struct TestTokenContract;
@@ -33,12 +48,30 @@ pub struct TestTokenContract;
 #[contractimpl]
 impl TestTokenContract {
     pub fn initialize(env: Env, admin: Address) -> Result<(), TokenError> {
+        Self::initialize_with_ceiling(env, admin, DEFAULT_MINT_CEILING)
+    }
+
+    /// One-time initialization with an immutable, positive total mint ceiling.
+    ///
+    /// The ceiling is bound at initialization and can never change. Passing a
+    /// non-positive ceiling is rejected so a misconfiguration cannot silently
+    /// disable minting or enable unbounded issuance.
+    pub fn initialize_with_ceiling(
+        env: Env,
+        admin: Address,
+        ceiling: i128,
+    ) -> Result<(), TokenError> {
         if env.storage().instance().has(&DataKey::Admin) {
             return Err(TokenError::AlreadyInitialized);
+        }
+        if ceiling <= 0 {
+            return Err(TokenError::InvalidAmount);
         }
 
         admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);
+        env.storage().instance().set(&DataKey::MintCeiling, &ceiling);
+        env.storage().instance().set(&DataKey::TotalSupply, &0_i128);
 
         Ok(())
     }
@@ -48,7 +81,34 @@ impl TestTokenContract {
 
         validate_positive_amount(amount)?;
         admin.require_auth();
-        credit(&env, &to, amount)
+
+        // Checked supply accounting: the ceiling and overflow are validated
+        // before any balance write so a rejected mint leaves total supply and
+        // every balance unchanged.
+        let current_supply = read_total_supply(&env);
+        let next_supply = current_supply
+            .checked_add(amount)
+            .ok_or(TokenError::MintCeilingExceeded)?;
+        if next_supply > read_mint_ceiling(&env) {
+            return Err(TokenError::MintCeilingExceeded);
+        }
+
+        credit(&env, &to, amount)?;
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalSupply, &next_supply);
+
+        Ok(())
+    }
+
+    /// Immutable test-only total mint ceiling configured at initialization.
+    pub fn mint_ceiling(env: Env) -> i128 {
+        read_mint_ceiling(&env)
+    }
+
+    /// Sum of all successful mint amounts since initialization.
+    pub fn total_supply(env: Env) -> i128 {
+        read_total_supply(&env)
     }
 
     pub fn transfer(env: Env, from: Address, to: Address, amount: i128) -> Result<(), TokenError> {
@@ -84,6 +144,20 @@ fn read_admin(env: &Env) -> Result<Address, TokenError> {
         .instance()
         .get(&DataKey::Admin)
         .ok_or(TokenError::NotInitialized)
+}
+
+fn read_mint_ceiling(env: &Env) -> i128 {
+    env.storage()
+        .instance()
+        .get(&DataKey::MintCeiling)
+        .unwrap_or(DEFAULT_MINT_CEILING)
+}
+
+fn read_total_supply(env: &Env) -> i128 {
+    env.storage()
+        .instance()
+        .get(&DataKey::TotalSupply)
+        .unwrap_or(0)
 }
 
 fn read_balance(env: &Env, account: &Address) -> i128 {
