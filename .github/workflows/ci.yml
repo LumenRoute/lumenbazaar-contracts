@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Install Rust
         run: |
@@ -36,6 +38,15 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: node scripts/check-release-versions.mjs --tag "$RELEASE_TAG"
+
+      - name: Test changelog gate
+        run: node --test scripts/lib/changelog-gate.test.mjs
+
+      - name: Require contract-facing changelog entries
+        if: github.event_name == 'pull_request'
+        env:
+          CHANGELOG_BASE: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/check-changelog.mjs --base "$CHANGELOG_BASE"
 
       - name: Install Stellar CLI
         run: |
