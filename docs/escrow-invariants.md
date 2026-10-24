@@ -54,6 +54,43 @@ All arithmetic that changes aggregate liabilities uses checked operations.
 Creation events use `event_version = 2` and expose only public settlement
 metadata. Resource and usage hashes remain opaque fixed-length digests.
 
+## Aggregate Exposure Ceilings
+
+Per-session caps bound one payment. Two further ceilings bound the total open
+escrow a deployment can accumulate. Both are part of every `AssetPolicy`, must
+be positive at initialization, and can be changed by the administrator with
+`set_asset_exposure_ceiling` and `set_buyer_exposure_ceiling`.
+
+For every supported asset `a` and buyer `b`:
+
+```text
+buyer_exposure[b, a] = sum(session.escrowed_amount for every open session of b using a)
+liability[a] + new_max_amount <= max_asset_exposure[a]          (checked at creation)
+buyer_exposure[b, a] + new_max_amount <= max_buyer_exposure[a]  (checked at creation)
+```
+
+- `create_session` computes both sums with checked arithmetic and rejects with
+  `AssetExposureCeilingExceeded` (36) or `BuyerExposureCeilingExceeded` (39)
+  before buyer authorization, sequence consumption, or any token transfer. An
+  overflowing sum fails with `LiabilityOverflow`. Reaching a ceiling exactly is
+  allowed. Both sums are re-derived after the funding transfer, so a token
+  callback cannot have raced a counter past its ceiling.
+- Each buyer has an independent counter per asset, stored under
+  `BuyerExposure(buyer, asset)`. No limit is shared between buyer addresses.
+- Settlement, cancellation, single recovery, and batch recovery each release
+  the session's full escrow from both counters once, in the same invocation
+  that writes the terminal status. Repeated terminal calls fail on the session
+  status and release nothing. A buyer counter that reaches zero is removed.
+- The buyer decrement is computed before any state changes. A counter that
+  would go negative fails the whole call with `BuyerExposureUnderflow` (40);
+  batch recovery reports that session as `EscrowUnavailable` and continues.
+- Lowering a ceiling below the current exposure is allowed. Existing sessions
+  close normally; new sessions are rejected until capacity returns. Ceilings
+  are per asset only: there is no fiat conversion, oracle pricing, or
+  cross-asset aggregation.
+- An active asset without a stored ceiling fails creation closed with
+  `ExposureCeilingNotConfigured` (38).
+
 ## Bounded State Model
 
 `formal/escrow-model` exhaustively explores the reachable states of one

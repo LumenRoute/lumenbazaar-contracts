@@ -28,6 +28,9 @@ pub enum DataKey {
     BuyerOpenSessions(Address),
     MaxSellerOpenSessions,
     SellerOpenSessions(Address),
+    AssetExposureCeiling(Address),
+    BuyerExposureCeiling(Address),
+    BuyerExposure(Address, Address),
 }
 
 pub fn write_storage_layout_version(env: &Env) {
@@ -362,6 +365,73 @@ pub fn decrement_seller_open_sessions(env: &Env, seller: &Address) -> Result<u32
     Ok(updated)
 }
 
+pub fn write_asset_exposure_ceiling(env: &Env, asset: &Address, ceiling: i128) {
+    env.storage()
+        .instance()
+        .set(&DataKey::AssetExposureCeiling(asset.clone()), &ceiling);
+}
+
+pub fn read_asset_exposure_ceiling(env: &Env, asset: &Address) -> Option<i128> {
+    env.storage()
+        .instance()
+        .get(&DataKey::AssetExposureCeiling(asset.clone()))
+}
+
+pub fn write_buyer_exposure_ceiling(env: &Env, asset: &Address, ceiling: i128) {
+    env.storage()
+        .instance()
+        .set(&DataKey::BuyerExposureCeiling(asset.clone()), &ceiling);
+}
+
+pub fn read_buyer_exposure_ceiling(env: &Env, asset: &Address) -> Option<i128> {
+    env.storage()
+        .instance()
+        .get(&DataKey::BuyerExposureCeiling(asset.clone()))
+}
+
+pub fn read_buyer_exposure(env: &Env, buyer: &Address, asset: &Address) -> i128 {
+    env.storage()
+        .persistent()
+        .get(&DataKey::BuyerExposure(buyer.clone(), asset.clone()))
+        .unwrap_or(0)
+}
+
+/// Returns the buyer exposure after adding `amount`, without writing it.
+pub fn checked_buyer_exposure_increase(
+    env: &Env,
+    buyer: &Address,
+    asset: &Address,
+    amount: i128,
+) -> Result<i128, ContractError> {
+    read_buyer_exposure(env, buyer, asset)
+        .checked_add(amount)
+        .ok_or(ContractError::LiabilityOverflow)
+}
+
+/// Returns the buyer exposure after removing `amount`, without writing it.
+pub fn checked_buyer_exposure_decrease(
+    env: &Env,
+    buyer: &Address,
+    asset: &Address,
+    amount: i128,
+) -> Result<i128, ContractError> {
+    read_buyer_exposure(env, buyer, asset)
+        .checked_sub(amount)
+        .filter(|value| *value >= 0)
+        .ok_or(ContractError::BuyerExposureUnderflow)
+}
+
+/// Stores the buyer exposure. A zero exposure removes the entry so a buyer
+/// without open sessions holds no rent-bearing state.
+pub fn write_buyer_exposure(env: &Env, buyer: &Address, asset: &Address, exposure: i128) {
+    let key = DataKey::BuyerExposure(buyer.clone(), asset.clone());
+    if exposure == 0 {
+        env.storage().persistent().remove(&key);
+    } else {
+        env.storage().persistent().set(&key, &exposure);
+    }
+}
+
 pub fn read_admin(env: &Env) -> Option<Address> {
     env.storage().instance().get(&DataKey::Admin)
 }
@@ -402,10 +472,20 @@ pub fn extend_session_and_liability_ttl(env: &Env, session: &Session) {
             TTL_EXTENSION_AMOUNT,
         );
     }
-    let exposure_key = DataKey::SellerExposure(session.seller.clone(), session.asset.clone());
-    if env.storage().persistent().has(&exposure_key) {
+    let seller_exposure_key =
+        DataKey::SellerExposure(session.seller.clone(), session.asset.clone());
+    if env.storage().persistent().has(&seller_exposure_key) {
         env.storage().persistent().extend_ttl(
-            &exposure_key,
+            &seller_exposure_key,
+            DEFAULT_TTL_THRESHOLD,
+            TTL_EXTENSION_AMOUNT,
+        );
+    }
+    let buyer_exposure_key =
+        DataKey::BuyerExposure(session.buyer.clone(), session.asset.clone());
+    if env.storage().persistent().has(&buyer_exposure_key) {
+        env.storage().persistent().extend_ttl(
+            &buyer_exposure_key,
             DEFAULT_TTL_THRESHOLD,
             TTL_EXTENSION_AMOUNT,
         );

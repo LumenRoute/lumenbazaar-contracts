@@ -21,4 +21,14 @@ Spending policies are keyed by agent address and can restrict:
 
 `check_payment` validates a proposed payment without mutating state. `authorize_payment` requires the agent signature and records the amount against the current ledger-day bucket.
 
+## Revocation
+
+`revoke_policy(agent)` requires the owner's signature. It removes the agent's policy, records the revocation ledger, and publishes `AgentPolicyRevoked`. From then on `get_policy`, `check_payment`, and `authorize_payment` for that agent return `PolicyRevoked` (14). `get_policy_revocation(agent)` returns the revocation ledger, or `None` when the agent is not revoked.
+
+- Revoking an agent that never had a policy returns `PolicyNotFound` and records nothing.
+- Revoking an already revoked agent returns `PolicyRevoked`, keeps the original ledger, and emits nothing.
+- Other agents' policies and every agent's recorded daily spend are unaffected. A later `set_policy` for the agent is an explicit re-grant that clears the revocation; spend recorded earlier the same ledger-day still counts toward the daily cap.
+
+Revocation in this example is not a production custody control; see the warning above.
+
 See [docs/policy-examples.md](docs/policy-examples.md) for the executable examples mirrored by the test suite.

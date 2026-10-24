@@ -47,6 +47,9 @@
 - Add two-step administrator proposal, acceptance, cancellation, expiry, and query behavior.
 - Preserve the current administrator's exclusive privileges until explicit acceptance.
 - Add a supported-asset escrow liability query for custody reconciliation.
+- Require positive per-asset and per-buyer aggregate exposure ceilings, enforce them before buyer authorization, and release them on every terminal path.
+- Add a read-only, authorization-free per-asset solvency snapshot query.
+- Add owner-authorized policy revocation to the example policy wallet.
 - Add branch, review, ownership, release, and emergency-change governance.
 - Generate sanitized, deterministic public deployment manifests from network receipts with an
   allowlist and a pre-write secret scan.

@@ -48,6 +48,12 @@ const requiredFunctions = [
   "extend_ttl",
   "pause_creation",
   "resume_creation",
+  "set_asset_exposure_ceiling",
+  "get_asset_exposure_ceiling",
+  "set_buyer_exposure_ceiling",
+  "get_buyer_exposure_ceiling",
+  "get_buyer_exposure",
+  "get_asset_solvency",
 ];
 const requiredErrors = [
   "AlreadyInitialized",
@@ -91,6 +97,11 @@ const requiredErrors = [
   "AssetAlreadyActive",
   "AssetDeprecated",
   "AssetLimitReached",
+  "AssetExposureCeilingExceeded",
+  "InvalidExposureCeiling",
+  "ExposureCeilingNotConfigured",
+  "BuyerExposureCeilingExceeded",
+  "BuyerExposureUnderflow",
 ];
 
 for (const item of [...requiredFunctions, ...requiredErrors]) {

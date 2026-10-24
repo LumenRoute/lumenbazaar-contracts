@@ -1,6 +1,8 @@
 #![no_std]
 
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, BytesN, Env, Vec};
+use soroban_sdk::{
+    contract, contracterror, contractevent, contractimpl, contracttype, Address, BytesN, Env, Vec,
+};
 
 pub const LEDGERS_PER_DAY: u32 = 17_280;
 
@@ -17,6 +19,8 @@ pub enum DataKey {
     DailySellerSpend(Address, Address, u32),
     DailyResourceSpend(Address, BytesN<32>, u32),
     DailyAuthCount(Address, u32),
+    /// Ledger at which the owner revoked the agent's policy.
+    RevokedPolicy(Address),
 }
 
 #[contracttype]
@@ -77,6 +81,16 @@ pub enum PolicyWalletError {
     ResourceHashNotAllowed = 11,
     PolicyNotActive = 12,
     AuthorizationLimitExceeded = 13,
+    PolicyRevoked = 14,
+}
+
+/// Emitted once when the owner revokes an agent's policy.
+#[contractevent]
+pub struct AgentPolicyRevoked {
+    #[topic]
+    pub agent: Address,
+    pub owner: Address,
+    pub revoked_at_ledger: u32,
 }
 
 #[contract]
@@ -121,12 +135,54 @@ impl PolicyWalletExampleContract {
         validate_policy(&env, &policy)?;
 
         let agent = policy.agent.clone();
+        // Setting a policy is an explicit re-grant and clears a revocation.
+        env.storage()
+            .instance()
+            .remove(&DataKey::RevokedPolicy(agent.clone()));
         env.storage()
             .instance()
             .set(&DataKey::Policy(agent), &policy);
         env.storage().instance().extend_ttl(DEFAULT_TTL_THRESHOLD, TTL_EXTENSION_AMOUNT);
 
         Ok(())
+    }
+
+    /// Owner-only: removes the agent's policy so every later check and
+    /// authorization fails with `PolicyRevoked`. Revoking an agent that never
+    /// had a policy fails with `PolicyNotFound`; revoking twice fails with
+    /// `PolicyRevoked`. Daily-spend records and other agents are untouched.
+    pub fn revoke_policy(env: Env, agent: Address) -> Result<(), PolicyWalletError> {
+        let owner = read_config(&env)?.owner;
+        owner.require_auth();
+        if env
+            .storage()
+            .instance()
+            .has(&DataKey::RevokedPolicy(agent.clone()))
+        {
+            return Err(PolicyWalletError::PolicyRevoked);
+        }
+        let policy_key = DataKey::Policy(agent.clone());
+        if !env.storage().instance().has(&policy_key) {
+            return Err(PolicyWalletError::PolicyNotFound);
+        }
+
+        let revoked_at_ledger = env.ledger().sequence();
+        env.storage().instance().remove(&policy_key);
+        env.storage()
+            .instance()
+            .set(&DataKey::RevokedPolicy(agent.clone()), &revoked_at_ledger);
+        AgentPolicyRevoked {
+            agent,
+            owner,
+            revoked_at_ledger,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    /// Ledger at which the agent's policy was revoked, if it is revoked.
+    pub fn get_policy_revocation(env: Env, agent: Address) -> Option<u32> {
+        env.storage().instance().get(&DataKey::RevokedPolicy(agent))
     }
 
     pub fn get_policy(env: Env, agent: Address) -> Result<SpendingPolicy, PolicyWalletError> {
@@ -232,6 +288,13 @@ fn require_owner_auth(env: &Env) -> Result<(), PolicyWalletError> {
 }
 
 fn read_policy(env: &Env, agent: &Address) -> Result<SpendingPolicy, PolicyWalletError> {
+    if env
+        .storage()
+        .instance()
+        .has(&DataKey::RevokedPolicy(agent.clone()))
+    {
+        return Err(PolicyWalletError::PolicyRevoked);
+    }
     env.storage()
         .instance()
         .get(&DataKey::Policy(agent.clone()))

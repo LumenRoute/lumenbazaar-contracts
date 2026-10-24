@@ -66,6 +66,8 @@ fn asset_policy(asset: &Address, max_session_amount: i128) -> AssetPolicy {
         asset: asset.clone(),
         max_session_amount,
         min_session_amount: 1,
+        max_asset_exposure: i128::MAX,
+        max_buyer_exposure: i128::MAX,
     }
 }
 
@@ -3707,6 +3709,8 @@ fn per_asset_minimum_enforces_boundaries_and_policy_invariants() {
         asset: asset.clone(),
         max_session_amount: max,
         min_session_amount: min,
+        max_asset_exposure: i128::MAX,
+        max_buyer_exposure: i128::MAX,
     };
     for policy in [bad(0, 100), bad(-1, 100), bad(101, 100)] {
         assert_eq!(
@@ -3723,11 +3727,15 @@ fn per_asset_minimum_enforces_boundaries_and_policy_invariants() {
                 asset: asset.clone(),
                 max_session_amount: 100,
                 min_session_amount: 10,
+                max_asset_exposure: i128::MAX,
+                max_buyer_exposure: i128::MAX,
             },
             AssetPolicy {
                 asset: other.clone(),
                 max_session_amount: 500,
                 min_session_amount: 50,
+                max_asset_exposure: i128::MAX,
+                max_buyer_exposure: i128::MAX,
             }
         ],
     );

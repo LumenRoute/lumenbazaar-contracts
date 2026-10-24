@@ -23,7 +23,28 @@ pub struct CapIncreaseProposed {
 }
 
 #[contractevent]
+pub struct AssetExposureCeilingUpdated {
+    #[topic]
+    pub asset: Address,
+    pub admin: Address,
+    pub previous_ceiling: i128,
+    pub new_ceiling: i128,
+    pub current_liability: i128,
+    pub event_version: u32,
+}
+
+#[contractevent]
 pub struct SellerExposureCeilingUpdated {
+    #[topic]
+    pub asset: Address,
+    pub admin: Address,
+    pub previous_ceiling: i128,
+    pub new_ceiling: i128,
+    pub event_version: u32,
+}
+
+#[contractevent]
+pub struct BuyerExposureCeilingUpdated {
     #[topic]
     pub asset: Address,
     pub admin: Address,
@@ -243,6 +264,25 @@ pub fn publish_cap_increase_proposed(
     .publish(env);
 }
 
+pub fn publish_asset_exposure_ceiling_updated(
+    env: &Env,
+    asset: &Address,
+    admin: &Address,
+    previous_ceiling: i128,
+    new_ceiling: i128,
+    current_liability: i128,
+) {
+    AssetExposureCeilingUpdated {
+        asset: asset.clone(),
+        admin: admin.clone(),
+        previous_ceiling,
+        new_ceiling,
+        current_liability,
+        event_version: 3,
+    }
+    .publish(env);
+}
+
 pub fn publish_seller_exposure_ceiling_updated(
     env: &Env,
     asset: &Address,
@@ -270,6 +310,23 @@ pub fn publish_cap_increase_cancelled(
         asset: asset.clone(),
         admin: admin.clone(),
         proposed_max_amount,
+        event_version: 3,
+    }
+    .publish(env);
+}
+
+pub fn publish_buyer_exposure_ceiling_updated(
+    env: &Env,
+    asset: &Address,
+    admin: &Address,
+    previous_ceiling: i128,
+    new_ceiling: i128,
+) {
+    BuyerExposureCeilingUpdated {
+        asset: asset.clone(),
+        admin: admin.clone(),
+        previous_ceiling,
+        new_ceiling,
         event_version: 3,
     }
     .publish(env);

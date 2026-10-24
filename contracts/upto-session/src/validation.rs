@@ -101,6 +101,13 @@ pub fn validate_asset_policy(
     Ok(())
 }
 
+pub fn validate_exposure_ceiling(ceiling: i128) -> Result<(), ContractError> {
+    if ceiling <= 0 {
+        return Err(ContractError::InvalidExposureCeiling);
+    }
+    Ok(())
+}
+
 pub struct AssetProbe {
     pub decimals: u32,
 }

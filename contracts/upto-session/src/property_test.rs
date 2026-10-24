@@ -91,6 +91,8 @@ fn initialize(
             asset,
             max_session_amount: i128::MAX,
             min_session_amount: 1,
+            max_asset_exposure: i128::MAX,
+            max_buyer_exposure: i128::MAX,
         });
     }
     client
