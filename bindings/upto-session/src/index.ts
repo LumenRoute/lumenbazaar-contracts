@@ -844,3 +844,4 @@ export class Client extends ContractClient {
 
 export * from "./usageReceipt.js";
 export * from "./sessionId.js";
+export * from "./transactionEvidence.js";

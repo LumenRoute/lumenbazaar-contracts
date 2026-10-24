@@ -121,3 +121,135 @@ Reports are not committed unless the project chooses to publish one as evidence.
 
 The exact build, deployment, and independent verification commands for the corrected deployment
 are in `docs/testnet-deployment-2026-10-07.md`.
+
+## Test-token release guard
+
+LBT (`test-token`) is a custom test-only token. It is not USDC and is never part of a production
+release. `node scripts/check-test-token-guard.mjs` enforces this:
+
+- It scans every committed manifest under `deployments/` (except ignored receipts) and
+  `artifacts/testnet/`, plus the repository README files and `docs/`.
+- A manifest that references the test token (a `test-token`/`test_token` key, a
+  `test_token.wasm` artifact, or the `LBT` asset code) passes only when every network or
+  environment label in it is allowlisted: `local`, `standalone`, `testnet`, `Test SDF Network`,
+  or the testnet or standalone passphrase. Labels are read from `environment`, `env`, `network`,
+  `networkName`, `networkPassphrase`, `passphrase`, `label`, `releaseLabel`, `stage`, `tier`, and
+  `name`/`passphrase` inside a `network` object.
+- Matching ignores case and collapses whitespace. `pubnet`, `public`, `mainnet`, `production`,
+  `prod` and the public network passphrase are rejected. Any other label, and a missing label,
+  is treated as production and rejected (fail closed).
+- A sentence that mentions LBT together with USDC or a production asset must negate the claim
+  (for example "LBT is not USDC"); otherwise it is rejected.
+- Errors name the file, the JSON path and the label, state that LBT is a test-only token and not
+  USDC, and say to remove `test-token` from the production manifest or correct the label.
+
+```bash
+node scripts/check-test-token-guard.mjs                                   # repository scan (CI)
+node scripts/check-test-token-guard.mjs --manifest deployments/<file>.json
+node scripts/check-test-token-guard.mjs --release-label testnet --artifacts-dir <dir>
+node --test scripts/lib/test-token-guard.test.mjs
+```
+
+The guard never removes local or testnet tooling: local manifests, testnet manifests, tests and
+`scripts/local/deploy-test-token-local.mjs` keep using LBT. `artifacts/interface/release-plan.json`
+is not scanned because it only maps crate versions and names no target network. Release
+packaging is checked with `--release-label` by the workflow below.
+
+## Testnet WASM releases
+
+`.github/workflows/release-testnet-wasm.yml` publishes reproducible checksums for the WASM recorded
+in one immutable deployment manifest. A release tag `testnet-wasm-YYYY-MM-DD` reproduces
+`deployments/testnet-YYYY-MM-DD.json`. Manual dispatch runs the same build and verification as a dry
+run and publishes nothing.
+
+The workflow:
+
+1. Verifies that the tag is annotated, points at the checked-out commit and has a signature that
+   GitHub verified (`scripts/check-release-tag.mjs`). Otherwise it stops before building.
+2. Reads the manifest's `sourceCommit`, `toolchain.rustc` and `toolchain.stellarCli`, and requires
+   the source commit to be an ancestor of the tagged commit.
+3. Installs exactly that Rust version and the Stellar CLI archive whose SHA-256 is pinned in
+   `scripts/lib/wasm-release.mjs`. Unpinned CLI versions are refused.
+4. Exports the source commit with `git archive` and runs `stellar contract build --locked` against
+   that commit's own `Cargo.lock` and release profile. No other optimization step is added.
+5. Compares the SHA-256 of every built WASM with `artifactSha256` in the manifest. The manifest is
+   never edited. A mismatch, a missing artifact, or a built artifact that the manifest does not
+   record fails the workflow, unless a reviewed explanation covers that exact artifact and hash.
+6. Runs the test-token guard on the manifest and the artifact list with the `testnet` label.
+7. Only for a verified tag, with `contents: write` limited to the publish job: creates a GitHub
+   prerelease titled "TESTNET WASM checksums ... (not a production release)" with
+   `checksums.json`, `SHA256SUMS` and the verified WASM files.
+
+`checksums.json` records each artifact's name, contract, SHA-256, size, recorded hash and verification
+status, plus the tag, tagged commit, manifest path and hash, source commit and its timestamp,
+Cargo.lock SHA-256, Rust and Stellar CLI versions (including the CLI archive hash), the build command
+and the verification result. It records no wall-clock time. `test_token.wasm` is labelled as the LBT
+test-only token, not USDC.
+
+All workflow actions are pinned to full commit SHAs. Permissions default to `contents: read`, and the
+only token used is the built-in `GITHUB_TOKEN`.
+
+### Toolchains for the recorded deployments
+
+| Manifest | Source commit | Rust | Stellar CLI |
+| --- | --- | --- | --- |
+| `testnet-2026-09-06.json` | `95ea3270b8a5cb052fee5dd9402ed19dbd5a9001` | 1.93.1 | 27.1.0 |
+| `testnet-2026-10-07.json` | `41940839d8f49c733b1815e108fc9740b1285f32` | 1.93.1 | 28.0.0 |
+| `testnet-2026-10-20.json` | `a8ac359ae155a85b5d71f16d5476aa26d3310cd3` | 1.93.1 | 28.0.0 |
+
+Commit `95ea327` pins `stable` in its `rust-toolchain.toml`, so the release overrides it with the
+recorded rustc 1.93.1 through `RUSTUP_TOOLCHAIN`. `testnet-2026-10-20.json` records two of the three
+contracts that its source commit builds, so releasing it needs a reviewed
+`excluded-unrecorded-artifact` entry for `policy_wallet_example.wasm`.
+
+### Verifying a testnet WASM release
+
+On a clean x86_64 Linux machine with Node 22.12.0, rustup and the recorded toolchain:
+
+```bash
+git clone https://github.com/LumenRoute/lumenbazaar-contracts && cd lumenbazaar-contracts
+git checkout testnet-wasm-2026-09-06 && git tag -v testnet-wasm-2026-09-06
+rustup toolchain install 1.93.1 --profile minimal --target wasm32v1-none
+curl -fsSLO https://github.com/stellar/stellar-cli/releases/download/v27.1.0/stellar-cli-27.1.0-x86_64-unknown-linux-gnu.tar.gz
+echo "9915fe63753d7154c26bb9e6410cf1d1ff9727a9b378e663c2790ab7a266af94  stellar-cli-27.1.0-x86_64-unknown-linux-gnu.tar.gz" | sha256sum --check
+tar -xzf stellar-cli-27.1.0-x86_64-unknown-linux-gnu.tar.gz && export PATH="$PWD:$PATH"
+
+node scripts/reproduce-testnet-wasm.mjs --tag testnet-wasm-2026-09-06 --dry-run   # toolchain checks only
+node scripts/reproduce-testnet-wasm.mjs --tag testnet-wasm-2026-09-06 --out-dir /tmp/release
+(cd /tmp/release/wasm && sha256sum --check ../SHA256SUMS)
+```
+
+To check downloaded release files without rebuilding, run
+`node scripts/reproduce-testnet-wasm.mjs --manifest deployments/testnet-2026-09-06.json --artifacts-dir <dir>`.
+Compare the reproduced hashes with the release's `SHA256SUMS`, the manifest, and the on-chain hash
+from `stellar contract info hash --id <contract> --network testnet`. The release logic tests run with
+`node --test scripts/lib/wasm-release.test.mjs`. Only a real tag-triggered run on GitHub proves the
+signed-tag check and the publish step end to end.
+
+### Reviewed mismatches
+
+When a clean build cannot reproduce a recorded hash, the release fails. Publishing anyway requires a
+reviewed explanation committed at `deployments/reviewed-mismatches/<manifest file name>` (format in
+`deployments/reviewed-mismatches/README.md`). Each entry names one artifact and the exact recorded and
+reproduced hashes, gives a reason, the reviewer's GitHub handle, the review date and the reviewing pull
+request. A mismatch is never accepted automatically, an entry with different hashes does not apply, and
+an entry that does not apply to the build fails the release. Built artifacts that the manifest does not
+record can only be excluded by an `excluded-unrecorded-artifact` entry, and excluded artifacts are never
+published.
+
+### Tag policy
+
+Maintainers create release tags only after the manifest and any reviewed mismatch file are merged:
+
+```bash
+git switch develop && git pull --ff-only
+git tag -s testnet-wasm-2026-09-06 -m "Testnet WASM checksums for deployments/testnet-2026-09-06.json"
+git tag -v testnet-wasm-2026-09-06
+git push origin testnet-wasm-2026-09-06
+```
+
+The tag must be annotated and signed (`-s`) with a GPG, SSH or S/MIME key registered on the tagger's
+GitHub account, so that GitHub reports it as verified. Lightweight, unsigned or unverified tags fail the
+release before anything is built. Never move or re-create a release tag. Protecting `testnet-wasm-*`
+tags with a repository ruleset (no updates or deletions) is recommended as well. The workflow cannot
+read rulesets with `GITHUB_TOKEN`, so the signature check is the enforced control.

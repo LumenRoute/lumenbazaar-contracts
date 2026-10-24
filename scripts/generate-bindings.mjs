@@ -61,6 +61,10 @@ copyFileSync(
   join(repoRoot, "scripts", "templates", "sessionId.ts"),
   join(outputDir, "src", "sessionId.ts"),
 );
+copyFileSync(
+  join(repoRoot, "scripts", "templates", "transactionEvidence.ts"),
+  join(outputDir, "src", "transactionEvidence.ts"),
+);
 
 const bindingPath = join(outputDir, "src", "index.ts");
 const binding = readFileSync(bindingPath, "utf8");
@@ -96,7 +100,22 @@ const sessionIdExport = 'export * from "./sessionId.js";';
 if (!canonicalBinding.includes(sessionIdExport)) {
   canonicalBinding = `${canonicalBinding.trimEnd()}\n${sessionIdExport}\n`;
 }
+const transactionEvidenceExport = 'export * from "./transactionEvidence.js";';
+if (!canonicalBinding.includes(transactionEvidenceExport)) {
+  canonicalBinding = `${canonicalBinding.trimEnd()}\n${transactionEvidenceExport}\n`;
+}
 writeFileSync(bindingPath, canonicalBinding, "utf8");
+
+// The CLI rewrites README.md; re-append the hand-written helper documentation.
+const readmePath = join(outputDir, "README.md");
+const readme = readFileSync(readmePath, "utf8");
+const evidenceReadme = readFileSync(
+  join(repoRoot, "scripts", "templates", "README.transactionEvidence.md"),
+  "utf8",
+);
+if (!readme.includes("<!-- lumenbazaar:transaction-evidence")) {
+  writeFileSync(readmePath, `${readme.trimEnd()}\n\n${evidenceReadme}`, "utf8");
+}
 
 const packagePath = join(outputDir, "package.json");
 const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));

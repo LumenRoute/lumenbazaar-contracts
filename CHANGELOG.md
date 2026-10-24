@@ -4,9 +4,35 @@
 
 ### Added
 
+- Add typed transaction evidence helpers to the TypeScript binding
+  (`createSessionWithEvidence`, `settleWithEvidence`, `cancelWithEvidence`,
+  `extendTtlWithEvidence`) that sign through an injected signer, confirm through RPC and
+  return confirmed, failed or pending evidence with RPC-reported hashes and ledgers.
+  Compatibility: additive binding exports; generated client methods are unchanged.
+  Migration: none.
+
+- Add Rust-generated, versioned backend encoding compatibility vectors
+  (`artifacts/backend-handoff/encoding-vectors.v1.json`) with a TypeScript verifier and a
+  compatibility lock that requires a new version for any encoding change.
+  Compatibility: test and handoff artifacts only; contract encoding is unchanged.
+  Migration: none.
+
+- Add a reproducible testnet WASM release workflow that rebuilds a deployment manifest's
+  source commit with its recorded toolchain, verifies every recorded SHA-256 and publishes
+  machine-readable checksums for signed `testnet-wasm-*` tags.
+  Compatibility: release tooling only; deployment manifests are unchanged.
+  Migration: none.
+
 - Add bounded, read-only session queries with ordered found/missing results and preserved
   duplicate IDs. Compatibility: additive method and result types; existing session and
   error definitions are unchanged. Migration: none beyond the planned v3 release.
+
+### Security
+
+- Reject the LBT `test-token` in deployment manifests and release artifact lists under
+  pubnet, production, unknown or missing network labels, and reject text that presents
+  LBT as USDC. Compatibility: local and testnet manifests and tooling are unchanged.
+  Migration: none.
 
 ### Breaking
 
@@ -17,6 +43,11 @@
   Migration: [v2-to-v3 replacement routing](artifacts/interface/migrations/v2-to-v3.json).
 
 ### Fixed
+
+- Bind `idempotencyKey` in the TypeScript `deriveSessionId` helper so it matches the
+  contract's v3 session ID preimage. Compatibility: `SessionIdInputV3` now requires
+  `idempotencyKey`; IDs derived without it never matched the contract. Migration: pass the
+  32-byte idempotency key used for `create_session`.
 
 - Optimize release WASM for size with link-time optimization, one codegen unit and
   stripped compiler symbols, retaining checked arithmetic and all contract APIs.

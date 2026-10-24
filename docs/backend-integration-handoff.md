@@ -167,6 +167,22 @@ Canonical vectors are in
 Node. A change to any field boundary, network ID, contract address, interface
 version, or domain label produces an intentionally different digest.
 
+The v3 session payload ends with the 32-byte `idempotency_key`; the TypeScript
+`deriveSessionId` helper requires it as `idempotencyKey`.
+
+### Encoding compatibility vectors
+
+`artifacts/backend-handoff/encoding-vectors.v1.json` is the versioned,
+Rust-generated set of cross-repository vectors for session IDs, usage
+commitments, usage receipt hashes, addresses, amounts, resource hashes,
+create-session expiry boundaries and event decoding. It covers Unicode
+(NFC/NFD, multibyte, emoji, combining marks), empty inputs, length boundaries
+and amount boundaries, with both valid encodings and rejected inputs. Backends
+should verify against it with `node scripts/check-encoding-vectors.mjs` or an
+equivalent consumer test. Location, versioning, regeneration and the
+compatibility update process are documented in
+`artifacts/backend-handoff/README.md`.
+
 assets use explicit `Active` and `Deprecated` states rather than a boolean
 marker. Initialize the replacement with the reviewed active set and keep every
 existing v2 session routed to its original contract.

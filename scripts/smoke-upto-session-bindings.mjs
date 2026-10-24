@@ -1,5 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { deepStrictEqual } from "node:assert";
+import {
+  failedPoll,
+  fakeClient,
+  fakeTime,
+  mockRpc,
+  recordingSigner,
+  successPoll,
+  transactionHashHex,
+} from "./lib/transaction-evidence-fixtures.mjs";
 
 const bindings = await import("../bindings/upto-session/dist/index.js");
 const distSource = await readFile(
@@ -73,6 +82,7 @@ if (bindings.ContractError?.[35]?.message !== "AssetLiabilityOutstanding") {
 }
 if (bindings.ContractError?.[36]?.message !== "SessionRejected") {
   throw new Error("Expected SessionRejected error mapping");
+}
 if (bindings.ContractError?.[37]?.message !== "OperationalStateUnchanged") {
   throw new Error("Expected complete operational state error mapping");
 }
@@ -149,5 +159,96 @@ const results = [
 ];
 const encodedResults = client.spec.nativeToScVal(results, querySpec.outputs[0].value.okType);
 deepStrictEqual(client.spec.funcResToNative("get_session_batch", encodedResults).unwrap(), results);
+
+// Consumer contract for transaction evidence: every write flow must return
+// RPC-derived evidence, and a consumer must reject a missing or synthesized
+// hash or ledger. Offline: synthetic RPC responses and a pass-through signer.
+for (const helper of [
+  "createSessionWithEvidence",
+  "settleWithEvidence",
+  "cancelWithEvidence",
+  "extendTtlWithEvidence",
+  "assertConfirmedEvidence",
+]) {
+  if (typeof bindings[helper] !== "function") {
+    throw new Error(`Expected ${helper} export`);
+  }
+}
+const evidenceFlows = [
+  ["create_session", bindings.createSessionWithEvidence, bindings.xdr.ScVal.scvBytes(foundId)],
+  ["settle", bindings.settleWithEvidence, bindings.xdr.ScVal.scvVoid()],
+  ["cancel", bindings.cancelWithEvidence, bindings.xdr.ScVal.scvVoid()],
+  ["extend_ttl", bindings.extendTtlWithEvidence, bindings.xdr.ScVal.scvVoid()],
+];
+for (const [method, flow, returnValue] of evidenceFlows) {
+  const rpc = mockRpc({ polls: [successPoll(bindings, returnValue)] });
+  const evidence = await flow(fakeClient(bindings, bindings.Networks.TESTNET), {}, {
+    networkPassphrase: bindings.Networks.TESTNET,
+    rpc,
+    signer: recordingSigner(),
+    ...fakeTime(),
+  });
+  bindings.assertConfirmedEvidence(evidence);
+  deepStrictEqual(
+    Object.keys(evidence).sort(),
+    ["createdAt", "ledger", "method", "network", "result", "status", "transactionHash"],
+  );
+  if (evidence.method !== method || evidence.transactionHash !== transactionHashHex(rpc.state.sent[0])) {
+    throw new Error(`${method} evidence does not carry the RPC transaction hash`);
+  }
+  for (const [name, broken] of [
+    ["missing hash", { ...evidence, transactionHash: undefined }],
+    ["empty hash", { ...evidence, transactionHash: "" }],
+    ["malformed hash", { ...evidence, transactionHash: "not-a-hash" }],
+    ["missing ledger", { ...evidence, ledger: undefined }],
+    ["zero ledger", { ...evidence, ledger: 0 }],
+    ["non-integer ledger", { ...evidence, ledger: 1.5 }],
+  ]) {
+    let rejected = false;
+    try {
+      bindings.assertConfirmedEvidence(broken);
+    } catch {
+      rejected = true;
+    }
+    if (!rejected) {
+      throw new Error(`Consumer check accepted ${method} evidence with a ${name}`);
+    }
+  }
+}
+for (const [label, poll] of [
+  ["missing ledger", { ...successPoll(bindings), ledger: undefined }],
+  ["zero ledger", { ...successPoll(bindings), ledger: 0 }],
+]) {
+  let code;
+  try {
+    await bindings.cancelWithEvidence(fakeClient(bindings, bindings.Networks.TESTNET), {}, {
+      networkPassphrase: bindings.Networks.TESTNET,
+      rpc: mockRpc({ polls: [poll] }),
+      signer: recordingSigner(),
+      ...fakeTime(),
+    });
+  } catch (error) {
+    code = error.code;
+  }
+  if (code !== "malformed_rpc_response") {
+    throw new Error(`RPC response with ${label} was not rejected`);
+  }
+}
+const failed = await bindings.settleWithEvidence(fakeClient(bindings, bindings.Networks.TESTNET), {}, {
+  networkPassphrase: bindings.Networks.TESTNET,
+  rpc: mockRpc({ polls: [failedPoll(bindings)] }),
+  signer: recordingSigner(),
+  ...fakeTime(),
+});
+const pending = await bindings.settleWithEvidence(fakeClient(bindings, bindings.Networks.TESTNET), {}, {
+  networkPassphrase: bindings.Networks.TESTNET,
+  rpc: mockRpc({ polls: [{ status: "NOT_FOUND" }] }),
+  signer: recordingSigner(),
+  timeoutMs: 2_000,
+  ...fakeTime(),
+});
+if (failed.status !== "failed" || pending.status !== "pending" || failed.status === pending.status) {
+  throw new Error("Failed and pending transactions must be distinct outcomes");
+}
 
 console.log("upto-session TypeScript binding smoke test passed");

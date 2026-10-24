@@ -1576,6 +1576,8 @@ fn require_admin(env: &Env) -> Result<Address, ContractError> {
 }
 
 #[cfg(test)]
+mod encoding_vectors_test;
+#[cfg(test)]
 mod exposure_test;
 #[cfg(test)]
 mod receipt_test;

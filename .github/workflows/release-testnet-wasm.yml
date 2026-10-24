@@ -1,0 +1,169 @@
+name: Testnet WASM Release
+
+# Rebuilds the WASM recorded in deployments/testnet-YYYY-MM-DD.json from its
+# recorded source commit and toolchain, verifies every SHA-256 and, for a
+# signed release tag, publishes checksums as a TESTNET prerelease.
+#
+# - Tag `testnet-wasm-YYYY-MM-DD` (annotated and signed): verify, then publish.
+# - Manual dispatch: dry run of the same build and verification; publishes nothing.
+#
+# See "Testnet WASM releases" in deployments/README.md.
+
+on:
+  push:
+    tags:
+      - "testnet-wasm-*"
+  workflow_dispatch:
+    inputs:
+      manifest:
+        description: "Deployment manifest to reproduce (dry run only; nothing is published)"
+        required: true
+        default: deployments/testnet-2026-09-06.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testnet-wasm-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-tag:
+    name: Verify signed tag
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Install Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 22.12.0
+
+      - name: Require an annotated, GitHub-verified tag on this commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: node scripts/check-release-tag.mjs --tag "$RELEASE_TAG" --repo "$REPOSITORY" --commit "$COMMIT"
+
+  build:
+    name: Reproduce and verify
+    needs: verify-tag
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || needs.verify-tag.result == 'success') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 22.12.0
+
+      - name: Test release verification and test-token guard
+        run: node --test scripts/lib/wasm-release.test.mjs scripts/lib/test-token-guard.test.mjs
+
+      - name: Resolve manifest and pinned toolchain
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          INPUT_MANIFEST: ${{ inputs.manifest }}
+        run: |
+          if [ "$EVENT_NAME" = "push" ]; then
+            node scripts/reproduce-testnet-wasm.mjs --tag "$RELEASE_TAG" --plan > "$RUNNER_TEMP/plan.json"
+          else
+            node scripts/reproduce-testnet-wasm.mjs --manifest "$INPUT_MANIFEST" --plan > "$RUNNER_TEMP/plan.json"
+          fi
+          node -e '
+            const plan = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+            const lines = ["manifest", "rustc", "stellarCli", "stellarCliUrl", "stellarCliSha256"]
+              .map((key) => `${key}=${plan[key]}`);
+            require("fs").appendFileSync(process.env.GITHUB_OUTPUT, lines.join("\n") + "\n");
+          ' "$RUNNER_TEMP/plan.json"
+          cat "$RUNNER_TEMP/plan.json"
+
+      - name: Check manifests with the test-token guard
+        env:
+          MANIFEST: ${{ steps.plan.outputs.manifest }}
+        run: node scripts/check-test-token-guard.mjs --manifest "$MANIFEST"
+
+      - name: Install recorded Rust toolchain
+        env:
+          RUSTC_VERSION: ${{ steps.plan.outputs.rustc }}
+        run: |
+          rustup toolchain install "$RUSTC_VERSION" --profile minimal --target wasm32v1-none
+          rustc "+$RUSTC_VERSION" --version
+
+      - name: Install recorded Stellar CLI from a pinned archive
+        env:
+          CLI_URL: ${{ steps.plan.outputs.stellarCliUrl }}
+          CLI_SHA256: ${{ steps.plan.outputs.stellarCliSha256 }}
+        run: |
+          curl -fsSL "$CLI_URL" -o "$RUNNER_TEMP/stellar-cli.tar.gz"
+          echo "$CLI_SHA256  $RUNNER_TEMP/stellar-cli.tar.gz" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/stellar-cli"
+          tar -xzf "$RUNNER_TEMP/stellar-cli.tar.gz" -C "$RUNNER_TEMP/stellar-cli"
+          sudo install -m 0755 "$RUNNER_TEMP/stellar-cli/stellar" /usr/local/bin/stellar
+          stellar version
+
+      - name: Reproduce WASM and verify recorded hashes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          MANIFEST: ${{ steps.plan.outputs.manifest }}
+        run: |
+          if [ "$EVENT_NAME" = "push" ]; then
+            node scripts/reproduce-testnet-wasm.mjs --tag "$RELEASE_TAG" --out-dir "$RUNNER_TEMP/release"
+          else
+            node scripts/reproduce-testnet-wasm.mjs --manifest "$MANIFEST" --out-dir "$RUNNER_TEMP/release"
+          fi
+
+      - name: Refuse to package test-token under a production label
+        run: node scripts/check-test-token-guard.mjs --release-label testnet --artifacts-dir "$RUNNER_TEMP/release/wasm"
+
+      - name: Summarize
+        run: cat "$RUNNER_TEMP/release/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload verified release files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: testnet-wasm-release
+          path: ${{ runner.temp }}/release
+          if-no-files-found: error
+
+  publish:
+    name: Publish TESTNET prerelease
+    needs: [verify-tag, build]
+    if: github.event_name == 'push' && needs.verify-tag.result == 'success' && needs.build.result == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release files
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: testnet-wasm-release
+          path: release
+
+      - name: Create the TESTNET prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            --repo "$REPOSITORY" \
+            --verify-tag \
+            --prerelease \
+            --title "TESTNET WASM checksums $RELEASE_TAG (not a production release)" \
+            --notes-file release/release-notes.md \
+            release/checksums.json release/SHA256SUMS release/wasm/*.wasm
