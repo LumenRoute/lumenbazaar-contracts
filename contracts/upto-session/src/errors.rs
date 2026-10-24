@@ -74,6 +74,8 @@ pub enum ContractError {
     ExposureCeilingNotConfigured = 38,
     BuyerExposureCeilingExceeded = 39,
     BuyerExposureUnderflow = 40,
+    SequenceExhausted = 36,
+    IdempotencyConflict = 37,
 }
 
 #[cfg(test)]
@@ -152,5 +154,7 @@ mod tests {
         assert_eq!(ContractError::ExposureCeilingNotConfigured as u32, 38);
         assert_eq!(ContractError::BuyerExposureCeilingExceeded as u32, 39);
         assert_eq!(ContractError::BuyerExposureUnderflow as u32, 40);
+        assert_eq!(ContractError::SequenceExhausted as u32, 36);
+        assert_eq!(ContractError::IdempotencyConflict as u32, 37);
     }
 }

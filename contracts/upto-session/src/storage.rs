@@ -31,6 +31,7 @@ pub enum DataKey {
     AssetExposureCeiling(Address),
     BuyerExposureCeiling(Address),
     BuyerExposure(Address, Address),
+    Idempotency(Address, BytesN<32>),
 }
 
 pub fn write_storage_layout_version(env: &Env) {
@@ -440,6 +441,13 @@ pub fn read_storage_layout_version(env: &Env) -> Option<u32> {
     env.storage().instance().get(&DataKey::StorageLayoutVersion)
 }
 
+/// The maximum valid session sequence that can be assigned.
+/// Sequences are 0-indexed and advance monotonically up to this terminal value.
+/// When the sequence counter reaches `u64::MAX`, session sequence capacity is exhausted.
+/// All subsequent session creation requests fail deterministically with
+/// `ContractError::SequenceExhausted` before authorization, transfers, or writes.
+pub const LAST_VALID_SESSION_SEQUENCE: u64 = u64::MAX - 1;
+
 pub fn read_next_session_sequence(env: &Env) -> u64 {
     env.storage()
         .instance()
@@ -447,12 +455,50 @@ pub fn read_next_session_sequence(env: &Env) -> u64 {
         .unwrap_or(0)
 }
 
-pub fn take_next_session_sequence(env: &Env) -> u64 {
+pub fn check_session_sequence_available(env: &Env) -> Result<u64, ContractError> {
     let sequence = read_next_session_sequence(env);
+    if sequence == u64::MAX {
+        return Err(ContractError::SequenceExhausted);
+    }
+    Ok(sequence)
+}
+
+pub fn take_next_session_sequence(env: &Env) -> Result<u64, ContractError> {
+    let sequence = read_next_session_sequence(env);
+    let next = sequence
+        .checked_add(1)
+        .ok_or(ContractError::SequenceExhausted)?;
     env.storage()
         .instance()
-        .set(&DataKey::NextSessionSequence, &(sequence + 1));
-    sequence
+        .set(&DataKey::NextSessionSequence, &next);
+    Ok(sequence)
+}
+
+pub fn write_idempotency_key(
+    env: &Env,
+    buyer: &Address,
+    key: &BytesN<32>,
+    session_id: &BytesN<32>,
+) {
+    let storage_key = DataKey::Idempotency(buyer.clone(), key.clone());
+    env.storage().persistent().set(&storage_key, session_id);
+    env.storage().persistent().extend_ttl(
+        &storage_key,
+        DEFAULT_TTL_THRESHOLD,
+        TTL_EXTENSION_AMOUNT,
+    );
+}
+
+pub fn read_idempotency_key(env: &Env, buyer: &Address, key: &BytesN<32>) -> Option<BytesN<32>> {
+    env.storage()
+        .persistent()
+        .get(&DataKey::Idempotency(buyer.clone(), key.clone()))
+}
+
+pub fn has_idempotency_key(env: &Env, buyer: &Address, key: &BytesN<32>) -> bool {
+    env.storage()
+        .persistent()
+        .has(&DataKey::Idempotency(buyer.clone(), key.clone()))
 }
 
 pub fn write_session(env: &Env, session: &Session) {
@@ -579,9 +625,60 @@ mod tests {
         let contract_id = env.register(crate::UptoSessionContract, ());
 
         env.as_contract(&contract_id, || {
-            assert_eq!(take_next_session_sequence(&env), 0);
-            assert_eq!(take_next_session_sequence(&env), 1);
+            assert_eq!(take_next_session_sequence(&env).unwrap(), 0);
+            assert_eq!(take_next_session_sequence(&env).unwrap(), 1);
             assert_eq!(read_next_session_sequence(&env), 2);
+        });
+    }
+
+    #[test]
+    fn session_sequence_exhaustion_behavior() {
+        let env = Env::default();
+        let contract_id = env.register(crate::UptoSessionContract, ());
+
+        env.as_contract(&contract_id, || {
+            // Set sequence counter to last valid sequence
+            env.storage()
+                .instance()
+                .set(&DataKey::NextSessionSequence, &LAST_VALID_SESSION_SEQUENCE);
+
+            // Last valid sequence succeeds and advances to u64::MAX
+            assert_eq!(
+                take_next_session_sequence(&env).unwrap(),
+                LAST_VALID_SESSION_SEQUENCE
+            );
+            assert_eq!(read_next_session_sequence(&env), u64::MAX);
+
+            // At terminal capacity, check fails without changing state
+            assert_eq!(
+                check_session_sequence_available(&env),
+                Err(ContractError::SequenceExhausted)
+            );
+            assert_eq!(
+                take_next_session_sequence(&env),
+                Err(ContractError::SequenceExhausted)
+            );
+            assert_eq!(read_next_session_sequence(&env), u64::MAX);
+        });
+    }
+
+    #[test]
+    fn idempotency_storage_round_trips() {
+        let env = Env::default();
+        let contract_id = env.register(crate::UptoSessionContract, ());
+
+        env.as_contract(&contract_id, || {
+            let buyer = Address::generate(&env);
+            let key = BytesN::from_array(&env, &[42; 32]);
+            let session_id = BytesN::from_array(&env, &[99; 32]);
+
+            assert!(!has_idempotency_key(&env, &buyer, &key));
+            assert_eq!(read_idempotency_key(&env, &buyer, &key), None);
+
+            write_idempotency_key(&env, &buyer, &key, &session_id);
+
+            assert!(has_idempotency_key(&env, &buyer, &key));
+            assert_eq!(read_idempotency_key(&env, &buyer, &key), Some(session_id));
         });
     }
 

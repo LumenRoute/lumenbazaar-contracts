@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(clippy::too_many_arguments)]
 
 mod errors;
 pub mod events;
@@ -26,7 +27,7 @@ use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
 pub struct UptoSessionContract;
 
 pub const INTERFACE_VERSION: u32 = 3;
-pub const CONFIGURATION_RESPONSE_VERSION: u32 = 1;
+pub const CONFIGURATION_RESPONSE_VERSION: u32 = 2;
 pub const RECOVERABILITY_RESPONSE_VERSION: u32 = 1;
 pub const COMMITMENT_DOMAIN_METADATA_RESPONSE_VERSION: u32 = 1;
 pub const RECEIPT_SCHEMA_VERSION: u32 = 1;
@@ -37,9 +38,14 @@ pub const MAX_SOLVENCY_QUERY_ASSETS: u32 = 16;
 pub const SOLVENCY_RESPONSE_VERSION: u32 = 1;
 
 #[contractimpl]
+#[allow(clippy::too_many_arguments)]
 impl UptoSessionContract {
     pub fn interface_version() -> u32 {
         INTERFACE_VERSION
+    }
+
+    pub fn max_session_duration_ledgers() -> u32 {
+        validation::MAX_SESSION_DURATION_LEDGERS
     }
 
     pub fn initialize(
@@ -562,6 +568,7 @@ impl UptoSessionContract {
             operational_state: storage::read_operational_state(&env),
             instance_ttl_threshold: storage::DEFAULT_TTL_THRESHOLD,
             instance_ttl_extension: storage::TTL_EXTENSION_AMOUNT,
+            max_session_duration_ledgers: validation::MAX_SESSION_DURATION_LEDGERS,
         })
     }
 
@@ -575,6 +582,7 @@ impl UptoSessionContract {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create_session(
         env: Env,
         buyer: Address,
@@ -583,6 +591,7 @@ impl UptoSessionContract {
         max_amount: i128,
         expires_at_ledger: u32,
         resource_hash: BytesN<32>,
+        idempotency_key: BytesN<32>,
     ) -> Result<BytesN<32>, ContractError> {
         validation::validate_commitment_scheme(
             validation::SUPPORTED_RESOURCE_SCHEME_VERSION,
@@ -656,8 +665,27 @@ impl UptoSessionContract {
             }
         }
 
+        storage::check_session_sequence_available(&env)?;
+
+        if let Some(existing_session_id) =
+            storage::read_idempotency_key(&env, &buyer, &idempotency_key)
+        {
+            let session = storage::read_session(&env, &existing_session_id)
+                .ok_or(ContractError::SessionNotFound)?;
+            if session.seller != seller
+                || session.asset != asset
+                || session.max_amount != max_amount
+                || session.expires_at_ledger != expires_at_ledger
+                || session.resource_hash != resource_hash
+            {
+                return Err(ContractError::IdempotencyConflict);
+            }
+            buyer.require_auth();
+            return Ok(existing_session_id);
+        }
+
         buyer.require_auth();
-        let sequence = storage::take_next_session_sequence(&env);
+        let sequence = storage::take_next_session_sequence(&env)?;
         let session_id = ids::derive_session_id(
             &env,
             &ids::SessionIdInput {
@@ -668,6 +696,7 @@ impl UptoSessionContract {
                 expires_at_ledger,
                 resource_hash: &resource_hash,
                 sequence,
+                idempotency_key: &idempotency_key,
             },
         );
 
@@ -704,7 +733,7 @@ impl UptoSessionContract {
         let current_ledger = env.ledger().sequence();
         let session = Session {
             id: session_id.clone(),
-            buyer,
+            buyer: buyer.clone(),
             seller,
             asset,
             max_amount,
@@ -721,6 +750,7 @@ impl UptoSessionContract {
         };
 
         storage::write_session(&env, &session);
+        storage::write_idempotency_key(&env, &buyer, &idempotency_key, &session_id);
         events::publish_session_created(&env, &session);
 
         Ok(session_id)
@@ -794,6 +824,45 @@ impl UptoSessionContract {
         storage::write_operational_state(&env, &OperationalState::Active);
         storage::extend_instance_ttl(&env);
         events::publish_creation_resumed(&env, &admin);
+        Ok(())
+    }
+
+    pub fn recover_surplus(
+        env: Env,
+        asset: Address,
+        recipient: Address,
+        amount: i128,
+    ) -> Result<(), ContractError> {
+        let _admin = require_admin(&env)?;
+        if storage::read_asset_status(&env, &asset).is_none() {
+            return Err(ContractError::UnsupportedAsset);
+        }
+        if amount <= 0 {
+            return Err(ContractError::InvalidAmount);
+        }
+
+        let escrow = token::Client::new(&env, &asset);
+        let contract = env.current_contract_address();
+        let balance_before = escrow.balance(&contract);
+        let liability = storage::read_liability(&env, &asset);
+        if balance_before < liability {
+            return Err(ContractError::EscrowUnderfunded);
+        }
+        let surplus = balance_before - liability;
+        if amount > surplus {
+            return Err(ContractError::EscrowUnderfunded);
+        }
+
+        let recipient_balance_before = escrow.balance(&recipient);
+        escrow.transfer(&contract, &recipient, &amount);
+        verify_debit(balance_before, escrow.balance(&contract), amount)?;
+        verify_credit(recipient_balance_before, escrow.balance(&recipient), amount)?;
+        if escrow.balance(&contract) < liability {
+            return Err(ContractError::EscrowUnderfunded);
+        }
+
+        events::publish_surplus_recovered(&env, &asset, &recipient, amount);
+        storage::extend_instance_ttl(&env);
         Ok(())
     }
 

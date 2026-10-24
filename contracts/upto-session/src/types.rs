@@ -121,6 +121,7 @@ pub struct ContractConfiguration {
     pub operational_state: OperationalState,
     pub instance_ttl_threshold: u32,
     pub instance_ttl_extension: u32,
+    pub max_session_duration_ledgers: u32,
 }
 
 #[contracttype]

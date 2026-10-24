@@ -159,11 +159,15 @@ pub fn validate_create_session(
         return Err(ContractError::InvalidAmount);
     }
 
-    if expires_at_ledger <= env.ledger().sequence() {
+    let current_ledger = env.ledger().sequence();
+    if expires_at_ledger <= current_ledger {
         return Err(ContractError::ExpiredSession);
     }
 
-    if expires_at_ledger - env.ledger().sequence() > MAX_SESSION_DURATION_LEDGERS {
+    let duration = expires_at_ledger
+        .checked_sub(current_ledger)
+        .ok_or(ContractError::ExpiredSession)?;
+    if duration > MAX_SESSION_DURATION_LEDGERS {
         return Err(ContractError::SessionDurationTooLong);
     }
 
@@ -439,6 +443,82 @@ mod tests {
         assert_eq!(
             validate_usage_hash(&env, &empty_hash),
             Err(ContractError::InvalidUsageHash)
+        );
+    }
+
+    #[test]
+    fn validates_session_lifetime_boundary_and_near_u32_limit_ledgers() {
+        let env = Env::default();
+        let (buyer, seller, asset, resource_hash) = valid_inputs(&env);
+
+        let current = 1_000;
+        env.ledger().set_sequence_number(current);
+
+        // Exact boundary succeeds
+        assert!(validate_create_session(
+            &env,
+            &buyer,
+            &seller,
+            &asset,
+            100,
+            current + MAX_SESSION_DURATION_LEDGERS,
+            &resource_hash
+        )
+        .is_ok());
+
+        // Boundary + 1 fails
+        assert_eq!(
+            validate_create_session(
+                &env,
+                &buyer,
+                &seller,
+                &asset,
+                100,
+                current + MAX_SESSION_DURATION_LEDGERS + 1,
+                &resource_hash
+            ),
+            Err(ContractError::SessionDurationTooLong)
+        );
+
+        // Near-u32-limit ledgers without overflow
+        let near_max = u32::MAX - 1_000;
+        env.ledger().set_sequence_number(near_max);
+
+        // Valid horizon near u32 limit succeeds
+        assert!(validate_create_session(
+            &env,
+            &buyer,
+            &seller,
+            &asset,
+            100,
+            near_max + 500,
+            &resource_hash
+        )
+        .is_ok());
+
+        assert!(validate_create_session(
+            &env,
+            &buyer,
+            &seller,
+            &asset,
+            100,
+            u32::MAX,
+            &resource_hash
+        )
+        .is_ok());
+
+        // Low current ledger with u32::MAX expiry rejects without overflow
+        env.ledger().set_sequence_number(10);
+        assert_eq!(
+            validate_create_session(&env, &buyer, &seller, &asset, 100, u32::MAX, &resource_hash),
+            Err(ContractError::SessionDurationTooLong)
+        );
+
+        // Terminal u32 ledger rejects expiry equal to current
+        env.ledger().set_sequence_number(u32::MAX);
+        assert_eq!(
+            validate_create_session(&env, &buyer, &seller, &asset, 100, u32::MAX, &resource_hash),
+            Err(ContractError::ExpiredSession)
         );
     }
 }

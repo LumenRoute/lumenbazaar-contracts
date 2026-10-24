@@ -11,6 +11,7 @@ pub struct SessionIdInput<'a> {
     pub expires_at_ledger: u32,
     pub resource_hash: &'a BytesN<32>,
     pub sequence: u64,
+    pub idempotency_key: &'a BytesN<32>,
 }
 
 pub struct UsageCommitmentInput<'a> {
@@ -99,6 +100,7 @@ fn session_id_preimage_for_version(
         input.expires_at_ledger,
         input.resource_hash.clone(),
         input.sequence,
+        input.idempotency_key.clone(),
     )
         .to_xdr(env);
 
@@ -153,6 +155,7 @@ mod tests {
         let seller = Address::generate(&env);
         let asset = Address::generate(&env);
         let resource_hash = BytesN::from_array(&env, &[9; 32]);
+        let idempotency_key = BytesN::from_array(&env, &[8; 32]);
 
         let (first, second) = env.as_contract(&contract, || {
             (
@@ -166,6 +169,7 @@ mod tests {
                         expires_at_ledger: 50,
                         resource_hash: &resource_hash,
                         sequence: 0,
+                        idempotency_key: &idempotency_key,
                     },
                 ),
                 derive_session_id(
@@ -178,6 +182,53 @@ mod tests {
                         expires_at_ledger: 50,
                         resource_hash: &resource_hash,
                         sequence: 1,
+                        idempotency_key: &idempotency_key,
+                    },
+                ),
+            )
+        });
+
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn idempotency_key_changes_session_id_for_identical_inputs() {
+        let env = Env::default();
+        let contract = Address::generate(&env);
+        env.register_at(&contract, crate::UptoSessionContract, ());
+        let buyer = Address::generate(&env);
+        let seller = Address::generate(&env);
+        let asset = Address::generate(&env);
+        let resource_hash = BytesN::from_array(&env, &[9; 32]);
+        let first_key = BytesN::from_array(&env, &[8; 32]);
+        let second_key = BytesN::from_array(&env, &[9; 32]);
+
+        let (first, second) = env.as_contract(&contract, || {
+            (
+                derive_session_id(
+                    &env,
+                    &SessionIdInput {
+                        buyer: &buyer,
+                        seller: &seller,
+                        asset: &asset,
+                        max_amount: 100,
+                        expires_at_ledger: 50,
+                        resource_hash: &resource_hash,
+                        sequence: 0,
+                        idempotency_key: &first_key,
+                    },
+                ),
+                derive_session_id(
+                    &env,
+                    &SessionIdInput {
+                        buyer: &buyer,
+                        seller: &seller,
+                        asset: &asset,
+                        max_amount: 100,
+                        expires_at_ledger: 50,
+                        resource_hash: &resource_hash,
+                        sequence: 0,
+                        idempotency_key: &second_key,
                     },
                 ),
             )
@@ -196,6 +247,7 @@ mod tests {
         let other_seller = Address::generate(&env);
         let asset = Address::generate(&env);
         let resource_hash = BytesN::from_array(&env, &[9; 32]);
+        let idempotency_key = BytesN::from_array(&env, &[8; 32]);
 
         let (first, second) = env.as_contract(&contract, || {
             (
@@ -209,6 +261,7 @@ mod tests {
                         expires_at_ledger: 50,
                         resource_hash: &resource_hash,
                         sequence: 0,
+                        idempotency_key: &idempotency_key,
                     },
                 ),
                 derive_session_id(
@@ -221,6 +274,7 @@ mod tests {
                         expires_at_ledger: 50,
                         resource_hash: &resource_hash,
                         sequence: 0,
+                        idempotency_key: &idempotency_key,
                     },
                 ),
             )
@@ -241,6 +295,7 @@ mod tests {
         let seller = Address::generate(&env);
         let asset = Address::generate(&env);
         let resource_hash = BytesN::from_array(&env, &[9; 32]);
+        let idempotency_key = BytesN::from_array(&env, &[8; 32]);
         let input = SessionIdInput {
             buyer: &buyer,
             seller: &seller,
@@ -249,6 +304,7 @@ mod tests {
             expires_at_ledger: 50,
             resource_hash: &resource_hash,
             sequence: 0,
+            idempotency_key: &idempotency_key,
         };
 
         let first = env.as_contract(&first_contract, || derive_session_id(&env, &input));
@@ -276,6 +332,7 @@ mod tests {
         let asset = Address::generate(&env);
         let resource_hash = BytesN::from_array(&env, &[9; 32]);
         let measurement_hash = BytesN::from_array(&env, &[10; 32]);
+        let idempotency_key = BytesN::from_array(&env, &[8; 32]);
         let first_input = SessionIdInput {
             buyer: &buyer,
             seller: &seller,
@@ -284,6 +341,7 @@ mod tests {
             expires_at_ledger: 23,
             resource_hash: &resource_hash,
             sequence: 4,
+            idempotency_key: &idempotency_key,
         };
         let second_input = SessionIdInput {
             max_amount: 12,
@@ -326,6 +384,7 @@ mod tests {
         let seller = Address::generate(&env);
         let asset = Address::generate(&env);
         let resource_hash = BytesN::from_array(&env, &[9; 32]);
+        let idempotency_key = BytesN::from_array(&env, &[8; 32]);
         let measurement_hash = BytesN::from_array(
             &env,
             &[
@@ -343,6 +402,7 @@ mod tests {
                 expires_at_ledger: 5_067_600,
                 resource_hash: &resource_hash,
                 sequence: 7,
+                idempotency_key: &idempotency_key,
             };
             let session_id = derive_session_id(&env, &session_input);
             let usage_input = UsageCommitmentInput {
@@ -363,6 +423,10 @@ mod tests {
                 seller.to_string().to_string()
             );
             assert_eq!(fixture["sessionId"]["asset"], asset.to_string().to_string());
+            assert_eq!(
+                fixture["sessionId"]["idempotencyKeyHex"],
+                hex_array(idempotency_key.to_array())
+            );
             assert_eq!(
                 fixture["sessionId"]["preimageXdrHex"],
                 hex_bytes(&session_id_preimage(&env, &session_input))
