@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertErrorMapMatchesFixture } from "./lib/contract-error-map.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const skipBuild = process.argv.includes("--skip-build");
@@ -9,6 +10,14 @@ const wasm = join(repoRoot, "target", "wasm32v1-none", "release", "upto_session.
 const outputDir = join(repoRoot, "bindings", "upto-session");
 const packageLockPath = join(outputDir, "package-lock.json");
 const packageLock = existsSync(packageLockPath) ? readFileSync(packageLockPath, "utf8") : null;
+const errorTemplate = join(repoRoot, "scripts", "templates", "contractErrors.ts");
+
+// Fail before touching the output if the typed error map has drifted from the
+// frozen interface fixture.
+assertErrorMapMatchesFixture(
+  errorTemplate,
+  join(repoRoot, "artifacts", "interface", "upto-session-v3.json"),
+);
 
 if (!skipBuild) {
   execFileSync("stellar", ["contract", "build", "--locked"], {
@@ -39,6 +48,7 @@ copyFileSync(
   join(repoRoot, "scripts", "templates", "usageReceipt.ts"),
   join(outputDir, "src", "usageReceipt.ts"),
 );
+copyFileSync(errorTemplate, join(outputDir, "src", "contractErrors.ts"));
 
 const bindingPath = join(outputDir, "src", "index.ts");
 const binding = readFileSync(bindingPath, "utf8");
@@ -62,9 +72,13 @@ const canonicalContractSpec = `new ContractSpec([\n${encodedEntries
   .join(",\n")}\n      ])`;
 
 let canonicalBinding = binding.replace(contractSpecPattern, canonicalContractSpec);
-const usageReceiptExport = 'export * from "./usageReceipt.js";';
-if (!canonicalBinding.includes(usageReceiptExport)) {
-  canonicalBinding = `${canonicalBinding.trimEnd()}\n\n${usageReceiptExport}\n`;
+for (const templateExport of [
+  'export * from "./usageReceipt.js";',
+  'export * from "./contractErrors.js";',
+]) {
+  if (!canonicalBinding.includes(templateExport)) {
+    canonicalBinding = `${canonicalBinding.trimEnd()}\n\n${templateExport}\n`;
+  }
 }
 writeFileSync(bindingPath, canonicalBinding, "utf8");
 

@@ -24,6 +24,8 @@ const requiredFunctions = [
   "initialize",
   "get_asset_max_session_amount",
   "set_asset_max_session_amount",
+  "activate_asset",
+  "get_asset_policy",
   "get_admin",
   "get_admin_rotation",
   "propose_admin",
@@ -86,6 +88,9 @@ const requiredErrors = [
   "SessionRejected",
   "CreationPaused",
   "OperationalStateUnchanged",
+  "AssetAlreadyActive",
+  "AssetDeprecated",
+  "AssetLimitReached",
 ];
 
 for (const item of [...requiredFunctions, ...requiredErrors]) {

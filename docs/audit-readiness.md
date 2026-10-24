@@ -10,6 +10,8 @@ The review target is the `upto-session` contract public interface:
 - `initialize(admin, asset_policies)`
 - `get_asset_max_session_amount(asset)`
 - `set_asset_max_session_amount(asset, max_session_amount)`
+- `activate_asset(policy)`
+- `get_asset_policy(asset)`
 - `get_admin()`
 - `get_admin_rotation()`
 - `propose_admin(pending_admin, expires_at_ledger)`

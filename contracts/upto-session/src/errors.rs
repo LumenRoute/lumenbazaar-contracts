@@ -66,6 +66,9 @@ pub enum ContractError {
     InvalidCapReduction = 49,
     CreationPaused = 36,
     OperationalStateUnchanged = 37,
+    AssetAlreadyActive = 36,
+    AssetDeprecated = 37,
+    AssetLimitReached = 38,
 }
 
 #[cfg(test)]
@@ -136,5 +139,8 @@ mod tests {
         assert_eq!(ContractError::InvalidCapReduction as u32, 49);
         assert_eq!(ContractError::CreationPaused as u32, 36);
         assert_eq!(ContractError::OperationalStateUnchanged as u32, 37);
+        assert_eq!(ContractError::AssetAlreadyActive as u32, 36);
+        assert_eq!(ContractError::AssetDeprecated as u32, 37);
+        assert_eq!(ContractError::AssetLimitReached as u32, 38);
     }
 }

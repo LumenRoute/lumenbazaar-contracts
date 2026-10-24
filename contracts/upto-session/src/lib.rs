@@ -9,7 +9,8 @@ pub mod validation;
 
 pub use errors::ContractError;
 pub use types::{
-    AdminRotation, AssetPolicy, AssetSolvency, AssetStatus, BatchRecoveryResult,
+    AdminRotation, AssetLifecycle, AssetPolicy, AssetPolicyResponse, AssetSolvency, AssetStatus,
+    BatchRecoveryResult,
     BatchRecoveryStatus, ContractConfiguration, OperationalState, RecoverabilityStatus, Session,
     SessionRecoverability, SessionStatus, SettlementPreview, SettlementRejectionReason,
     SolvencyAssetState,
@@ -28,6 +29,7 @@ pub const CONFIGURATION_RESPONSE_VERSION: u32 = 1;
 pub const RECOVERABILITY_RESPONSE_VERSION: u32 = 1;
 pub const COMMITMENT_DOMAIN_METADATA_RESPONSE_VERSION: u32 = 1;
 pub const RECEIPT_SCHEMA_VERSION: u32 = 1;
+pub const ASSET_POLICY_RESPONSE_VERSION: u32 = 1;
 pub const MAX_SUPPORTED_ASSETS: u32 = 16;
 pub const MAX_RECOVERY_BATCH_SIZE: u32 = 8;
 pub const MAX_SOLVENCY_QUERY_ASSETS: u32 = 16;
@@ -303,6 +305,67 @@ impl UptoSessionContract {
         Ok(storage::read_seller_open_sessions(&env, &seller))
     }
 
+    // Activates one reviewed asset after initialization. Only the current
+    // admin may call it. The asset must be new (or fully removed earlier),
+    // pass the same SEP-41 probe as `initialize`, carry a positive cap, and
+    // fit within `MAX_SUPPORTED_ASSETS`. A deprecated asset is never
+    // reactivated here. Every check runs before any storage write.
+    pub fn activate_asset(env: Env, policy: AssetPolicy) -> Result<(), ContractError> {
+        let admin = require_admin(&env)?;
+        validation::validate_asset_cap(policy.max_session_amount)?;
+        if policy.asset == env.current_contract_address() || policy.asset == admin {
+            return Err(ContractError::InvalidAsset);
+        }
+        match storage::read_asset_status(&env, &policy.asset) {
+            None => {}
+            Some(AssetStatus::Active) => return Err(ContractError::AssetAlreadyActive),
+            Some(AssetStatus::Deprecated) => return Err(ContractError::AssetDeprecated),
+        }
+        let mut configured = storage::read_configured_assets(&env);
+        if configured.len() >= MAX_SUPPORTED_ASSETS {
+            return Err(ContractError::AssetLimitReached);
+        }
+        let probe = validation::validate_supported_asset(&env, &policy.asset, &admin)?;
+
+        storage::write_supported_asset(&env, &policy.asset);
+        storage::write_asset_max_session_amount(&env, &policy.asset, policy.max_session_amount);
+        configured.push_back(policy.asset.clone());
+        storage::write_supported_assets(&env, &configured);
+        storage::extend_instance_ttl(&env);
+        events::publish_asset_activated(&env, &policy.asset, probe.decimals);
+        Ok(())
+    }
+
+    // Authoritative, read-only lifecycle view of one asset. Needs no
+    // authorization and never writes. Unknown and removed assets both report
+    // `NotConfigured` with no cap.
+    pub fn get_asset_policy(
+        env: Env,
+        asset: Address,
+    ) -> Result<AssetPolicyResponse, ContractError> {
+        if !storage::has_admin(&env) {
+            return Err(ContractError::NotInitialized);
+        }
+        let (lifecycle, max_session_amount) = match storage::read_asset_status(&env, &asset) {
+            Some(AssetStatus::Active) => (
+                AssetLifecycle::Active,
+                Some(
+                    storage::read_asset_max_session_amount(&env, &asset)
+                        .ok_or(ContractError::AssetCapNotConfigured)?,
+                ),
+            ),
+            Some(AssetStatus::Deprecated) => (AssetLifecycle::Deprecated, None),
+            None => (AssetLifecycle::NotConfigured, None),
+        };
+        Ok(AssetPolicyResponse {
+            response_version: ASSET_POLICY_RESPONSE_VERSION,
+            asset,
+            accepts_new_sessions: lifecycle == AssetLifecycle::Active,
+            lifecycle,
+            max_session_amount,
+        })
+    }
+
     pub fn get_asset_max_session_amount(env: Env, asset: Address) -> Result<i128, ContractError> {
         if !storage::is_supported_asset(&env, &asset) {
             return Err(ContractError::UnsupportedAsset);
@@ -397,7 +460,7 @@ impl UptoSessionContract {
             storage_layout_version: storage::read_storage_layout_version(&env)
                 .unwrap_or(storage::STORAGE_LAYOUT_VERSION),
             admin,
-            supported_assets: storage::read_supported_assets(&env),
+            supported_assets: storage::read_configured_assets(&env),
             max_supported_assets: MAX_SUPPORTED_ASSETS,
             operational_state: storage::read_operational_state(&env),
             instance_ttl_threshold: storage::DEFAULT_TTL_THRESHOLD,
@@ -572,7 +635,12 @@ impl UptoSessionContract {
             return Err(ContractError::AssetLiabilityOutstanding);
         }
 
+        // Delete every policy record so nothing about the asset can be read as
+        // active configuration; session history is untouched.
+        storage::remove_from_supported_assets(&env, &asset);
         storage::remove_asset_status(&env, &asset);
+        storage::remove_asset_max_session_amount(&env, &asset);
+        storage::remove_liability(&env, &asset);
         storage::extend_instance_ttl(&env);
         events::publish_asset_removed(&env, &asset, &admin, &reason_commitment);
         Ok(())

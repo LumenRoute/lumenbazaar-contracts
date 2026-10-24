@@ -22,6 +22,29 @@ pub enum AssetStatus {
     Deprecated,
 }
 
+// Lifecycle of an asset as reported by `get_asset_policy`. `NotConfigured`
+// covers both addresses that were never configured and assets that were
+// removed; removal deletes every policy record, so the two are identical.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AssetLifecycle {
+    Active,
+    Deprecated,
+    NotConfigured,
+}
+
+// Read-only, versioned view of one asset's policy.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AssetPolicyResponse {
+    pub response_version: u32,
+    pub asset: Address,
+    pub lifecycle: AssetLifecycle,
+    // The cap applied to new sessions; `None` unless the asset is active.
+    pub max_session_amount: Option<i128>,
+    pub accepts_new_sessions: bool,
+}
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SessionStatus {
