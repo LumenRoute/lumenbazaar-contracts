@@ -9,6 +9,10 @@ pub mod validation;
 
 pub use errors::ContractError;
 pub use types::{
+    AdminRotation, AssetPolicy, AssetSolvency, AssetStatus, BatchRecoveryResult,
+    BatchRecoveryStatus, ContractConfiguration, OperationalState, RecoverabilityStatus, Session,
+    SessionRecoverability, SessionStatus, SettlementPreview, SettlementRejectionReason,
+    SolvencyAssetState,
     AdminRotation, AssetPolicy, AssetStatus, BatchRecoveryResult, BatchRecoveryStatus,
     CapIncreaseProposal, CommitmentDomainMetadata, ContractConfiguration, OperationalState,
     Session, SessionStatus, SessionStatusResponse,
@@ -21,10 +25,12 @@ pub struct UptoSessionContract;
 
 pub const INTERFACE_VERSION: u32 = 3;
 pub const CONFIGURATION_RESPONSE_VERSION: u32 = 1;
+pub const RECOVERABILITY_RESPONSE_VERSION: u32 = 1;
 pub const COMMITMENT_DOMAIN_METADATA_RESPONSE_VERSION: u32 = 1;
 pub const RECEIPT_SCHEMA_VERSION: u32 = 1;
 pub const MAX_SUPPORTED_ASSETS: u32 = 16;
 pub const MAX_RECOVERY_BATCH_SIZE: u32 = 8;
+pub const MAX_SOLVENCY_QUERY_ASSETS: u32 = 16;
 
 #[contractimpl]
 impl UptoSessionContract {
@@ -614,6 +620,7 @@ impl UptoSessionContract {
             SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
             SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
             SessionStatus::Expired => return Err(ContractError::SessionExpired),
+            SessionStatus::Rejected => return Err(ContractError::SessionRejected),
         }
 
         validation::validate_commitment_scheme(
@@ -678,6 +685,70 @@ impl UptoSessionContract {
         Ok(())
     }
 
+    pub fn preview_settle(
+        env: Env,
+        session_id: BytesN<32>,
+        actual_amount: i128,
+    ) -> SettlementPreview {
+        let session = match storage::read_session(&env, &session_id) {
+            Some(s) => s,
+            None => {
+                return SettlementPreview {
+                    eligible: false,
+                    actual_amount,
+                    seller_payout: 0,
+                    buyer_refund: 0,
+                    is_expired: false,
+                    rejection_reason: SettlementRejectionReason::NotFound,
+                };
+            }
+        };
+
+        let is_expired = env.ledger().sequence() >= session.expires_at_ledger;
+
+        let rejection_reason = match &session.status {
+            SessionStatus::Settled => SettlementRejectionReason::AlreadySettled,
+            SessionStatus::Cancelled => SettlementRejectionReason::AlreadyCancelled,
+            SessionStatus::Expired => SettlementRejectionReason::AlreadyExpired,
+            SessionStatus::Rejected => SettlementRejectionReason::AlreadyRejected,
+            SessionStatus::Open => {
+                if actual_amount <= 0 {
+                    SettlementRejectionReason::InvalidAmount
+                } else if actual_amount > session.max_amount {
+                    SettlementRejectionReason::AmountExceedsCap
+                } else if is_expired {
+                    SettlementRejectionReason::Expired
+                } else {
+                    let contract = env.current_contract_address();
+                    let asset = token::Client::new(&env, &session.asset);
+                    if session.escrowed_amount != session.max_amount
+                        || asset.balance(&contract) < storage::read_liability(&env, &session.asset)
+                    {
+                        SettlementRejectionReason::EscrowUnderfunded
+                    } else {
+                        SettlementRejectionReason::None
+                    }
+                }
+            }
+        };
+
+        let eligible = rejection_reason == SettlementRejectionReason::None;
+        let (seller_payout, buyer_refund) = if eligible {
+            (actual_amount, session.escrowed_amount - actual_amount)
+        } else {
+            (0, 0)
+        };
+
+        SettlementPreview {
+            eligible,
+            actual_amount,
+            seller_payout,
+            buyer_refund,
+            is_expired,
+            rejection_reason,
+        }
+    }
+
     pub fn cancel(env: Env, session_id: BytesN<32>) -> Result<(), ContractError> {
         let mut session =
             storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
@@ -687,6 +758,7 @@ impl UptoSessionContract {
             SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
             SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
             SessionStatus::Expired => return Err(ContractError::SessionExpired),
+            SessionStatus::Rejected => return Err(ContractError::SessionRejected),
         }
 
         if env.ledger().sequence() >= session.expires_at_ledger {
@@ -733,6 +805,7 @@ impl UptoSessionContract {
         Ok(())
     }
 
+    pub fn reject(env: Env, session_id: BytesN<32>) -> Result<(), ContractError> {
     pub fn reduce_session_cap(
         env: Env,
         session_id: BytesN<32>,
@@ -746,11 +819,17 @@ impl UptoSessionContract {
             SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
             SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
             SessionStatus::Expired => return Err(ContractError::SessionExpired),
+            SessionStatus::Rejected => return Err(ContractError::SessionRejected),
         }
 
         if env.ledger().sequence() >= session.expires_at_ledger {
             return Err(ContractError::ExpiredSession);
         }
+        session.seller.require_auth();
+        let refunded_amount = session.escrowed_amount;
+        let asset = token::Client::new(&env, &session.asset);
+        let contract = env.current_contract_address();
+        if refunded_amount != session.max_amount
 
         if new_max_amount <= 0 || new_max_amount >= session.max_amount {
             return Err(ContractError::InvalidCapReduction);
@@ -768,6 +847,14 @@ impl UptoSessionContract {
         {
             return Err(ContractError::EscrowUnderfunded);
         }
+        let contract_balance_before = asset.balance(&contract);
+        let buyer_balance_before = asset.balance(&session.buyer);
+        storage::decrease_liability(&env, &session.asset, refunded_amount)?;
+        asset.transfer(&contract, &session.buyer, &refunded_amount);
+        verify_debit(
+            contract_balance_before,
+            asset.balance(&contract),
+            refunded_amount,
 
         let contract_balance_before = asset.balance(&contract);
         let buyer_balance_before = asset.balance(&session.buyer);
@@ -789,6 +876,18 @@ impl UptoSessionContract {
         verify_credit(
             buyer_balance_before,
             asset.balance(&session.buyer),
+            refunded_amount,
+        )?;
+        session.escrowed_amount = 0;
+        session.status = SessionStatus::Rejected;
+        storage::write_session(&env, &session);
+        events::publish_session_rejected(
+            &env,
+            &session_id,
+            &session.seller,
+            &session.buyer,
+            &session.asset,
+            refunded_amount,
             refund_difference,
         )?;
 
@@ -818,6 +917,7 @@ impl UptoSessionContract {
             SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
             SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
             SessionStatus::Expired => return Err(ContractError::SessionExpired),
+            SessionStatus::Rejected => return Err(ContractError::SessionRejected),
         }
         if env.ledger().sequence() < session.expires_at_ledger {
             return Err(ContractError::SessionNotExpired);
@@ -853,6 +953,7 @@ impl UptoSessionContract {
                 SessionStatus::Settled => BatchRecoveryStatus::AlreadySettled,
                 SessionStatus::Cancelled => BatchRecoveryStatus::AlreadyCancelled,
                 SessionStatus::Expired => BatchRecoveryStatus::AlreadyRecovered,
+                SessionStatus::Rejected => BatchRecoveryStatus::AlreadyRejected,
                 SessionStatus::Open if env.ledger().sequence() < session.expires_at_ledger => {
                     BatchRecoveryStatus::NotExpired
                 }
@@ -877,6 +978,98 @@ impl UptoSessionContract {
             results.push_back(batch_result(session_id, status, 0));
         }
 
+        Ok(results)
+    }
+
+    pub fn get_recoverability(env: Env, session_id: BytesN<32>) -> SessionRecoverability {
+        let current_ledger = env.ledger().sequence();
+        let session = match storage::read_session(&env, &session_id) {
+            Some(session) => session,
+            None => {
+                return SessionRecoverability {
+                    response_version: RECOVERABILITY_RESPONSE_VERSION,
+                    status: RecoverabilityStatus::NotFound,
+                    expires_at_ledger: 0,
+                    current_ledger,
+                    recipient: None,
+                    asset: None,
+                    refundable_amount: 0,
+                };
+            }
+        };
+
+        let status = match session.status {
+            SessionStatus::Settled => RecoverabilityStatus::AlreadySettled,
+            SessionStatus::Cancelled => RecoverabilityStatus::AlreadyCancelled,
+            SessionStatus::Expired => RecoverabilityStatus::AlreadyRecovered,
+            SessionStatus::Rejected => RecoverabilityStatus::AlreadyRejected,
+            SessionStatus::Open if current_ledger < session.expires_at_ledger => {
+                RecoverabilityStatus::NotExpired
+            }
+            SessionStatus::Open => RecoverabilityStatus::Recoverable,
+        };
+        let refundable_amount = if status == RecoverabilityStatus::Recoverable {
+            session.escrowed_amount
+        } else {
+            0
+        };
+
+        SessionRecoverability {
+            response_version: RECOVERABILITY_RESPONSE_VERSION,
+            status,
+            expires_at_ledger: session.expires_at_ledger,
+            current_ledger,
+            recipient: Some(session.buyer),
+            asset: Some(session.asset),
+            refundable_amount,
+        }
+    }
+
+    /// Read-only solvency snapshot for a caller-supplied list of one to
+    /// `MAX_SOLVENCY_QUERY_ASSETS` assets. Results preserve input order.
+    /// Duplicates are evaluated independently and returned once per
+    /// occurrence. Assets unknown to this deployment are reported as
+    /// `Unknown` with zero values and are never called, so arbitrary
+    /// contracts cannot be invoked. `surplus` is `balance - liability`
+    /// (negative when underfunded).
+    pub fn get_solvency(
+        env: Env,
+        assets: Vec<Address>,
+    ) -> Result<Vec<AssetSolvency>, ContractError> {
+        if assets.is_empty() || assets.len() > MAX_SOLVENCY_QUERY_ASSETS {
+            return Err(ContractError::InvalidBatchSize);
+        }
+        if !storage::has_admin(&env) {
+            return Err(ContractError::NotInitialized);
+        }
+
+        let contract = env.current_contract_address();
+        let mut results = Vec::new(&env);
+        for asset in assets.iter() {
+            let state = match storage::read_asset_status(&env, &asset) {
+                Some(AssetStatus::Active) => SolvencyAssetState::Active,
+                Some(AssetStatus::Deprecated) => SolvencyAssetState::Deprecated,
+                None => {
+                    results.push_back(AssetSolvency {
+                        asset,
+                        state: SolvencyAssetState::Unknown,
+                        balance: 0,
+                        liability: 0,
+                        surplus: 0,
+                    });
+                    continue;
+                }
+            };
+            let balance = token::Client::new(&env, &asset).balance(&contract);
+            let liability = storage::read_liability(&env, &asset);
+            results.push_back(AssetSolvency {
+                asset,
+                state,
+                balance,
+                liability,
+                surplus: balance.saturating_sub(liability),
+            });
+        }
         Ok(results)
     }
 
@@ -916,9 +1109,10 @@ impl UptoSessionContract {
                 storage::extend_session_and_liability_ttl(&env, &session);
                 Ok(())
             }
-            SessionStatus::Settled | SessionStatus::Cancelled | SessionStatus::Expired => {
-                Err(ContractError::TtlExtensionFailed)
-            }
+            SessionStatus::Settled
+            | SessionStatus::Cancelled
+            | SessionStatus::Expired
+            | SessionStatus::Rejected => Err(ContractError::TtlExtensionFailed),
         }
     }
 }

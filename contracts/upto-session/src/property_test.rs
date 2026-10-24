@@ -22,6 +22,7 @@ enum ModelStatus {
     Settled,
     Cancelled,
     Expired,
+    Rejected,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -55,7 +56,7 @@ fn cap_strategy() -> impl Strategy<Value = (i128, i128)> {
 }
 
 fn action_strategy() -> impl Strategy<Value = std::vec::Vec<(u8, u8, u8)>> {
-    collection::vec((0_u8..6, 0_u8..2, 0_u8..5), 1..24)
+    collection::vec((0_u8..7, 0_u8..2, 0_u8..5), 1..24)
 }
 
 fn create_asset(env: &Env, owner: &Address, amount: i128) -> Address {
@@ -201,6 +202,27 @@ fn try_cancel(
         .is_ok()
 }
 
+fn try_reject(
+    env: &Env,
+    client: &UptoSessionContractClient<'_>,
+    contract: &Address,
+    seller: &Address,
+    session_id: &BytesN<32>,
+) -> bool {
+    client
+        .mock_auths(&[MockAuth {
+            address: seller,
+            invoke: &MockAuthInvoke {
+                contract,
+                fn_name: "reject",
+                args: (session_id.clone(),).into_val(env),
+                sub_invokes: &[],
+            },
+        }])
+        .try_reject(session_id)
+        .is_ok()
+}
+
 fn selected_amount(selector: u8, cap: i128) -> i128 {
     match selector {
         0 => 0,
@@ -239,6 +261,7 @@ fn assert_session_invariants(
         ),
         ModelStatus::Cancelled => (model.cap, 0, 0, 0, SessionStatus::Cancelled),
         ModelStatus::Expired => (model.cap, 0, 0, 0, SessionStatus::Expired),
+        ModelStatus::Rejected => (model.cap, 0, 0, 0, SessionStatus::Rejected),
     };
 
     assert_eq!(session.status, status);
@@ -388,6 +411,20 @@ proptest! {
                         1,
                         &usage_hash,
                     ));
+                }
+                5 => {
+                    let succeeded = try_reject(
+                        &env,
+                        &client,
+                        &contract,
+                        &sellers[index],
+                        &session_ids[index],
+                    );
+                    let expected = before.status == ModelStatus::Open && !expired;
+                    prop_assert_eq!(succeeded, expected);
+                    if expected {
+                        model[index].status = ModelStatus::Rejected;
+                    }
                 }
                 _ => {
                     prop_assert!(!try_settle(

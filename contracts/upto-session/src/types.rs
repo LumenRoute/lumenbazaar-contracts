@@ -29,6 +29,7 @@ pub enum SessionStatus {
     Settled,
     Cancelled,
     Expired,
+    Rejected,
 }
 
 #[contracttype]
@@ -76,6 +77,7 @@ pub enum BatchRecoveryStatus {
     AlreadySettled,
     AlreadyCancelled,
     AlreadyRecovered,
+    AlreadyRejected,
     Duplicate,
     EscrowUnavailable,
 }
@@ -104,6 +106,52 @@ pub struct BatchRecoveryResult {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SettlementRejectionReason {
+    None,
+    NotFound,
+    AlreadySettled,
+    AlreadyCancelled,
+    AlreadyExpired,
+    AlreadyRejected,
+    InvalidAmount,
+    AmountExceedsCap,
+    Expired,
+    EscrowUnderfunded,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SettlementPreview {
+    pub eligible: bool,
+    pub actual_amount: i128,
+    pub seller_payout: i128,
+    pub buyer_refund: i128,
+    pub is_expired: bool,
+    pub rejection_reason: SettlementRejectionReason,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum RecoverabilityStatus {
+    NotFound,
+    NotExpired,
+    Recoverable,
+    AlreadySettled,
+    AlreadyCancelled,
+    AlreadyRecovered,
+    AlreadyRejected,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SessionRecoverability {
+    pub response_version: u32,
+    pub status: RecoverabilityStatus,
+    pub expires_at_ledger: u32,
+    pub current_ledger: u32,
+    pub recipient: Option<Address>,
+    pub asset: Option<Address>,
+    pub refundable_amount: i128,
 pub struct CommitmentDomainMetadata {
     pub response_version: u32,
     pub interface_version: u32,
@@ -114,6 +162,20 @@ pub struct CommitmentDomainMetadata {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SolvencyAssetState {
+    Unknown,
+    Active,
+    Deprecated,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AssetSolvency {
+    pub asset: Address,
+    pub state: SolvencyAssetState,
+    pub balance: i128,
+    pub liability: i128,
+    pub surplus: i128,
 pub struct SessionStatusResponse {
     pub exists: bool,
     pub status: SessionStatus,

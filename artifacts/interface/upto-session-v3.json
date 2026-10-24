@@ -1,6 +1,9 @@
 {
   "contractVersion": "0.3.0",
   "interfaceVersion": 3,
+  "sourceSpecSha256": "026dc59bcfe7c3993a8609b60250049d125371d8b5cca7b7b981aa580c044086",
+  "sourceSpecSha256": "f0e2a98a4ae7d396ad5ed2a87a4f13d28c9658f3ea7cc97b5b07ea47d355f674",
+  "sourceSpecSha256": "fc603a096025df811f1cb31384595dbf334a35353d7ff03e300447eaa8368bf1",
   "sourceSpecSha256": "d70448072290cda266851becf600afd422353c6f31b3ff85bbaf7ce24dce0aee",
   "methods": [
     "accept_admin",
@@ -20,20 +23,24 @@
     "get_commitment_domain_metadata",
     "get_configuration",
     "get_escrow_liability",
+    "get_recoverability",
     "get_max_buyer_open_sessions",
     "get_max_seller_open_sessions",
     "get_seller_exposure",
     "get_seller_exposure_ceiling",
     "get_seller_open_sessions",
     "get_session",
+    "get_solvency",
     "get_session_status",
     "initialize",
     "interface_version",
+    "preview_settle",
     "pause_creation",
     "propose_admin",
     "propose_asset_cap_increase",
     "recover_expired",
     "recover_expired_batch",
+    "reject",
     "reduce_session_cap",
     "remove_asset",
     "resume_creation",
@@ -622,6 +629,48 @@
       ]
     },
     {
+      "name": "SessionRejected",
+      "prefixTopics": [
+        "session_rejected"
+      ],
+      "fields": [
+        {
+          "name": "session_id",
+          "location": "topic_list",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "name": "seller",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "buyer",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "asset",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        },
+        {
+          "name": "refunded_amount",
+          "location": "data",
+          "type": "i128"
+        }
+      ]
+    },
+    {
       "name": "SessionSettled",
       "prefixTopics": [
         "session_settled"
@@ -815,6 +864,8 @@
       "value": 35
     },
     {
+      "name": "SessionRejected",
+      "value": 36
       "name": "CapIncreasePending",
       "value": 38
     },

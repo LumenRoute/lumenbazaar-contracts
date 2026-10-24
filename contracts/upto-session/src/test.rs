@@ -3178,6 +3178,341 @@ fn cancel_emits_stable_event() {
 }
 
 #[test]
+fn reject_allows_seller_rejection_and_refunds_buyer_only() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 500);
+    let resource_hash = BytesN::from_array(&env, &[81; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    let session_before = client.get_session(&session_id);
+    assert_eq!(session_before.status, SessionStatus::Open);
+
+    let reject_result = client.try_reject(&session_id);
+    assert!(reject_result.is_ok(), "Reject should succeed");
+
+    assert_eq!(
+        env.events().all().filter_by_contract(&contract_id),
+        std::vec![events::SessionRejected {
+            session_id: session_id.clone(),
+            seller: seller.clone(),
+            buyer: buyer.clone(),
+            asset: asset.clone(),
+            event_version: 2,
+            refunded_amount: 500,
+        }
+        .to_xdr(&env, &contract_id)]
+    );
+
+    let session_after = client.get_session(&session_id);
+    assert_eq!(session_after.status, SessionStatus::Rejected);
+    assert_eq!(session_after.escrowed_amount, 0);
+
+    let token_client = token::Client::new(&env, &asset);
+    assert_eq!(token_client.balance(&buyer), 500);
+    assert_eq!(token_client.balance(&seller), 0);
+    assert_eq!(token_client.balance(&contract_id), 0);
+}
+
+#[test]
+fn reject_requires_seller_auth() {
+    let env = Env::default();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let session_id = BytesN::from_array(&env, &[82; 32]);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[83; 32]);
+
+    env.as_contract(&contract_id, || {
+        storage::write_session(
+            &env,
+            &Session {
+                id: session_id.clone(),
+                buyer,
+                seller,
+                asset,
+                max_amount: 100,
+                escrowed_amount: 100,
+                settled_amount: 0,
+                expires_at_ledger: 50,
+                resource_hash,
+                usage_hash: None,
+                status: SessionStatus::Open,
+            },
+        );
+    });
+
+    assert!(client.try_reject(&session_id).is_err());
+}
+
+#[test]
+fn reject_rejects_terminal_and_expired_states() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 2_000);
+    let resource_hash = BytesN::from_array(&env, &[84; 32]);
+    let usage_hash = BytesN::from_array(&env, &[85; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let missing_id = BytesN::from_array(&env, &[86; 32]);
+    assert_eq!(
+        client.try_reject(&missing_id),
+        Err(Ok(ContractError::SessionNotFound))
+    );
+
+    let rejected_id = client.create_session(&buyer, &seller, &asset, &200, &50, &resource_hash);
+    client.reject(&rejected_id);
+    assert_eq!(
+        client.try_reject(&rejected_id),
+        Err(Ok(ContractError::SessionRejected))
+    );
+    assert_eq!(
+        client.try_settle(&rejected_id, &100, &usage_hash),
+        Err(Ok(ContractError::SessionRejected))
+    );
+    assert_eq!(
+        client.try_cancel(&rejected_id),
+        Err(Ok(ContractError::SessionRejected))
+    );
+    env.ledger().set_sequence_number(50);
+    assert_eq!(
+        client.try_recover_expired(&rejected_id),
+        Err(Ok(ContractError::SessionRejected))
+    );
+
+    let settled_id = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    client.settle(&settled_id, &100, &usage_hash);
+    assert_eq!(
+        client.try_reject(&settled_id),
+        Err(Ok(ContractError::SessionAlreadySettled))
+    );
+
+    let cancelled_id = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    client.cancel(&cancelled_id);
+    assert_eq!(
+        client.try_reject(&cancelled_id),
+        Err(Ok(ContractError::SessionCancelled))
+    );
+
+    let expired_id = client.create_session(&buyer, &seller, &asset, &200, &70, &resource_hash);
+    env.ledger().set_sequence_number(70);
+    assert_eq!(
+        client.try_reject(&expired_id),
+        Err(Ok(ContractError::ExpiredSession))
+    );
+}
+
+#[test]
+fn preview_settle_calculates_exact_payout_and_refund_without_state_changes_or_auth() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 1_000);
+    let resource_hash = BytesN::from_array(&env, &[87; 32]);
+    let usage_hash = BytesN::from_array(&env, &[88; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+
+    // 1. Valid partial settlement preview
+    let preview = client.preview_settle(&session_id, &200);
+    assert_eq!(
+        preview,
+        SettlementPreview {
+            eligible: true,
+            actual_amount: 200,
+            seller_payout: 200,
+            buyer_refund: 300,
+            is_expired: false,
+            rejection_reason: SettlementRejectionReason::None,
+        }
+    );
+
+    // 2. Valid full settlement preview (payout == cap, refund == 0)
+    let full_preview = client.preview_settle(&session_id, &500);
+    assert_eq!(
+        full_preview,
+        SettlementPreview {
+            eligible: true,
+            actual_amount: 500,
+            seller_payout: 500,
+            buyer_refund: 0,
+            is_expired: false,
+            rejection_reason: SettlementRejectionReason::None,
+        }
+    );
+
+    // Verify session remains Open, balances untouched, no events emitted
+    let session_before = client.get_session(&session_id);
+    assert_eq!(session_before.status, SessionStatus::Open);
+    assert_eq!(session_before.escrowed_amount, 500);
+    let token_client = token::Client::new(&env, &asset);
+    assert_eq!(token_client.balance(&contract_id), 500);
+    assert_eq!(token_client.balance(&seller), 0);
+    assert_eq!(token_client.balance(&buyer), 500);
+
+    // 3. Settle and verify actual settlement amounts match preview exactly
+    client.settle(&session_id, &200, &usage_hash);
+    let session_after = client.get_session(&session_id);
+    assert_eq!(session_after.settled_amount, preview.seller_payout);
+    assert_eq!(token_client.balance(&seller), preview.seller_payout);
+    assert_eq!(token_client.balance(&buyer), 500 + preview.buyer_refund);
+}
+
+#[test]
+fn preview_settle_reports_deterministic_rejection_reasons() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 2_000);
+    let resource_hash = BytesN::from_array(&env, &[89; 32]);
+    let usage_hash = BytesN::from_array(&env, &[90; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    // 1. Missing session
+    let missing_id = BytesN::from_array(&env, &[91; 32]);
+    let missing_preview = client.preview_settle(&missing_id, &100);
+    assert_eq!(
+        missing_preview,
+        SettlementPreview {
+            eligible: false,
+            actual_amount: 100,
+            seller_payout: 0,
+            buyer_refund: 0,
+            is_expired: false,
+            rejection_reason: SettlementRejectionReason::NotFound,
+        }
+    );
+
+    // 2. Invalid zero and negative amounts
+    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let zero_preview = client.preview_settle(&session_id, &0);
+    assert_eq!(
+        zero_preview.rejection_reason,
+        SettlementRejectionReason::InvalidAmount
+    );
+    assert!(!zero_preview.eligible);
+
+    let neg_preview = client.preview_settle(&session_id, &-10);
+    assert_eq!(
+        neg_preview.rejection_reason,
+        SettlementRejectionReason::InvalidAmount
+    );
+    assert!(!neg_preview.eligible);
+
+    // 3. Amount exceeds cap
+    let exceed_preview = client.preview_settle(&session_id, &501);
+    assert_eq!(
+        exceed_preview.rejection_reason,
+        SettlementRejectionReason::AmountExceedsCap
+    );
+    assert!(!exceed_preview.eligible);
+
+    // 4. Expired state
+    let expired_id = client.create_session(&buyer, &seller, &asset, &200, &30, &resource_hash);
+    env.ledger().set_sequence_number(30);
+    let expired_preview = client.preview_settle(&expired_id, &100);
+    assert_eq!(
+        expired_preview,
+        SettlementPreview {
+            eligible: false,
+            actual_amount: 100,
+            seller_payout: 0,
+            buyer_refund: 0,
+            is_expired: true,
+            rejection_reason: SettlementRejectionReason::Expired,
+        }
+    );
+
+    // 5. Terminal states: Settled, Cancelled, Expired, Rejected
+    env.ledger().set_sequence_number(1);
+    let s_id = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    client.settle(&s_id, &100, &usage_hash);
+    assert_eq!(
+        client.preview_settle(&s_id, &100).rejection_reason,
+        SettlementRejectionReason::AlreadySettled
+    );
+
+    let c_id = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    client.cancel(&c_id);
+    assert_eq!(
+        client.preview_settle(&c_id, &100).rejection_reason,
+        SettlementRejectionReason::AlreadyCancelled
+    );
+
+    let r_id = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    client.reject(&r_id);
+    assert_eq!(
+        client.preview_settle(&r_id, &100).rejection_reason,
+        SettlementRejectionReason::AlreadyRejected
+    );
+
+    let exp_id = client.create_session(&buyer, &seller, &asset, &200, &40, &resource_hash);
+    env.ledger().set_sequence_number(40);
+    client.recover_expired(&exp_id);
+    assert_eq!(
+        client.preview_settle(&exp_id, &100).rejection_reason,
+        SettlementRejectionReason::AlreadyExpired
+    );
+}
+
+#[test]
+fn preview_settle_detects_undercollateralized_escrow() {
+    let env = Env::default();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = Address::generate(&env);
+    let resource_hash = BytesN::from_array(&env, &[92; 32]);
+    let session_id = BytesN::from_array(&env, &[93; 32]);
+
+    env.as_contract(&contract_id, || {
+        storage::write_session(
+            &env,
+            &Session {
+                id: session_id.clone(),
+                buyer,
+                seller,
+                asset,
+                max_amount: 500,
+                escrowed_amount: 100, // Partial escrow amount != max_amount
+                settled_amount: 0,
+                expires_at_ledger: 50,
+                resource_hash,
+                usage_hash: None,
+                status: SessionStatus::Open,
+            },
+        );
+    });
+
+    let preview = client.preview_settle(&session_id, &50);
+    assert_eq!(
+        preview.rejection_reason,
+        SettlementRejectionReason::EscrowUnderfunded
+    );
+    assert!(!preview.eligible);
+}
+
+#[test]
 fn extend_ttl_succeeds_for_open_sessions() {
     let env = Env::default();
     env.mock_all_auths();
@@ -3290,6 +3625,73 @@ fn extend_ttl_rejects_missing_session() {
 }
 
 #[test]
+fn recoverability_query_matches_recover_expired_boundary_and_terminal_states() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 2_000);
+    let resource_hash = BytesN::from_array(&env, &[94; 32]);
+    let usage_hash = BytesN::from_array(&env, &[95; 32]);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let missing = client.get_recoverability(&BytesN::from_array(&env, &[96; 32]));
+    assert_eq!(missing.status, RecoverabilityStatus::NotFound);
+    assert_eq!(missing.response_version, 1);
+    assert_eq!(missing.recipient, None);
+    assert_eq!(missing.refundable_amount, 0);
+
+    let open_id = client.create_session(&buyer, &seller, &asset, &200, &50, &resource_hash);
+    env.ledger().set_sequence_number(49);
+    let before = client.get_recoverability(&open_id);
+    assert_eq!(before.status, RecoverabilityStatus::NotExpired);
+    assert_eq!(before.expires_at_ledger, 50);
+    assert_eq!(before.current_ledger, 49);
+    assert_eq!(before.recipient, Some(buyer.clone()));
+    assert_eq!(before.asset, Some(asset.clone()));
+    assert_eq!(before.refundable_amount, 0);
+    assert_eq!(
+        client.try_recover_expired(&open_id),
+        Err(Ok(ContractError::SessionNotExpired))
+    );
+
+    env.ledger().set_sequence_number(50);
+    let at = client.get_recoverability(&open_id);
+    assert_eq!(at.status, RecoverabilityStatus::Recoverable);
+    assert_eq!(at.refundable_amount, 200);
+    assert_eq!(at.recipient, Some(buyer.clone()));
+    // Query is storage-neutral: session still open.
+    assert_eq!(client.get_session(&open_id).status, SessionStatus::Open);
+    client.recover_expired(&open_id);
+    assert_eq!(
+        client.get_recoverability(&open_id).status,
+        RecoverabilityStatus::AlreadyRecovered
+    );
+
+    env.ledger().set_sequence_number(1);
+    let settled = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    client.settle(&settled, &100, &usage_hash);
+    assert_eq!(
+        client.get_recoverability(&settled).status,
+        RecoverabilityStatus::AlreadySettled
+    );
+    let cancelled = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    client.cancel(&cancelled);
+    assert_eq!(
+        client.get_recoverability(&cancelled).status,
+        RecoverabilityStatus::AlreadyCancelled
+    );
+    let rejected = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    client.reject(&rejected);
+    let rej = client.get_recoverability(&rejected);
+    assert_eq!(rej.status, RecoverabilityStatus::AlreadyRejected);
+    assert_eq!(rej.refundable_amount, 0);
+}
+
+#[test]
+fn solvency_query_reports_ordered_mixed_health_with_defined_edge_cases() {
 fn per_asset_minimum_enforces_boundaries_and_policy_invariants() {
     let env = Env::default();
     env.mock_all_auths_allowing_non_root_auth();
@@ -3708,6 +4110,87 @@ fn creation_pause_rejects_repeated_calls_and_resume_restores_creation() {
     let admin = Address::generate(&env);
     let buyer = Address::generate(&env);
     let seller = Address::generate(&env);
+    let healthy = create_test_asset(&env, &buyer, 300);
+    let surplus = create_test_asset(&env, &buyer, 300);
+    let underfunded = create_test_asset(&env, &buyer, 300);
+    let deprecated = create_test_asset(&env, &buyer, 300);
+    let unknown = Address::generate(&env);
+
+    assert_eq!(
+        client.try_get_solvency(&soroban_sdk::vec![&env, healthy.clone()]),
+        Err(Ok(ContractError::NotInitialized))
+    );
+    client.initialize(
+        &admin,
+        &soroban_sdk::vec![
+            &env,
+            asset_policy(&healthy, 300),
+            asset_policy(&surplus, 300),
+            asset_policy(&underfunded, 300),
+            asset_policy(&deprecated, 300)
+        ],
+    );
+    let hash = BytesN::from_array(&env, &[97; 32]);
+    client.create_session(&buyer, &seller, &healthy, &100, &50, &hash);
+    client.create_session(&buyer, &seller, &surplus, &100, &50, &hash);
+    client.create_session(&buyer, &seller, &underfunded, &100, &50, &hash);
+    // Surplus: unsolicited transfer into escrow custody.
+    token::StellarAssetClient::new(&env, &surplus).mint(&contract_id, &40);
+    // Underfunded: raise recorded liability above custody.
+    env.as_contract(&contract_id, || {
+        storage::increase_liability(&env, &underfunded, 25).unwrap();
+    });
+    client.deprecate_asset(&deprecated);
+
+    let query = soroban_sdk::vec![
+        &env,
+        underfunded.clone(),
+        unknown.clone(),
+        healthy.clone(),
+        deprecated.clone(),
+        surplus.clone(),
+        healthy.clone()
+    ];
+    let results = client.get_solvency(&query);
+    assert_eq!(results.len(), 6);
+    let expected = [
+        (&underfunded, SolvencyAssetState::Active, 100, 125, -25),
+        (&unknown, SolvencyAssetState::Unknown, 0, 0, 0),
+        (&healthy, SolvencyAssetState::Active, 100, 100, 0),
+        (&deprecated, SolvencyAssetState::Deprecated, 0, 0, 0),
+        (&surplus, SolvencyAssetState::Active, 140, 100, 40),
+        (&healthy, SolvencyAssetState::Active, 100, 100, 0),
+    ];
+    for (index, (asset, state, balance, liability, delta)) in expected.iter().enumerate() {
+        let item = results.get(index as u32).unwrap();
+        assert_eq!(&item.asset, *asset);
+        assert_eq!(&item.state, state);
+        assert_eq!(item.balance, *balance);
+        assert_eq!(item.liability, *liability);
+        assert_eq!(item.surplus, *delta);
+    }
+
+    // Strict bounds.
+    assert_eq!(
+        client.try_get_solvency(&soroban_sdk::Vec::new(&env)),
+        Err(Ok(ContractError::InvalidBatchSize))
+    );
+    let mut oversized = soroban_sdk::Vec::new(&env);
+    for _ in 0..=MAX_SOLVENCY_QUERY_ASSETS {
+        oversized.push_back(healthy.clone());
+    }
+    assert_eq!(
+        client.try_get_solvency(&oversized),
+        Err(Ok(ContractError::InvalidBatchSize))
+    );
+    let mut at_limit = soroban_sdk::Vec::new(&env);
+    for _ in 0..MAX_SOLVENCY_QUERY_ASSETS {
+        at_limit.push_back(healthy.clone());
+    }
+    assert_eq!(
+        client.get_solvency(&at_limit).len(),
+        MAX_SOLVENCY_QUERY_ASSETS
+    );
     let asset = create_test_asset(&env, &buyer, 1_000);
     let resource_hash = BytesN::from_array(&env, &[72; 32]);
     initialize_for_asset(&env, &client, &admin, &asset);
