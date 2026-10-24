@@ -1,0 +1,99 @@
+<!-- lumenbazaar:transaction-evidence (appended by scripts/generate-bindings.mjs; edit scripts/templates/README.transactionEvidence.md) -->
+
+# Transaction evidence helpers
+
+Generated methods return an `AssembledTransaction` that is built and simulated
+but not submitted. The hand-written helpers in `src/transactionEvidence.ts`
+(copied from `scripts/templates/transactionEvidence.ts`, so they survive
+regeneration) take it the rest of the way and return typed evidence:
+
+| Helper | Contract method |
+| --- | --- |
+| `createSessionWithEvidence(client, args, options)` | `create_session` |
+| `settleWithEvidence(client, args, options)` | `settle` |
+| `cancelWithEvidence(client, args, options)` | `cancel` |
+| `extendTtlWithEvidence(client, args, options)` | `extend_ttl` |
+
+Each helper simulates through the generated client, hands the envelope to your
+signer, submits it with `sendTransaction`, polls `getTransaction` within a
+bounded budget, and decodes the return value with the generated decoder.
+
+```ts
+import { Client, Networks, rpc, createSessionWithEvidence } from "upto-session";
+
+const networkPassphrase = Networks.TESTNET; // testnet or a local standalone network only
+const server = new rpc.Server("https://soroban-testnet.stellar.org");
+const client = new Client({
+  contractId: "C...", // the published testnet deployment
+  networkPassphrase,
+  rpcUrl: "https://soroban-testnet.stellar.org",
+  publicKey: "G...", // the buyer's public account; no secret key here
+});
+
+// Placeholder signer: delegate to a wallet, HSM or KMS that you control.
+const signer = {
+  async signTransaction(transactionXdr: string, { networkPassphrase }: { networkPassphrase: string }) {
+    return wallet.signTransaction(transactionXdr, { networkPassphrase }); // { signedTxXdr }
+  },
+};
+
+const evidence = await createSessionWithEvidence(client, args, {
+  networkPassphrase,
+  rpc: server,
+  signer,
+  timeoutMs: 60_000, // default 60 s, at most 600 s
+  pollIntervalMs: 1_000, // default 1 s, 100 ms to 30 s
+});
+
+switch (evidence.status) {
+  case "confirmed":
+    // transactionHash, ledger and createdAt come from RPC; result is typed.
+    store(evidence.transactionHash, evidence.ledger, evidence.result);
+    break;
+  case "failed":
+    // stage "submission": RPC rejected it, no ledger. stage "ledger": included and failed.
+    report(evidence.transactionHash, evidence.stage, evidence.resultCode);
+    break;
+  case "pending":
+    // Unknown outcome. Keep polling evidence.transactionHash; do not resubmit blindly.
+    resume(evidence.transactionHash);
+    break;
+}
+```
+
+Outcomes are a discriminated union, so pending can never be read as success
+or failure. Evidence fields are taken from RPC responses only: a missing or
+malformed hash, a missing, zero or non-integer ledger, a missing close time or
+a missing return value raises `EvidenceError("malformed_rpc_response")` instead
+of being defaulted. `assertConfirmedEvidence(value)` applies the same rules to
+evidence you load back from storage.
+
+`EvidenceError.code` separates problems that are not on-chain outcomes:
+`unsupported_network`, `invalid_configuration`, `not_a_write`, `not_simulated`,
+`additional_signers_required`, `signer_rejected`, `signer_modified_transaction`,
+`rpc_error` (transport or RPC failure; `transactionHash` is set when the
+transaction is known to be submitted, `expectedTransactionHash` when it is not)
+and `malformed_rpc_response`.
+
+Pubnet is not supported. The helpers accept only the testnet and standalone
+passphrases and require the passphrase explicitly; there is no default network.
+LBT, the repository's test token, is a custom test-only token and is not USDC.
+
+## Safe signer boundaries
+
+- The library never accepts, stores, logs or requires a secret key, seed phrase
+  or mnemonic. It receives only the signed envelope back from your signer.
+- The signer is injected and owned by you. Prefer a wallet, HSM or KMS-backed
+  signer, and keep signing material out of client code, configuration files,
+  logs, error reports and source control.
+- Verify the network passphrase the signer is asked to use before signing. The
+  helpers reject an envelope whose hash differs from the simulated transaction,
+  which also catches a signer that changed the network or the operations.
+- Use testnet or a local standalone network for examples and tests. Never use
+  real funds or production keys with these examples.
+- Calls that need other parties' authorization entries
+  (`needsNonInvokerSigningBy()`) are rejected; collect those signatures with the
+  generated client first.
+- Treat `pending` as an unknown outcome. Poll the reported hash until it is
+  confirmed or failed, or until the transaction's time bounds have passed,
+  before deciding whether to build a new transaction. Never resubmit blindly.

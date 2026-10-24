@@ -45,6 +45,14 @@ jobs:
       - name: Check deterministic transaction finality
         run: node --test scripts/lib/transaction-finality.test.mjs
 
+      - name: Check test-token release guard
+        run: |
+          node --test scripts/lib/test-token-guard.test.mjs
+          node scripts/check-test-token-guard.mjs
+
+      - name: Check testnet WASM release verification
+        run: node --test scripts/lib/wasm-release.test.mjs
+
       - name: Test changelog gate
         run: node --test scripts/lib/changelog-gate.test.mjs
 
@@ -140,6 +148,7 @@ jobs:
           npm --prefix bindings/upto-session run build
           node scripts/smoke-upto-session-bindings.mjs
           node --test scripts/test-contract-errors.mjs
+          node --test scripts/test-transaction-evidence.mjs
 
       - name: Check usage receipt commitments
         run: node scripts/check-usage-receipt-fixtures.mjs
@@ -161,6 +170,13 @@ jobs:
         run: |
           node scripts/check-domain-vectors.mjs
           node scripts/check-backend-handoff.mjs
+
+      - name: Check encoding compatibility vectors
+        env:
+          ENCODING_VECTORS_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node --test scripts/lib/encoding-vectors.test.mjs
+          node scripts/check-encoding-vectors.mjs --base "$ENCODING_VECTORS_BASE"
 
       - name: Check security checklist
         run: node scripts/check-security-checklist.mjs

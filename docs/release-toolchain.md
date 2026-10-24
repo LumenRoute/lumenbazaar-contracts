@@ -63,6 +63,11 @@ Contract release and audit evidence must use the following exact toolchain:
 | cargo-audit | 0.22.2 | CI install command |
 | generated Stellar SDK | 17.2.1 | Binding generator output |
 
+Historical deployments keep the toolchain they recorded. The testnet WASM release workflow
+(`.github/workflows/release-testnet-wasm.yml`) rebuilds a manifest's source commit with the Rust
+and Stellar CLI versions in that manifest, from archives pinned in `scripts/lib/wasm-release.mjs`.
+See "Testnet WASM releases" in `deployments/README.md`.
+
 ## Dependency Audit Policy
 
 CI runs `cargo audit --deny warnings` and `npm audit --omit=dev`. A Rust advisory may be ignored only when it has a matching record in `audits/dependency-exceptions.json` with an owner, dependency path, risk statement, planned resolution, and future expiry date. The exception checker fails on expired, duplicate, malformed, or incomplete records.
