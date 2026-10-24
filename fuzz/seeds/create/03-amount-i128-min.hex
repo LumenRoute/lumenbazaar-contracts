@@ -1,0 +1,3 @@
+# create: amount selector 4 => i128::MIN
+# Synthetic. Layout: fuzz/README.md.
+000000000000000004

@@ -4,7 +4,10 @@ members = [
     "contracts/test-token",
     "contracts/upto-session",
     "formal/escrow-model",
+    "fuzz",
 ]
+# Nightly-only libFuzzer package with its own workspace; see fuzz/README.md.
+exclude = ["fuzz/libfuzzer"]
 resolver = "2"
 
 [workspace.package]

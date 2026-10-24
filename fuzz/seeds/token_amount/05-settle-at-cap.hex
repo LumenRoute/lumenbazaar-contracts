@@ -1,0 +1,5 @@
+# token_amount: validate_settlement_amount(a = cap) with expiry raw
+# Synthetic. Layout: fuzz/README.md.
+02080000000000000000000000000000
+07d00000000000000000000000000000
+00000000001000

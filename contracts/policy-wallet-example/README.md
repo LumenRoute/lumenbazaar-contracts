@@ -22,3 +22,5 @@ Spending policies are keyed by agent address and can restrict:
 `check_payment` validates a proposed payment without mutating state. `authorize_payment` requires the agent signature and records the amount against the current ledger-day bucket.
 
 See [docs/policy-examples.md](docs/policy-examples.md) for the executable examples mirrored by the test suite.
+See [docs/invariants.md](docs/invariants.md) for the randomized invariant properties and the residual
+example-only risks they do not cover.

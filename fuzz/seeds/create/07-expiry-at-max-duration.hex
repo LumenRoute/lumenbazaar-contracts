@@ -1,0 +1,4 @@
+# create: expiry selector 3 => ledger + MAX_SESSION_DURATION_LEDGERS (valid boundary)
+# Synthetic. Layout: fuzz/README.md.
+00000000000000000000000000000000
+00000000000000000003

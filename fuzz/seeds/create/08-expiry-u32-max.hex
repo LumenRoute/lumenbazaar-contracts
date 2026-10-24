@@ -1,0 +1,4 @@
+# create: expiry selector 6 => u32::MAX
+# Synthetic. Layout: fuzz/README.md.
+00000000000000000000000000000000
+00000000000000000006

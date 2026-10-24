@@ -16,3 +16,4 @@ soroban-sdk.workspace = true
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 upto-session = { path = "../upto-session" }
+proptest = "1.11.0"

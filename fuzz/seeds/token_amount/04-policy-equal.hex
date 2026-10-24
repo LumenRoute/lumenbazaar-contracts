@@ -1,0 +1,4 @@
+# token_amount: validate_asset_policy(min 1, max 1)
+# Synthetic. Layout: fuzz/README.md.
+01020000000000000000000000000000
+000002

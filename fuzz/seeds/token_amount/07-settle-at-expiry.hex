@@ -1,0 +1,5 @@
+# token_amount: settlement at ledger == expiry (1000)
+# Synthetic. Layout: fuzz/README.md.
+02000000000000000000000000000000
+00000000000000000000000000000000
+000000000003e8

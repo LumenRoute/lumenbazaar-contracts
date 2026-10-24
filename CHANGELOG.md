@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- Document the immutable replacement-deployment migration procedure, storage lifecycle and
+  missing-state policy (rules SR-1 to SR-10 with boundary tests), policy-wallet invariant
+  properties, and bounded fuzz targets with a seeded CI corpus. No contract source, interface,
+  storage layout, or deployment manifest changes; `policy-wallet-example` gains a `proptest`
+  dev-dependency only.
+  Compatibility: none; tests and documentation only.
+  Migration: none; replacements follow [deployment migration](docs/deployment-migration.md).
+
 ### Breaking
 
 - Reconcile the unreleased v3 generated interface with merged contract source, including

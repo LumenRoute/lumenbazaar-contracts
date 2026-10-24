@@ -4,6 +4,10 @@ mod mutation_harness {
     include!("mutation_test.rs");
 }
 
+mod property_harness {
+    include!("property_test.rs");
+}
+
 use super::*;
 use soroban_sdk::{
     testutils::{Address as _, Ledger as _},

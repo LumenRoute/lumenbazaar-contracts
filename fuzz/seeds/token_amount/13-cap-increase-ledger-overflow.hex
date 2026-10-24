@@ -1,0 +1,5 @@
+# token_amount: cap increase at ledger u32::MAX (checked_add fails)
+# Synthetic. Layout: fuzz/README.md.
+04000000000000000000000000000000
+00000000000000000000000000000000
+000000ffffffffffffffff02

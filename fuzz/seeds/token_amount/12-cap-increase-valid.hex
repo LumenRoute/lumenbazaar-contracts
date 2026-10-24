@@ -1,0 +1,5 @@
+# token_amount: current 1000, proposed 2000, active ledger+100, expires active+1
+# Synthetic. Layout: fuzz/README.md.
+04000000000000000000000000000000
+00000000000000000000000000000000
+0000000000044c0000044d

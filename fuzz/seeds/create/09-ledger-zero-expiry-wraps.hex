@@ -1,0 +1,4 @@
+# create: ledger selector 2 => 0, expiry selector 2 => ledger - 1 wrapping to u32::MAX
+# Synthetic. Layout: fuzz/README.md.
+02000000000000000000000000000000
+00000000000000000002

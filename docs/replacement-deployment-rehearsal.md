@@ -38,3 +38,7 @@ Backend storage must persist both `session_id` and `contract_id`. Never derive
 an existing session's destination from the current active contract setting.
 Deprecation is an integration policy: old sessions remain readable and retain
 their original interface behavior, while new sessions use the replacement.
+
+The production procedure that this rehearsal exercises, including cutover order, open-session
+drain, rollback rules, and deprecation windows, is in
+[deployment-migration.md](deployment-migration.md).

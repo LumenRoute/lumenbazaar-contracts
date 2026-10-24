@@ -12,6 +12,10 @@ mod mutation_harness {
     include!("mutation_test.rs");
 }
 
+mod storage_lifecycle_harness {
+    include!("storage_lifecycle_test.rs");
+}
+
 // Global auth mocks in the legacy tests below isolate validation, state,
 // event, and resource-accounting behavior. They are not authorization
 // evidence. Release-gating authorization paths belong in

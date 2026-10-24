@@ -10,3 +10,8 @@ bindings/*/dist/
 !.github/
 .stellar/
 .soroban/
+fuzz/libfuzzer/target/
+fuzz/libfuzzer/corpus/
+fuzz/libfuzzer/artifacts/
+fuzz/libfuzzer/coverage/
+fuzz/libfuzzer/Cargo.lock

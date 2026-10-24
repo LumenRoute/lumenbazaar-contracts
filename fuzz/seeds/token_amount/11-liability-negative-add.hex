@@ -1,0 +1,4 @@
+# token_amount: liability: +i128::MIN then -1
+# Synthetic. Layout: fuzz/README.md.
+03040000000000000000000000000000
+000002
