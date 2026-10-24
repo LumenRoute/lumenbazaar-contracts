@@ -19,6 +19,10 @@ pub struct CapIncreaseProposed {
     pub proposed_max_amount: i128,
     pub active_at_ledger: u32,
     pub expires_at_ledger: u32,
+    pub event_version: u32,
+}
+
+#[contractevent]
 pub struct SellerExposureCeilingUpdated {
     #[topic]
     pub asset: Address,
@@ -34,7 +38,12 @@ pub struct CapIncreaseCancelled {
     pub asset: Address,
     pub admin: Address,
     pub proposed_max_amount: i128,
+    pub event_version: u32,
+}
+
+#[contractevent]
 pub struct MaxBuyerOpenSessionsUpdated {
+    #[topic]
     pub admin: Address,
     pub previous_limit: u32,
     pub new_limit: u32,
@@ -43,6 +52,7 @@ pub struct MaxBuyerOpenSessionsUpdated {
 
 #[contractevent]
 pub struct MaxSellerOpenSessionsUpdated {
+    #[topic]
     pub admin: Address,
     pub previous_limit: u32,
     pub new_limit: u32,
@@ -214,12 +224,6 @@ pub fn publish_asset_session_cap_updated(
     .publish(env);
 }
 
-pub fn publish_asset_deprecated(
-    env: &Env,
-    asset: &Address,
-    admin: &Address,
-    reason_commitment: &BytesN<32>,
-) {
 pub fn publish_cap_increase_proposed(
     env: &Env,
     asset: &Address,
@@ -235,6 +239,10 @@ pub fn publish_cap_increase_proposed(
         active_at_ledger,
         expires_at_ledger,
         event_version: 3,
+    }
+    .publish(env);
+}
+
 pub fn publish_seller_exposure_ceiling_updated(
     env: &Env,
     asset: &Address,
@@ -263,6 +271,10 @@ pub fn publish_cap_increase_cancelled(
         admin: admin.clone(),
         proposed_max_amount,
         event_version: 3,
+    }
+    .publish(env);
+}
+
 pub fn publish_max_buyer_open_sessions_updated(
     env: &Env,
     admin: &Address,
@@ -293,7 +305,12 @@ pub fn publish_max_seller_open_sessions_updated(
     .publish(env);
 }
 
-pub fn publish_asset_deprecated(env: &Env, asset: &Address, admin: &Address) {
+pub fn publish_asset_deprecated(
+    env: &Env,
+    asset: &Address,
+    admin: &Address,
+    reason_commitment: &BytesN<32>,
+) {
     AssetDeprecated {
         asset: asset.clone(),
         admin: admin.clone(),

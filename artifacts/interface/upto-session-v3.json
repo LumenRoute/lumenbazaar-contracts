@@ -4,21 +4,31 @@
   "sourceSpecSha256": "026dc59bcfe7c3993a8609b60250049d125371d8b5cca7b7b981aa580c044086",
   "sourceSpecSha256": "f0e2a98a4ae7d396ad5ed2a87a4f13d28c9658f3ea7cc97b5b07ea47d355f674",
   "sourceSpecSha256": "fc603a096025df811f1cb31384595dbf334a35353d7ff03e300447eaa8368bf1",
+  "sourceSpecSha256": "d70448072290cda266851becf600afd422353c6f31b3ff85bbaf7ce24dce0aee",
   "methods": [
     "accept_admin",
+    "accept_asset_cap_increase",
     "cancel",
     "cancel_admin_rotation",
+    "cancel_asset_cap_increase",
     "create_session",
     "deprecate_asset",
     "extend_ttl",
     "get_admin",
     "get_admin_rotation",
+    "get_asset_cap_increase",
     "get_asset_max_session_amount",
     "get_asset_min_session_amount",
+    "get_buyer_open_sessions",
     "get_commitment_domain_metadata",
     "get_configuration",
     "get_escrow_liability",
     "get_recoverability",
+    "get_max_buyer_open_sessions",
+    "get_max_seller_open_sessions",
+    "get_seller_exposure",
+    "get_seller_exposure_ceiling",
+    "get_seller_open_sessions",
     "get_session",
     "get_solvency",
     "get_session_status",
@@ -27,12 +37,17 @@
     "preview_settle",
     "pause_creation",
     "propose_admin",
+    "propose_asset_cap_increase",
     "recover_expired",
     "recover_expired_batch",
     "reject",
+    "reduce_session_cap",
     "remove_asset",
     "resume_creation",
     "set_asset_max_session_amount",
+    "set_max_buyer_open_sessions",
+    "set_max_seller_open_sessions",
+    "set_seller_exposure_ceiling",
     "settle"
   ],
   "events": [
@@ -231,6 +246,72 @@
       ]
     },
     {
+      "name": "CapIncreaseCancelled",
+      "prefixTopics": [
+        "cap_increase_cancelled"
+      ],
+      "fields": [
+        {
+          "name": "asset",
+          "location": "topic_list",
+          "type": "address"
+        },
+        {
+          "name": "admin",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "proposed_max_amount",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "CapIncreaseProposed",
+      "prefixTopics": [
+        "cap_increase_proposed"
+      ],
+      "fields": [
+        {
+          "name": "asset",
+          "location": "topic_list",
+          "type": "address"
+        },
+        {
+          "name": "admin",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "proposed_max_amount",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "active_at_ledger",
+          "location": "data",
+          "type": "u32"
+        },
+        {
+          "name": "expires_at_ledger",
+          "location": "data",
+          "type": "u32"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "CreationPaused",
       "prefixTopics": [
         "creation_paused"
@@ -258,6 +339,95 @@
           "name": "admin",
           "location": "topic_list",
           "type": "address"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "MaxBuyerOpenSessionsUpdated",
+      "prefixTopics": [
+        "max_buyer_open_sessions_updated"
+      ],
+      "fields": [
+        {
+          "name": "admin",
+          "location": "topic_list",
+          "type": "address"
+        },
+        {
+          "name": "previous_limit",
+          "location": "data",
+          "type": "u32"
+        },
+        {
+          "name": "new_limit",
+          "location": "data",
+          "type": "u32"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "MaxSellerOpenSessionsUpdated",
+      "prefixTopics": [
+        "max_seller_open_sessions_updated"
+      ],
+      "fields": [
+        {
+          "name": "admin",
+          "location": "topic_list",
+          "type": "address"
+        },
+        {
+          "name": "previous_limit",
+          "location": "data",
+          "type": "u32"
+        },
+        {
+          "name": "new_limit",
+          "location": "data",
+          "type": "u32"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "SellerExposureCeilingUpdated",
+      "prefixTopics": [
+        "seller_exposure_ceiling_updated"
+      ],
+      "fields": [
+        {
+          "name": "asset",
+          "location": "topic_list",
+          "type": "address"
+        },
+        {
+          "name": "admin",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "previous_ceiling",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "new_ceiling",
+          "location": "data",
+          "type": "i128"
         },
         {
           "name": "event_version",
@@ -300,6 +470,53 @@
           "name": "refunded_amount",
           "location": "data",
           "type": "i128"
+        }
+      ]
+    },
+    {
+      "name": "SessionCapReduced",
+      "prefixTopics": [
+        "session_cap_reduced"
+      ],
+      "fields": [
+        {
+          "name": "session_id",
+          "location": "topic_list",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "name": "buyer",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "asset",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "previous_max_amount",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "new_max_amount",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "refunded_amount",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
         }
       ]
     },
@@ -649,6 +866,54 @@
     {
       "name": "SessionRejected",
       "value": 36
+      "name": "CapIncreasePending",
+      "value": 38
+    },
+    {
+      "name": "CapIncreaseNotReady",
+      "value": 39
+    },
+    {
+      "name": "CapIncreaseNotFound",
+      "value": 40
+    },
+    {
+      "name": "CapIncreaseExpired",
+      "value": 41
+    },
+    {
+      "name": "InvalidCapIncreaseDelay",
+      "value": 42
+    },
+    {
+      "name": "UnsupportedCommitmentScheme",
+      "value": 43
+    },
+    {
+      "name": "SellerExposureCeilingExceeded",
+      "value": 44
+    },
+    {
+      "name": "SellerExposureCeilingNotConfigured",
+      "value": 45
+    },
+    {
+      "name": "BuyerOpenSessionsExceeded",
+      "value": 46
+    },
+    {
+      "name": "InvalidSessionCountLimit",
+      "value": 47
+    },
+    {
+      "name": "SellerOpenSessionsExceeded",
+      "value": 48
+    },
+    {
+      "name": "InvalidCapReduction",
+      "value": 49
+    },
+    {
       "name": "CreationPaused",
       "value": 36
     },
