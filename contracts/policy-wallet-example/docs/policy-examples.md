@@ -18,6 +18,9 @@ Spending policy validity boundaries are inclusive: a policy is active for ledger
 | Wrong seller | `documentation_wrong_seller_example_reports_seller_error` | A seller outside the allowlist returns `SellerNotAllowed`. |
 | Wrong asset | `documentation_wrong_asset_example_reports_asset_error` | An asset outside the allowlist returns `AssetNotAllowed`. |
 | Revoked agent | `owner_revocation_denies_later_checks_and_authorizations` | After `revoke_policy`, checks and authorizations return `PolicyRevoked`. |
+| Stale revision write | `stale_expected_revision_fails_without_modifying_policy_or_spend` | An outdated expected revision returns `StaleRevision` without changing policy or spend. |
+| Oversized allowlist | `allowlists_enforce_exact_limits_and_fail_at_limit_plus_one` | More than 16 sellers, assets, or resource hashes returns `InvalidPolicy`. |
+| Duplicate allowlist entries | `allowlists_reject_duplicate_sellers_deterministically` | Duplicate seller, asset, or resource hash entries return `InvalidPolicy`. |
 
 ## Policy Replacement and Day Rollover Semantics
 

@@ -1388,6 +1388,43 @@ impl UptoSessionContract {
         })
     }
 
+    pub fn extend_session_expiry(
+        env: Env,
+        session_id: BytesN<32>,
+        new_expires_at_ledger: u32,
+    ) -> Result<(), ContractError> {
+        let mut session =
+            storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
+
+        match &session.status {
+            SessionStatus::Open => {}
+            SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
+            SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
+            SessionStatus::Expired => return Err(ContractError::SessionExpired),
+            SessionStatus::Rejected => return Err(ContractError::SessionRejected),
+        }
+
+        validation::validate_expiry_extension(&env, &session, new_expires_at_ledger)?;
+
+        session.buyer.require_auth();
+        session.seller.require_auth();
+
+        let previous_expires_at_ledger = session.expires_at_ledger;
+        session.expires_at_ledger = new_expires_at_ledger;
+        storage::write_session(&env, &session);
+
+        events::publish_session_expiry_extended(
+            &env,
+            &session_id,
+            &session.buyer,
+            &session.seller,
+            previous_expires_at_ledger,
+            new_expires_at_ledger,
+        );
+
+        Ok(())
+    }
+
     pub fn get_escrow_liability(env: Env, asset: Address) -> Result<i128, ContractError> {
         if !storage::has_admin(&env) {
             return Err(ContractError::NotInitialized);

@@ -5,6 +5,9 @@ use soroban_sdk::{
 };
 
 pub const LEDGERS_PER_DAY: u32 = 17_280;
+pub const MAX_ALLOWED_SELLERS: u32 = 16;
+pub const MAX_ALLOWED_ASSETS: u32 = 16;
+pub const MAX_ALLOWED_RESOURCE_HASHES: u32 = 16;
 
 // TTL management constants for instance storage keys
 pub const DEFAULT_TTL_THRESHOLD: u32 = 100_000;
@@ -70,6 +73,7 @@ pub struct SpendingPolicy {
     pub allowed_resource_hashes: Vec<BytesN<32>>,
     pub seller_limits: Vec<SellerSpendingLimit>,
     pub resource_limits: Vec<ResourceSpendingLimit>,
+    pub revision: u32,
 }
 
 #[contracterror]
@@ -95,6 +99,8 @@ pub enum PolicyWalletError {
     OwnerRotationPending = 17,
     OwnerRotationNotFound = 18,
     OwnerRotationExpired = 19,
+    StaleRevision = 20,
+    RevisionOverflow = 21,
 }
 
 /// Emitted once when the owner revokes an agent's policy.
@@ -143,11 +149,31 @@ impl PolicyWalletExampleContract {
         Ok(())
     }
 
-    pub fn set_policy(env: Env, policy: SpendingPolicy) -> Result<(), PolicyWalletError> {
+    pub fn set_policy(
+        env: Env,
+        mut policy: SpendingPolicy,
+        expected_revision: u32,
+    ) -> Result<(), PolicyWalletError> {
         require_owner_auth(&env)?;
         validate_policy(&env, &policy)?;
 
         let agent = policy.agent.clone();
+        let current_revision = env
+            .storage()
+            .instance()
+            .get::<_, SpendingPolicy>(&DataKey::Policy(agent.clone()))
+            .map(|existing| existing.revision)
+            .unwrap_or(0);
+
+        if current_revision != expected_revision {
+            return Err(PolicyWalletError::StaleRevision);
+        }
+
+        let next_revision = current_revision
+            .checked_add(1)
+            .ok_or(PolicyWalletError::RevisionOverflow)?;
+
+        policy.revision = next_revision;
         // Setting a policy is an explicit re-grant and clears a revocation.
         env.storage()
             .instance()
@@ -198,8 +224,16 @@ impl PolicyWalletExampleContract {
         env.storage().instance().get(&DataKey::RevokedPolicy(agent))
     }
 
+    pub fn create_policy(env: Env, policy: SpendingPolicy) -> Result<(), PolicyWalletError> {
+        Self::set_policy(env, policy, 0)
+    }
+
     pub fn get_policy(env: Env, agent: Address) -> Result<SpendingPolicy, PolicyWalletError> {
         read_policy(&env, &agent)
+    }
+
+    pub fn get_policy_revision(env: Env, agent: Address) -> Result<u32, PolicyWalletError> {
+        Ok(read_policy(&env, &agent)?.revision)
     }
 
     pub fn check_payment(
@@ -387,6 +421,32 @@ fn read_policy(env: &Env, agent: &Address) -> Result<SpendingPolicy, PolicyWalle
         .ok_or(PolicyWalletError::PolicyNotFound)
 }
 
+fn has_duplicate_addresses(items: &Vec<Address>) -> bool {
+    let len = items.len();
+    for i in 0..len {
+        let item = items.get(i).unwrap();
+        for j in (i + 1)..len {
+            if item == items.get(j).unwrap() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn has_duplicate_hashes(items: &Vec<BytesN<32>>) -> bool {
+    let len = items.len();
+    for i in 0..len {
+        let item = items.get(i).unwrap();
+        for j in (i + 1)..len {
+            if item == items.get(j).unwrap() {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 fn validate_policy(env: &Env, policy: &SpendingPolicy) -> Result<(), PolicyWalletError> {
     if policy.max_amount_per_payment <= 0
         || policy.max_amount_per_day <= 0
@@ -394,8 +454,14 @@ fn validate_policy(env: &Env, policy: &SpendingPolicy) -> Result<(), PolicyWalle
         || policy.max_amount_per_payment > policy.max_amount_per_day
         || policy.valid_from_ledger > policy.valid_until_ledger
         || policy.allowed_sellers.is_empty()
+        || policy.allowed_sellers.len() > MAX_ALLOWED_SELLERS
+        || has_duplicate_addresses(&policy.allowed_sellers)
         || policy.allowed_assets.is_empty()
+        || policy.allowed_assets.len() > MAX_ALLOWED_ASSETS
+        || has_duplicate_addresses(&policy.allowed_assets)
         || policy.allowed_resource_hashes.is_empty()
+        || policy.allowed_resource_hashes.len() > MAX_ALLOWED_RESOURCE_HASHES
+        || has_duplicate_hashes(&policy.allowed_resource_hashes)
     {
         return Err(PolicyWalletError::InvalidPolicy);
     }

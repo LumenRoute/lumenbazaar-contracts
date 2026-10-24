@@ -33,6 +33,8 @@ arguments: it always refunds the complete escrow to the stored buyer and marks
 the session `Expired`. Settlement, cancellation, and recovery are mutually
 exclusive terminal paths.
 
+`extend_session_expiry` requires both the recorded buyer and seller, only advances an open and unexpired session, and leaves escrow liability and deposited balances unchanged.
+
 Before either terminal transfer, the contract checks that the stored open
 session still carries its complete cap and that the contract token balance
 covers the aggregate liability for that asset. A failed check returns
@@ -142,10 +144,10 @@ model action to implementation and test evidence that must remain green.
 | `Settle` | `settle`, seller authorization, amount and expiry validation, liability decrease | `settle_rejects_wrong_seller_auth`, `settle_accepts_exact_cap_without_refund`, `settlement_isolates_concurrent_sessions_sharing_an_asset` |
 | `Cancel` | `cancel`, buyer authorization, pre-expiry gate, full refund | `cancel_requires_buyer_auth`, `cancel_allows_buyer_cancellation_before_settlement`, `cancel_rejects_already_cancelled_session` |
 | `AdvanceToExpiry` | ledger sequence compared with `expires_at_ledger` | `expiry_boundary_selects_exactly_one_terminal_path` |
+| `ExtendExpiry` | `extend_session_expiry`, buyer and seller authorization, pre-expiry and maximum-duration gates | `extend_session_expiry_succeeds_and_emits_event`, `production_expiry_extension_requires_both_buyer_and_seller_authorization_trees` |
 | `Recover` | `recover_expired`, fixed stored buyer recipient, full refund | `expiry_recovery_is_permissionless_fixed_recipient_and_single_use`, `expiry_recovery_rejects_missing_settled_and_cancelled_sessions` |
 | `DeprecateAsset` | `deprecate_asset`, admin authorization, active-asset status gate | `asset_deprecation_requires_admin_and_blocks_new_sessions` |
 | `RemoveAsset` | `remove_asset`, admin authorization, deprecated status and zero liability gates | `deprecated_asset_terminal_paths_clear_liability_before_removal` |
 | `ProposeAdmin` | `propose_admin`, admin authorization, single pending rotation gate, expiry validation | `admin_rotation_requires_acceptance_and_changes_privileges_atomically`, `admin_rotation_rejects_overwrite_expiry_and_replay` |
 | `AcceptAdmin` | `accept_admin`, pending admin authorization, non-expired ledger gate | `admin_rotation_requires_acceptance_and_changes_privileges_atomically`, `admin_rotation_rejects_overwrite_expiry_and_replay` |
 | `CancelAdminRotation` | `cancel_admin_rotation`, current admin authorization, pending rotation existence gate | `admin_rotation_requires_acceptance_and_changes_privileges_atomically`, `admin_rotation_rejects_overwrite_expiry_and_replay` |
-

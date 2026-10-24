@@ -43,6 +43,7 @@ const requiredFunctions = [
   "preview_settle",
   "cancel",
   "reject",
+  "extend_session_expiry",
   "recover_expired",
   "get_recoverability",
   "recover_expired_batch",

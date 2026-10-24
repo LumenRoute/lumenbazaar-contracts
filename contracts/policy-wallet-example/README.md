@@ -14,12 +14,16 @@ Spending policies are keyed by agent address and can restrict:
 - Maximum amount per payment.
 - Maximum total amount per ledger-day bucket.
 - Maximum number of successful authorizations per ledger-day bucket (`max_authorizations_per_day`).
-- Allowed sellers (with optional per-seller payment and daily ceilings).
-- Allowed assets.
-- Allowed resource hashes (with optional per-resource payment and daily ceilings).
+- Allowed sellers (maximum 16 unique entries, with optional per-seller payment and daily ceilings).
+- Allowed assets (maximum 16 unique entries).
+- Allowed resource hashes (maximum 16 unique entries, with optional per-resource payment and daily ceilings).
 - Validity window by ledger sequence (`valid_from_ledger` to `valid_until_ledger`, inclusive).
 
 `check_payment` validates a proposed payment without mutating state. `authorize_payment` requires the agent signature and records the amount against the current ledger-day bucket.
+
+## Policy Revisions and Concurrency
+
+Each policy carries a monotonic `revision`. `set_policy(policy, expected_revision)` rejects stale updates with `StaleRevision`; new policies use revision zero as the expectation and are stored at revision one. `create_policy(policy)` is the revision-zero convenience entrypoint, and `get_policy_revision(agent)` returns the current value.
 
 ## Revocation
 

@@ -217,6 +217,26 @@ pub fn validate_reason_commitment(
     Ok(())
 }
 
+pub fn validate_expiry_extension(
+    env: &Env,
+    session: &Session,
+    new_expires_at_ledger: u32,
+) -> Result<(), ContractError> {
+    let current_ledger = env.ledger().sequence();
+    if current_ledger >= session.expires_at_ledger
+        || new_expires_at_ledger <= session.expires_at_ledger
+    {
+        return Err(ContractError::ExpiredSession);
+    }
+    let duration = new_expires_at_ledger
+        .checked_sub(current_ledger)
+        .ok_or(ContractError::ExpiredSession)?;
+    if duration > MAX_SESSION_DURATION_LEDGERS {
+        return Err(ContractError::SessionDurationTooLong);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     extern crate std;
