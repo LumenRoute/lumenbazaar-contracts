@@ -7,6 +7,13 @@
 - Add bounded, read-only session queries with ordered found/missing results and preserved
   duplicate IDs. Compatibility: additive method and result types; existing session and
   error definitions are unchanged. Migration: none beyond the planned v3 release.
+- Document the immutable replacement-deployment migration procedure, storage lifecycle and
+  missing-state policy (rules SR-1 to SR-10 with boundary tests), policy-wallet invariant
+  properties, and bounded fuzz targets with a seeded CI corpus. No contract source, interface,
+  storage layout, or deployment manifest changes; `policy-wallet-example` gains a `proptest`
+  dev-dependency only.
+  Compatibility: none; tests and documentation only.
+  Migration: none; replacements follow [deployment migration](docs/deployment-migration.md).
 
 ### Breaking
 

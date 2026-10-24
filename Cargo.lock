@@ -1158,6 +1158,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
+name = "lumenbazaar-fuzz"
+version = "0.1.0"
+dependencies = [
+ "policy-wallet-example",
+ "soroban-sdk",
+ "upto-session",
+]
+
+[[package]]
 name = "macro-string"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1263,6 +1272,7 @@ dependencies = [
 name = "policy-wallet-example"
 version = "0.1.0"
 dependencies = [
+ "proptest",
  "soroban-sdk",
  "upto-session",
 ]

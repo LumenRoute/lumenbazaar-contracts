@@ -1,0 +1,5 @@
+# token_amount: settlement at ledger u32::MAX
+# Synthetic. Layout: fuzz/README.md.
+02000000000000000000000000000000
+00000000000000000000000000000000
+000000ffffffff0000000002

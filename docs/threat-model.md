@@ -75,6 +75,9 @@ interface v3 source is published in `deployments/testnet-2026-10-20.json` and
 - TTL extension is limited to open sessions. Tests cover missing, settled, cancelled, and expired
   session rejection. The public lifecycle evidence also covers settlement rejection at the live
   expiry boundary and permissionless recovery seven ledgers after expiry.
+- Every storage key, its TTL owner, the separate open and finalized session policies, and required
+  backend behavior for missing or expired state are specified in
+  [storage-lifecycle.md](storage-lifecycle.md). Its rules (`SR-n`) map directly to boundary tests.
 
 ### Storage TTL boundary semantics
 
@@ -122,7 +125,21 @@ extension only when the remaining TTL is at or below the threshold.
   cancellation, expiry recovery, TTL extension, and read-only queries stay available so
   existing escrow cannot be trapped.
 - Deployed instances are therefore operationally immutable through this interface. A code change
-  requires a new deployment and explicit migration or reconfiguration by clients.
+  requires a new deployment and explicit migration or reconfiguration by clients. The rollout,
+  client reconfiguration, cutover order, open-session drain, rollback, and deprecation windows are
+  specified in [deployment-migration.md](deployment-migration.md). No upgrade entry point is added
+  or implied by that procedure.
+- Replacement deployment risks (mitigations in [deployment-migration.md](deployment-migration.md#7-risks-this-procedure-addresses)):
+  - Stale clients may keep targeting the old contract. New session creation there fails closed with
+    `CreationPaused` once the old deployment is paused. Reads and exits for existing sessions
+    intentionally still reach it.
+  - Session ID confusion on rollback. A session's identity is `(network, contract_id, session_id)`.
+    Looking an ID up on the wrong contract returns `SessionNotFound`, and backends must not read
+    that as "never existed" or "refunded". Interface v2 IDs are not bound to the contract address,
+    so two v2 deployments can produce the same ID.
+  - Split-brain sessions: an on-chain session with no backend route, or a route pointing at the
+    wrong contract. Backends persist the route before returning a session and reconcile both
+    contracts during the drain.
 - The policy wallet owner can update its own spending policy. That authority does not grant access to
   another buyer's session or permit settlement by a different seller.
 

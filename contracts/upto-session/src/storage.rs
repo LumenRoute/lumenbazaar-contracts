@@ -4,29 +4,54 @@ use crate::{
 use soroban_sdk::{contracttype, Address, BytesN, Env, Vec};
 
 pub const STORAGE_LAYOUT_VERSION: u32 = 3;
+// Every `extend_ttl` in this contract uses these two values: an entry whose remaining TTL is at or
+// below `DEFAULT_TTL_THRESHOLD` ledgers is extended to `TTL_EXTENSION_AMOUNT` ledgers. Key
+// lifetimes, extension responsibility, and missing-state behavior are specified in
+// docs/storage-lifecycle.md (rules SR-1 to SR-10).
 pub const DEFAULT_TTL_THRESHOLD: u32 = 100_000;
 pub const TTL_EXTENSION_AMOUNT: u32 = 1_000_000;
 
+// Instance keys share the single contract-instance TTL, extended only by `initialize` and admin
+// entry points (SR-1, SR-2). Persistent keys have their own TTL, extended by session writes and
+// `extend_ttl` (SR-3 to SR-6). No temporary storage is used.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DataKey {
+    // Instance.
     Admin,
+    // Instance.
     AdminRotation,
+    // Instance. Lives with the rest of the config, so it cannot lapse on its own.
     NextSessionSequence,
+    // Persistent, one per session (open and finalized).
     Session(BytesN<32>),
+    // Instance.
     StorageLayoutVersion,
+    // Instance, one per configured asset.
     SupportedAsset(Address),
+    // Instance, one per configured asset.
     AssetMaxSessionAmount(Address),
+    // Instance, one per configured asset.
     AssetMinSessionAmount(Address),
+    // Instance, present only while a cap increase is pending.
     CapIncreaseProposal(Address),
+    // Instance.
     SupportedAssets,
+    // Instance.
     OperationalState,
+    // Persistent aggregate per asset; extended only alongside a session of that asset.
     Liability(Address),
+    // Instance, optional.
     SellerExposureCeiling(Address),
+    // Persistent aggregate per (seller, asset); extended only alongside a matching session.
     SellerExposure(Address, Address),
+    // Instance, optional.
     MaxBuyerOpenSessions,
+    // Persistent aggregate per buyer; extended only alongside that buyer's session.
     BuyerOpenSessions(Address),
+    // Instance, optional.
     MaxSellerOpenSessions,
+    // Persistent aggregate per seller; extended only alongside that seller's session.
     SellerOpenSessions(Address),
     AssetExposureCeiling(Address),
     BuyerExposureCeiling(Address),

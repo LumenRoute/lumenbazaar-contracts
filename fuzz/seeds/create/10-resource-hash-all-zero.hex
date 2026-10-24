@@ -1,0 +1,4 @@
+# create: hash selector 1 => all-zero resource hash (InvalidResourceHash)
+# Synthetic. Layout: fuzz/README.md.
+00000000000000000000000000000000
+000000000000000000000000000001

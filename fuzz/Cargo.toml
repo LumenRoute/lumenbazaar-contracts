@@ -1,0 +1,17 @@
+[package]
+name = "lumenbazaar-fuzz"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Bounded fuzz harness for LumenBazaar contract inputs. Test-only; never deployed."
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+upto-session = { path = "../contracts/upto-session" }
+policy-wallet-example = { path = "../contracts/policy-wallet-example" }

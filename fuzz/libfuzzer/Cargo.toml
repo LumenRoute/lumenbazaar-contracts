@@ -1,0 +1,46 @@
+# Extended libFuzzer campaigns (nightly only). Not a member of the root workspace, so
+# `cargo test --workspace` never builds it. See fuzz/README.md.
+[package]
+name = "lumenbazaar-libfuzzer"
+version = "0.0.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+lumenbazaar-fuzz = { path = ".." }
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "create"
+path = "fuzz_targets/create.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "settle"
+path = "fuzz_targets/settle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "policy"
+path = "fuzz_targets/policy.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "token_amount"
+path = "fuzz_targets/token_amount.rs"
+test = false
+doc = false
+bench = false

@@ -110,6 +110,14 @@ Reading a result:
 Pull-request CI never contacts testnet. It runs the offline generator and verifier tests, which
 cover mismatches and outages against fixtures and a loopback server.
 
+## Replacement deployments
+
+Contracts here are never upgraded in place. A replacement is a new deployment with a new contract
+ID, recorded as a new dated manifest; earlier manifests stay unchanged as evidence and are never
+edited to point at the replacement. Contract IDs are never reused. Follow
+[docs/deployment-migration.md](../docs/deployment-migration.md) for the rollout, registry
+versioning, cutover order, open-session drain, rollback, and deprecation windows.
+
 `replacement-rehearsal.example.json` documents the client routing state used by
 the executable local replacement rehearsal. Live rehearsal evidence is written
 under ignored `target/rehearsals/`; it is local evidence, not a public deployment

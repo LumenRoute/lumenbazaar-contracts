@@ -1,0 +1,3 @@
+# create: amount selector 5 => i128::MAX (valid: cap and balance are i128::MAX)
+# Synthetic. Layout: fuzz/README.md.
+000000000000000005

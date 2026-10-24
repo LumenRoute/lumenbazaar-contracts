@@ -46,3 +46,5 @@ The contract provides an expiring two-step owner rotation modeled independently 
 - `get_owner()`: Queries the current owner address.
 
 See [docs/policy-examples.md](docs/policy-examples.md) for the executable examples mirrored by the test suite.
+See [docs/invariants.md](docs/invariants.md) for the randomized invariant properties and the residual
+example-only risks they do not cover.

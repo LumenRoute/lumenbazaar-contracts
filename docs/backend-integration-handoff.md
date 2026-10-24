@@ -27,6 +27,29 @@ destination for new sessions; existing sessions always route to their recorded
 contract. See `docs/replacement-deployment-rehearsal.md` and
 `deployments/replacement-rehearsal.example.json`.
 
+### Replacement deployments and session routes
+
+The full procedure is in [deployment-migration.md](deployment-migration.md). Backend obligations:
+
+- Persist `(network, contract_id, session_id)` for every session before returning it to a client.
+  Never key a session by `session_id` alone and never derive its contract from the active setting.
+- Read contract IDs from a versioned deployment registry and ignore a registry version older than
+  one already applied.
+- Follow the cutover order: backend dual-deployment awareness first, frontend reconfiguration
+  second, then the backend switch of new sessions, then `pause_creation` on the old contract.
+- Keep settling, cancelling, recovering, and extending TTL for old sessions on the old contract
+  until the retirement criteria are met. Do not migrate or recreate them.
+- On rollback, change only the destination for new sessions. Treat `SessionNotFound` from the wrong
+  contract as a routing fault to alert on, never as "absent" or "refunded".
+
+### Missing or expired on-chain state
+
+Storage lifetimes, extension responsibility, and the decision table for missing or expired state
+are in [storage-lifecycle.md](storage-lifecycle.md). In short: never assume success when on-chain
+state is missing, never treat a missing off-chain record as proof that a session is absent on
+chain, reconcile against events and the stored route, and do not depend on archived entries being
+restorable.
+
 ## Generated Interfaces
 
 - TypeScript package: `bindings/upto-session`
