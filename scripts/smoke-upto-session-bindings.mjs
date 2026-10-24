@@ -77,6 +77,12 @@ if (bindings.ContractError?.[37]?.message !== "OperationalStateUnchanged") {
 if (packageJson.version !== "3.0.0") {
   throw new Error("Expected generated binding package version 3.0.0");
 }
+if (typeof bindings.deriveSessionId !== "function") {
+  throw new Error("Expected deriveSessionId export");
+}
+if (typeof bindings.deriveSessionIdPreimage !== "function") {
+  throw new Error("Expected deriveSessionIdPreimage export");
+}
 
 for (const method of requiredMethods) {
   if (!distSource.includes(method)) {

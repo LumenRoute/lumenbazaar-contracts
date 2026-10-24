@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertErrorMapMatchesFixture } from "./lib/contract-error-map.mjs";
@@ -26,29 +27,40 @@ if (!skipBuild) {
   });
 }
 
-execFileSync(
-  "stellar",
-  [
-    "contract",
-    "bindings",
-    "typescript",
-    "--wasm",
-    wasm,
-    "--output-dir",
-    outputDir,
-    "--overwrite",
-  ],
-  {
-    cwd: repoRoot,
-    stdio: "inherit",
-  },
-);
+const tempParent = mkdtempSync(join(tmpdir(), "bindings-"));
+const tempDir = join(tempParent, "upto-session");
+try {
+  execFileSync(
+    "stellar",
+    [
+      "contract",
+      "bindings",
+      "typescript",
+      "--wasm",
+      wasm,
+      "--output-dir",
+      tempDir,
+      "--overwrite",
+    ],
+    {
+      cwd: repoRoot,
+      stdio: "inherit",
+    },
+  );
+  cpSync(tempDir, outputDir, { recursive: true, force: true });
+} finally {
+  rmSync(tempParent, { recursive: true, force: true });
+}
 
 copyFileSync(
   join(repoRoot, "scripts", "templates", "usageReceipt.ts"),
   join(outputDir, "src", "usageReceipt.ts"),
 );
 copyFileSync(errorTemplate, join(outputDir, "src", "contractErrors.ts"));
+copyFileSync(
+  join(repoRoot, "scripts", "templates", "sessionId.ts"),
+  join(outputDir, "src", "sessionId.ts"),
+);
 
 const bindingPath = join(outputDir, "src", "index.ts");
 const binding = readFileSync(bindingPath, "utf8");
@@ -79,6 +91,10 @@ for (const templateExport of [
   if (!canonicalBinding.includes(templateExport)) {
     canonicalBinding = `${canonicalBinding.trimEnd()}\n\n${templateExport}\n`;
   }
+}
+const sessionIdExport = 'export * from "./sessionId.js";';
+if (!canonicalBinding.includes(sessionIdExport)) {
+  canonicalBinding = `${canonicalBinding.trimEnd()}\n${sessionIdExport}\n`;
 }
 writeFileSync(bindingPath, canonicalBinding, "utf8");
 
