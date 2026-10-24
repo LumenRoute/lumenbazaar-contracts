@@ -60,6 +60,9 @@
 - Make `remove_asset` delete the asset's cap, zero liability record, and entry in the configured asset order; hide stale entries from earlier removals.
 - Add the read-only, versioned `get_asset_policy` lifecycle query.
 - Add typed TypeScript contract error decoding (`decodeContractError`, `CONTRACT_ERROR_CODES`) with a generation-time drift check against the interface fixture.
+- Add deterministic ledger-boundary tests for config, sequence, session, and liability TTL and document the boundary semantics.
+- Add state-transition and cap-invariant property tests with documented reproducible seeds.
+- Add an opt-in live testnet lifecycle smoke runner that emits a sanitized JSON report, plus an offline test suite and report checker.
 
 ## v0.2.0-testnet.20261007
 

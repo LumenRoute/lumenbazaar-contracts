@@ -115,5 +115,9 @@ the executable local replacement rehearsal. Live rehearsal evidence is written
 under ignored `target/rehearsals/`; it is local evidence, not a public deployment
 claim.
 
+`scripts/testnet/smoke-lifecycle.mjs` is an opt-in runner that submits a bounded live lifecycle and
+writes a sanitized report under ignored `target/testnet-smoke/`. See `docs/testnet-lifecycle-smoke.md`.
+Reports are not committed unless the project chooses to publish one as evidence.
+
 The exact build, deployment, and independent verification commands for the corrected deployment
 are in `docs/testnet-deployment-2026-10-07.md`.

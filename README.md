@@ -70,7 +70,8 @@ sanitized manifest with `node scripts/testnet/generate-public-manifest.mjs`; see
 for what it refuses to write, the live rejection runner, and the scheduled Horizon verification.
 Sanitized public deployment evidence is in
 `deployments/testnet-2026-09-06.json`; it records the test-only LBT asset accurately and does not
-claim that deployment alone proves a live payment.
+claim that deployment alone proves a live payment. To produce fresh create, settle, cancel, and
+replay evidence on testnet, see `docs/testnet-lifecycle-smoke.md`.
 
 ## Related Repositories
 
