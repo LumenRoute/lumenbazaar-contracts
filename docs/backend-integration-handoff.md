@@ -66,6 +66,7 @@ administrator-rotation, and creation pause/resume events use version `3`.
 | `deprecate_asset(asset, reason_commitment)` | Admin-authorized transition from active to deprecated with fixed-size reason commitment; blocks new sessions without changing existing sessions. |
 | `remove_asset(asset, reason_commitment)` | Admin-authorized final removal with fixed-size reason commitment after deprecation and only when recorded liability is exactly zero. |
 | `get_session(session_id)` | Read current session state for API responses, reconciliation, and settlement guards. |
+| `get_session_batch(session_ids)` | Read up to eight caller-supplied session IDs in request order with explicit `Found(Session)` or `NotFound` per-item status. Repeated IDs preserve request order and count toward the eight-item bound. |
 | `get_session_status(session_id)` | Read lightweight session status (exists, status, expires_at_ledger) without decoding commitment fields. |
 | `get_escrow_liability(asset)` | Read aggregate open-session escrow accounting for a supported asset and compare it with contract token custody. |
 | `get_solvency(assets)` | Read ordered multi-asset solvency (`AssetSolvency`: `asset`, `state`, `balance`, `liability`, `surplus`) for 1 to 16 assets without authorization. Rejects empty or oversized input with `InvalidBatchSize`. |

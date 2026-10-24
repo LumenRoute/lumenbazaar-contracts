@@ -19,6 +19,7 @@ pub use types::{
     CapIncreaseProposal, CommitmentDomainMetadata, ContractConfiguration, OperationalState,
     Session, SessionStatus, SessionStatusResponse,
     AssetSolvencySnapshot, SolvencyStatus,
+    BatchSessionResult, BatchSessionStatus,
 };
 
 use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
@@ -36,6 +37,7 @@ pub const MAX_SUPPORTED_ASSETS: u32 = 16;
 pub const MAX_RECOVERY_BATCH_SIZE: u32 = 8;
 pub const MAX_SOLVENCY_QUERY_ASSETS: u32 = 16;
 pub const SOLVENCY_RESPONSE_VERSION: u32 = 1;
+pub const MAX_SESSION_QUERY_BATCH_SIZE: u32 = 8;
 
 #[contractimpl]
 #[allow(clippy::too_many_arguments)]
@@ -1351,6 +1353,26 @@ impl UptoSessionContract {
 
     pub fn get_session(env: Env, session_id: BytesN<32>) -> Result<Session, ContractError> {
         storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)
+    }
+
+    pub fn get_session_batch(
+        env: Env,
+        session_ids: Vec<BytesN<32>>,
+    ) -> Result<Vec<BatchSessionResult>, ContractError> {
+        if session_ids.is_empty() || session_ids.len() > MAX_SESSION_QUERY_BATCH_SIZE {
+            return Err(ContractError::InvalidBatchSize);
+        }
+
+        let mut results = Vec::new(&env);
+        for session_id in session_ids.iter() {
+            let status = match storage::read_session(&env, &session_id) {
+                Some(session) => BatchSessionStatus::Found(session),
+                None => BatchSessionStatus::NotFound,
+            };
+            results.push_back(BatchSessionResult { session_id, status });
+        }
+
+        Ok(results)
     }
 
     pub fn get_session_status(

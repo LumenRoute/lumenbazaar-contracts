@@ -1862,6 +1862,207 @@ fn session_status_query_decodes_open_and_all_terminal_states_compatibly() {
 }
 
 #[test]
+fn get_session_batch_returns_ordered_found_and_missing_results_with_duplicate_ids() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 400);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let open_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &30,
+        &BytesN::from_array(&env, &[81; 32]),
+    );
+    let cancelled_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &30,
+        &BytesN::from_array(&env, &[82; 32]),
+    );
+    let settled_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &30,
+        &BytesN::from_array(&env, &[83; 32]),
+    );
+    let expired_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &10,
+        &BytesN::from_array(&env, &[84; 32]),
+    );
+
+    client.cancel(&cancelled_id);
+    client.settle(&settled_id, &60, &BytesN::from_array(&env, &[85; 32]));
+    env.ledger().set_sequence_number(10);
+    client.recover_expired(&expired_id);
+
+    let missing_first = BytesN::from_array(&env, &[86; 32]);
+    let missing_second = BytesN::from_array(&env, &[87; 32]);
+
+    let open_session = client.get_session(&open_id);
+    let cancelled_session = client.get_session(&cancelled_id);
+    let settled_session = client.get_session(&settled_id);
+    let expired_session = client.get_session(&expired_id);
+
+    let results = client.get_session_batch(&soroban_sdk::vec![
+        &env,
+        open_id.clone(),
+        missing_first.clone(),
+        open_id.clone(),
+        cancelled_id.clone(),
+        settled_id.clone(),
+        expired_id.clone(),
+        missing_second.clone(),
+        missing_first.clone(),
+    ]);
+
+    assert_eq!(
+        results,
+        soroban_sdk::vec![
+            &env,
+            BatchSessionResult {
+                session_id: open_id.clone(),
+                status: BatchSessionStatus::Found(open_session.clone()),
+            },
+            BatchSessionResult {
+                session_id: missing_first.clone(),
+                status: BatchSessionStatus::NotFound,
+            },
+            BatchSessionResult {
+                session_id: open_id,
+                status: BatchSessionStatus::Found(open_session),
+            },
+            BatchSessionResult {
+                session_id: cancelled_id,
+                status: BatchSessionStatus::Found(cancelled_session),
+            },
+            BatchSessionResult {
+                session_id: settled_id,
+                status: BatchSessionStatus::Found(settled_session),
+            },
+            BatchSessionResult {
+                session_id: expired_id,
+                status: BatchSessionStatus::Found(expired_session),
+            },
+            BatchSessionResult {
+                session_id: missing_second,
+                status: BatchSessionStatus::NotFound,
+            },
+            BatchSessionResult {
+                session_id: missing_first,
+                status: BatchSessionStatus::NotFound,
+            },
+        ]
+    );
+}
+
+#[test]
+fn get_session_batch_enforces_nonzero_and_max_batch_size_bounds() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 800);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    assert_eq!(
+        client.try_get_session_batch(&soroban_sdk::vec![&env]),
+        Err(Ok(ContractError::InvalidBatchSize))
+    );
+
+    let mut max_batch = soroban_sdk::Vec::new(&env);
+    for idx in 0..MAX_SESSION_QUERY_BATCH_SIZE {
+        let id = client.create_session(
+            &buyer,
+            &seller,
+            &asset,
+            &100,
+            &30,
+            &BytesN::from_array(&env, &[(90 + idx) as u8; 32]),
+        );
+        max_batch.push_back(id);
+    }
+
+    let max_results = client.get_session_batch(&max_batch);
+    assert_eq!(max_results.len(), MAX_SESSION_QUERY_BATCH_SIZE);
+    assert!(max_results
+        .iter()
+        .all(|item| matches!(item.status, BatchSessionStatus::Found(_))));
+
+    let mut oversized = max_batch.clone();
+    oversized.push_back(BytesN::from_array(&env, &[99; 32]));
+    assert_eq!(
+        client.try_get_session_batch(&oversized),
+        Err(Ok(ContractError::InvalidBatchSize))
+    );
+
+    let mut oversized_duplicates = soroban_sdk::Vec::new(&env);
+    let repeated_id = max_batch.get(0).unwrap();
+    for _ in 0..=MAX_SESSION_QUERY_BATCH_SIZE {
+        oversized_duplicates.push_back(repeated_id.clone());
+    }
+    assert_eq!(
+        client.try_get_session_batch(&oversized_duplicates),
+        Err(Ok(ContractError::InvalidBatchSize))
+    );
+}
+
+#[test]
+fn get_session_batch_resource_usage_is_read_only_and_bounded() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 800);
+    initialize_for_asset(&env, &client, &buyer, &asset);
+
+    let mut batch_ids = soroban_sdk::Vec::new(&env);
+    for idx in 0..MAX_SESSION_QUERY_BATCH_SIZE {
+        let session_id = client.create_session(
+            &buyer,
+            &seller,
+            &asset,
+            &100,
+            &50,
+            &BytesN::from_array(&env, &[(110 + idx) as u8; 32]),
+        );
+        batch_ids.push_back(session_id);
+    }
+
+    let results = client.get_session_batch(&batch_ids);
+    assert_eq!(results.len(), MAX_SESSION_QUERY_BATCH_SIZE);
+
+    let resources = env.cost_estimate().resources();
+    let fee = env.cost_estimate().fee();
+    assert!(resources.instructions > 0);
+    assert!(resources.mem_bytes > 0);
+    assert_eq!(resources.write_entries, 0);
+    assert_eq!(resources.write_bytes, 0);
+    assert_eq!(resources.contract_events_size_bytes, 0);
+    assert_eq!(resources.persistent_entry_rent_bumps, 0);
+    assert!(fee.total > 0);
+    assert!(env.auths().is_empty());
+}
+
+#[test]
 fn settle_returns_not_found_for_missing_session() {
     let env = Env::default();
     let contract_id = env.register(UptoSessionContract, ());

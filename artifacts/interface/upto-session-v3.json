@@ -30,6 +30,7 @@
     "get_seller_exposure_ceiling",
     "get_seller_open_sessions",
     "get_session",
+    "get_session_batch",
     "get_solvency",
     "get_session_status",
     "initialize",

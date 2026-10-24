@@ -240,3 +240,18 @@ pub struct SessionStatusResponse {
     pub status: SessionStatus,
     pub expires_at_ledger: u32,
 }
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::large_enum_variant)]
+pub enum BatchSessionStatus {
+    Found(Session),
+    NotFound,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchSessionResult {
+    pub session_id: BytesN<32>,
+    pub status: BatchSessionStatus,
+}

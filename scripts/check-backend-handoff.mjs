@@ -36,6 +36,7 @@ const requiredFunctions = [
   "deprecate_asset",
   "remove_asset",
   "get_session",
+  "get_session_batch",
   "get_escrow_liability",
   "get_solvency",
   "settle",

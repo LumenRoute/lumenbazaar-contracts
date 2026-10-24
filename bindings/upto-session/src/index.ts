@@ -33,6 +33,95 @@ if (typeof window !== "undefined") {
 
 
 
+
+export interface Session {
+  asset: string;
+  buyer: string;
+  creation_ledger: u32;
+  escrowed_amount: i128;
+  expires_at_ledger: u32;
+  finalized_ledger: Option<u32>;
+  id: Buffer;
+  max_amount: i128;
+  resource_hash: Buffer;
+  resource_scheme_version: u32;
+  seller: string;
+  settled_amount: i128;
+  status: SessionStatus;
+  usage_hash: Option<Buffer>;
+  usage_scheme_version: Option<u32>;
+}
+
+
+export interface AssetPolicy {
+  asset: string;
+  max_session_amount: i128;
+  min_session_amount: i128;
+}
+
+
+export interface AdminRotation {
+  expires_at_ledger: u32;
+  pending_admin: string;
+}
+
+export type SessionStatus = {tag: "Open", values: void} | {tag: "Settled", values: void} | {tag: "Cancelled", values: void} | {tag: "Expired", values: void};
+
+export type OperationalState = {tag: "Active", values: void} | {tag: "Paused", values: void} | {tag: "Deprecated", values: void};
+
+
+export interface BatchSessionResult {
+  session_id: Buffer;
+  status: BatchSessionStatus;
+}
+
+export type BatchSessionStatus = {tag: "Found", values: readonly [Session]} | {tag: "NotFound", values: void};
+
+
+export interface BatchRecoveryResult {
+  refunded_amount: i128;
+  session_id: Buffer;
+  status: BatchRecoveryStatus;
+}
+
+export type BatchRecoveryStatus = {tag: "Recovered", values: void} | {tag: "NotFound", values: void} | {tag: "NotExpired", values: void} | {tag: "AlreadySettled", values: void} | {tag: "AlreadyCancelled", values: void} | {tag: "AlreadyRecovered", values: void} | {tag: "Duplicate", values: void} | {tag: "EscrowUnavailable", values: void};
+
+
+export interface CapIncreaseProposal {
+  active_at_ledger: u32;
+  expires_at_ledger: u32;
+  proposed_max_amount: i128;
+}
+
+
+export interface ContractConfiguration {
+  admin: string;
+  instance_ttl_extension: u32;
+  instance_ttl_threshold: u32;
+  interface_version: u32;
+  max_supported_assets: u32;
+  operational_state: OperationalState;
+  response_version: u32;
+  storage_layout_version: u32;
+  supported_assets: Array<string>;
+}
+
+
+export interface SessionStatusResponse {
+  exists: boolean;
+  expires_at_ledger: u32;
+  status: SessionStatus;
+}
+
+
+export interface CommitmentDomainMetadata {
+  interface_version: u32;
+  receipt_schema_version: u32;
+  response_version: u32;
+  session_id_domain: Buffer;
+  usage_commitment_domain: Buffer;
+}
+
 export const ContractError = {
   1: {message:"AlreadyInitialized"},
   2: {message:"Unauthorized"},
@@ -84,7 +173,6 @@ export const ContractError = {
   36: {message:"CreationPaused"},
   37: {message:"OperationalStateUnchanged"}
 }
-
 
 
 
@@ -369,7 +457,6 @@ export interface CreateContractWithConstructorHostFnContext {
   executable: ContractExecutable;
   salt: Buffer;
 }
-
 export interface Client {
   /**
    * Construct and simulate a cancel transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
@@ -465,6 +552,11 @@ export interface Client {
    * Construct and simulate a get_configuration transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   get_configuration: (options?: MethodOptions) => Promise<AssembledTransaction<Result<ContractConfiguration>>>
+
+  /**
+   * Construct and simulate a get_session_batch transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  get_session_batch: ({session_ids}: {session_ids: Array<Buffer>}, options?: MethodOptions) => Promise<AssembledTransaction<Result<Array<BatchSessionResult>>>>
 
   /**
    * Construct and simulate a interface_version transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
@@ -626,6 +718,7 @@ export class Client extends ContractClient {
         "AAAAAAAAAAAAAAAPcmVjb3Zlcl9leHBpcmVkAAAAAAEAAAAAAAAACnNlc3Npb25faWQAAAAAA+4AAAAgAAAAAQAAA+kAAAACAAAH0AAAAA1Db250cmFjdEVycm9yAAAA",
         "AAAAAAAAAAAAAAAPcmVzdW1lX2NyZWF0aW9uAAAAAAAAAAABAAAD6QAAAAIAAAfQAAAADUNvbnRyYWN0RXJyb3IAAAA=",
         "AAAAAAAAAAAAAAARZ2V0X2NvbmZpZ3VyYXRpb24AAAAAAAAAAAAAAQAAA+kAAAfQAAAAFUNvbnRyYWN0Q29uZmlndXJhdGlvbgAAAAAAB9AAAAANQ29udHJhY3RFcnJvcgAAAA==",
+        "AAAAAAAAAAAAAAARZ2V0X3Nlc3Npb25fYmF0Y2gAAAAAAAABAAAAAAAAAAtzZXNzaW9uX2lkcwAAAAPqAAAD7gAAACAAAAABAAAD6QAAA+oAAAfQAAAAEkJhdGNoU2Vzc2lvblJlc3VsdAAAAAAH0AAAAA1Db250cmFjdEVycm9yAAAA",
         "AAAAAAAAAAAAAAARaW50ZXJmYWNlX3ZlcnNpb24AAAAAAAAAAAAAAQAAAAQ=",
         "AAAAAAAAAAAAAAASZ2V0X2FkbWluX3JvdGF0aW9uAAAAAAAAAAAAAQAAA+gAAAfQAAAADUFkbWluUm90YXRpb24AAAA=",
         "AAAAAAAAAAAAAAASZ2V0X3JlY292ZXJhYmlsaXR5AAAAAAABAAAAAAAAAApzZXNzaW9uX2lkAAAAAAPuAAAAIAAAAAEAAAfQAAAAFVNlc3Npb25SZWNvdmVyYWJpbGl0eQAAAA==",
@@ -659,6 +752,7 @@ export class Client extends ContractClient {
         "AAAAAQAAAAAAAAAAAAAAE0JhdGNoUmVjb3ZlcnlSZXN1bHQAAAAAAwAAAAAAAAAPcmVmdW5kZWRfYW1vdW50AAAAAAsAAAAAAAAACnNlc3Npb25faWQAAAAAA+4AAAAgAAAAAAAAAAZzdGF0dXMAAAAAB9AAAAATQmF0Y2hSZWNvdmVyeVN0YXR1cwA=",
         "AAAAAQAAAAAAAAAAAAAAEVNldHRsZW1lbnRQcmV2aWV3AAAAAAAABgAAAAAAAAANYWN0dWFsX2Ftb3VudAAAAAAAAAsAAAAAAAAADGJ1eWVyX3JlZnVuZAAAAAsAAAAAAAAACGVsaWdpYmxlAAAAAQAAAAAAAAAKaXNfZXhwaXJlZAAAAAAAAQAAAAAAAAAQcmVqZWN0aW9uX3JlYXNvbgAAB9AAAAAZU2V0dGxlbWVudFJlamVjdGlvblJlYXNvbgAAAAAAAAAAAAANc2VsbGVyX3BheW91dAAAAAAAAAs=",
         "AAAAAQAAAAAAAAAAAAAAE0NhcEluY3JlYXNlUHJvcG9zYWwAAAAAAwAAAAAAAAAQYWN0aXZlX2F0X2xlZGdlcgAAAAQAAAAAAAAAEWV4cGlyZXNfYXRfbGVkZ2VyAAAAAAAABAAAAAAAAAATcHJvcG9zZWRfbWF4X2Ftb3VudAAAAAAL",
+        "AAAAAQAAAAAAAAAAAAAAEkJhdGNoU2Vzc2lvblJlc3VsdAAAAAAAAgAAAAAAAAAKc2Vzc2lvbl9pZAAAAAAD7gAAACAAAAAAAAAABnN0YXR1cwAAAAAH0AAAABJCYXRjaFNlc3Npb25TdGF0dXMAAA==",
         "AAAAAQAAAAAAAAAAAAAAFUNvbnRyYWN0Q29uZmlndXJhdGlvbgAAAAAAAAkAAAAAAAAABWFkbWluAAAAAAAAEwAAAAAAAAAWaW5zdGFuY2VfdHRsX2V4dGVuc2lvbgAAAAAABAAAAAAAAAAWaW5zdGFuY2VfdHRsX3RocmVzaG9sZAAAAAAABAAAAAAAAAARaW50ZXJmYWNlX3ZlcnNpb24AAAAAAAAEAAAAAAAAABRtYXhfc3VwcG9ydGVkX2Fzc2V0cwAAAAQAAAAAAAAAEW9wZXJhdGlvbmFsX3N0YXRlAAAAAAAH0AAAABBPcGVyYXRpb25hbFN0YXRlAAAAAAAAABByZXNwb25zZV92ZXJzaW9uAAAABAAAAAAAAAAWc3RvcmFnZV9sYXlvdXRfdmVyc2lvbgAAAAAABAAAAAAAAAAQc3VwcG9ydGVkX2Fzc2V0cwAAA+oAAAAT",
         "AAAAAQAAAAAAAAAAAAAAFVNlc3Npb25SZWNvdmVyYWJpbGl0eQAAAAAAAAcAAAAAAAAABWFzc2V0AAAAAAAD6AAAABMAAAAAAAAADmN1cnJlbnRfbGVkZ2VyAAAAAAAEAAAAAAAAABFleHBpcmVzX2F0X2xlZGdlcgAAAAAAAAQAAAAAAAAACXJlY2lwaWVudAAAAAAAA+gAAAATAAAAAAAAABFyZWZ1bmRhYmxlX2Ftb3VudAAAAAAAAAsAAAAAAAAAEHJlc3BvbnNlX3ZlcnNpb24AAAAEAAAAAAAAAAZzdGF0dXMAAAAAB9AAAAAUUmVjb3ZlcmFiaWxpdHlTdGF0dXM=",
         "AAAAAgAAAAAAAAAAAAAADVNlc3Npb25TdGF0dXMAAAAAAAAFAAAAAAAAAAAAAAAET3BlbgAAAAAAAAAAAAAAB1NldHRsZWQAAAAAAAAAAAAAAAAJQ2FuY2VsbGVkAAAAAAAAAAAAAAAAAAAHRXhwaXJlZAAAAAAAAAAAAAAAAAhSZWplY3RlZA==",
@@ -675,6 +769,7 @@ export class Client extends ContractClient {
         "AAAAAgAAAAAAAAAAAAAADVNlc3Npb25TdGF0dXMAAAAAAAAEAAAAAAAAAAAAAAAET3BlbgAAAAAAAAAAAAAAB1NldHRsZWQAAAAAAAAAAAAAAAAJQ2FuY2VsbGVkAAAAAAAAAAAAAAAAAAAHRXhwaXJlZAA=",
         "AAAAAgAAAAAAAAAAAAAAE0JhdGNoUmVjb3ZlcnlTdGF0dXMAAAAACAAAAAAAAAAAAAAACVJlY292ZXJlZAAAAAAAAAAAAAAAAAAACE5vdEZvdW5kAAAAAAAAAAAAAAAKTm90RXhwaXJlZAAAAAAAAAAAAAAAAAAOQWxyZWFkeVNldHRsZWQAAAAAAAAAAAAAAAAAEEFscmVhZHlDYW5jZWxsZWQAAAAAAAAAAAAAABBBbHJlYWR5UmVjb3ZlcmVkAAAAAAAAAAAAAAAJRHVwbGljYXRlAAAAAAAAAAAAAAAAAAARRXNjcm93VW5hdmFpbGFibGUAAAA=",
         "AAAAAgAAAAAAAAAAAAAAEE9wZXJhdGlvbmFsU3RhdGUAAAADAAAAAAAAAAAAAAAGQWN0aXZlAAAAAAAAAAAAAAAAAAZQYXVzZWQAAAAAAAAAAAAAAAAACkRlcHJlY2F0ZWQAAA==",
+        "AAAAAgAAAAAAAAAAAAAAEkJhdGNoU2Vzc2lvblN0YXR1cwAAAAAAAgAAAAEAAAAAAAAABUZvdW5kAAAAAAAAAQAAB9AAAAAHU2Vzc2lvbgAAAAAAAAAAAAAAAAhOb3RGb3VuZA==",
         "AAAABAAAAAAAAAAAAAAADUNvbnRyYWN0RXJyb3IAAAAAAAAxAAAAAAAAABJBbHJlYWR5SW5pdGlhbGl6ZWQAAAAAAAEAAAAAAAAADFVuYXV0aG9yaXplZAAAAAIAAAAAAAAADUludmFsaWRBbW91bnQAAAAAAAADAAAAAAAAAA5FeHBpcmVkU2Vzc2lvbgAAAAAABAAAAAAAAAAPU2Vzc2lvbk5vdEZvdW5kAAAAAAUAAAAAAAAAFVNlc3Npb25BbHJlYWR5U2V0dGxlZAAAAAAAAAYAAAAAAAAAEFNlc3Npb25DYW5jZWxsZWQAAAAHAAAAAAAAABBBbW91bnRFeGNlZWRzQ2FwAAAACAAAAAAAAAAMSW52YWxpZEFzc2V0AAAACQAAAAAAAAANSW52YWxpZFNlbGxlcgAAAAAAAAoAAAAAAAAAElR0bEV4dGVuc2lvbkZhaWxlZAAAAAAACwAAAAAAAAATSW52YWxpZFJlc291cmNlSGFzaAAAAAAMAAAAAAAAABBJbnZhbGlkVXNhZ2VIYXNoAAAADQAAAAAAAAAQVW5zdXBwb3J0ZWRBc3NldAAAAA4AAAAAAAAAFkludmFsaWRTdXBwb3J0ZWRBc3NldHMAAAAAAA8AAAAAAAAAFlNlc3Npb25EdXJhdGlvblRvb0xvbmcAAAAAABAAAAAAAAAAEUxpYWJpbGl0eU92ZXJmbG93AAAAAAAAEQAAAAAAAAASTGlhYmlsaXR5VW5kZXJmbG93AAAAAAASAAAAAAAAABFFc2Nyb3dVbmRlcmZ1bmRlZAAAAAAAABMAAAAAAAAADk5vdEluaXRpYWxpemVkAAAAAAAUAAAAAAAAAA5TZXNzaW9uRXhwaXJlZAAAAAAAFQAAAAAAAAARU2Vzc2lvbk5vdEV4cGlyZWQAAAAAAAAWAAAAAAAAAA9JbnZhbGlkQXNzZXRDYXAAAAAAFwAAAAAAAAAVQXNzZXRDYXBOb3RDb25maWd1cmVkAAAAAAAAGAAAAAAAAAAMSW52YWxpZEFkbWluAAAAGQAAAAAAAAAaSW52YWxpZEFkbWluUm90YXRpb25FeHBpcnkAAAAAABoAAAAAAAAAFEFkbWluUm90YXRpb25QZW5kaW5nAAAAGwAAAAAAAAAVQWRtaW5Sb3RhdGlvbk5vdEZvdW5kAAAAAAAAHAAAAAAAAAAUQWRtaW5Sb3RhdGlvbkV4cGlyZWQAAAAdAAAAAAAAABdUb2tlbkludmFyaWFudFZpb2xhdGlvbgAAAAAeAAAAAAAAABBJbnZhbGlkQmF0Y2hTaXplAAAAHwAAAAAAAAAVSW52YWxpZEFzc2V0SW50ZXJmYWNlAAAAAAAAIAAAAAAAAAAOQXNzZXROb3RBY3RpdmUAAAAAACEAAAAAAAAAEkFzc2V0Tm90RGVwcmVjYXRlZAAAAAAAIgAAAAAAAAAZQXNzZXRMaWFiaWxpdHlPdXRzdGFuZGluZwAAAAAAACMAAAAAAAAAEkNhcEluY3JlYXNlUGVuZGluZwAAAAAAJgAAAAAAAAATQ2FwSW5jcmVhc2VOb3RSZWFkeQAAAAAnAAAAAAAAABNDYXBJbmNyZWFzZU5vdEZvdW5kAAAAACgAAAAAAAAAEkNhcEluY3JlYXNlRXhwaXJlZAAAAAAAKQAAAAAAAAAXSW52YWxpZENhcEluY3JlYXNlRGVsYXkAAAAAKgAAAAAAAAAbVW5zdXBwb3J0ZWRDb21taXRtZW50U2NoZW1lAAAAACsAAAAAAAAAHVNlbGxlckV4cG9zdXJlQ2VpbGluZ0V4Y2VlZGVkAAAAAAAALAAAAAAAAAAiU2VsbGVyRXhwb3N1cmVDZWlsaW5nTm90Q29uZmlndXJlZAAAAAAALQAAAAAAAAAZQnV5ZXJPcGVuU2Vzc2lvbnNFeGNlZWRlZAAAAAAAAC4AAAAAAAAAGEludmFsaWRTZXNzaW9uQ291bnRMaW1pdAAAAC8AAAAAAAAAGlNlbGxlck9wZW5TZXNzaW9uc0V4Y2VlZGVkAAAAAAAwAAAAAAAAABNJbnZhbGlkQ2FwUmVkdWN0aW9uAAAAADEAAAAAAAAADkNyZWF0aW9uUGF1c2VkAAAAAAAkAAAAAAAAABlPcGVyYXRpb25hbFN0YXRlVW5jaGFuZ2VkAAAAAAAAJQ==",
         "AAAABQAAAAAAAAAAAAAAD0Fzc2V0RGVwcmVjYXRlZAAAAAABAAAAEGFzc2V0X2RlcHJlY2F0ZWQAAAAEAAAAAAAAAAVhc3NldAAAAAAAABMAAAABAAAAAAAAAAVhZG1pbgAAAAAAABMAAAAAAAAAAAAAABFyZWFzb25fY29tbWl0bWVudAAAAAAAA+4AAAAgAAAAAAAAAAAAAAANZXZlbnRfdmVyc2lvbgAAAAAAAAQAAAAAAAAAAg==",
         "AAAABQAAAAAAAAAAAAAAD0NyZWF0aW9uUmVzdW1lZAAAAAABAAAAEGNyZWF0aW9uX3Jlc3VtZWQAAAACAAAAAAAAAAVhZG1pbgAAAAAAABMAAAABAAAAAAAAAA1ldmVudF92ZXJzaW9uAAAAAAAABAAAAAAAAAAC",
@@ -718,6 +813,7 @@ export class Client extends ContractClient {
         recover_expired: this.txFromJSON<Result<void>>,
         resume_creation: this.txFromJSON<Result<void>>,
         get_configuration: this.txFromJSON<Result<ContractConfiguration>>,
+        get_session_batch: this.txFromJSON<Result<Array<BatchSessionResult>>>,
         interface_version: this.txFromJSON<u32>,
         get_admin_rotation: this.txFromJSON<Option<AdminRotation>>,
         get_recoverability: this.txFromJSON<SessionRecoverability>,

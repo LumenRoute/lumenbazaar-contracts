@@ -14,6 +14,12 @@ stellar contract build --locked
 node scripts/check-wasm-size-budget.mjs --report wasm-size-report.json
 ```
 
+The workspace release profile optimizes for size (`opt-level = "z"`), enables
+link-time optimization with one codegen unit, and strips compiler symbols.
+Overflow checks remain enabled. The normal build command uses these settings;
+no extra flags or budget override are needed. Contract interfaces and security
+checks must remain intact when optimizing the binary.
+
 The report includes each contract's absolute byte delta and percentage change.
 Both `maxBytes` and `maxIncreasePercent` must pass. A maintainer may adjust the
 committed baseline and thresholds when a reviewed feature intentionally grows a

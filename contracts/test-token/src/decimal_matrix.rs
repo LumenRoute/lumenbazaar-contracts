@@ -22,7 +22,7 @@ use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, 
 
 /// Far below `i128::MAX` so `DECIMALS_38` fixtures are never throttled by
 /// supply accounting overflow during tests.
-pub const MATRIX_MINT_CEILING: i128 = 10_000_000_000_000_000_000_000_000_000_000_000_000_000;
+pub const MATRIX_MINT_CEILING: i128 = i128::MAX / 100;
 
 pub const DECIMALS_0: u32 = 0;
 pub const DECIMALS_2: u32 = 2;
@@ -35,18 +35,18 @@ pub const MAX_TOKEN_DECIMALS: u32 = 38;
 
 /// Every matrix entry: (label, decimals). Kept in a fixed order and fully
 /// deterministic so session lifecycle evidence is reproducible.
-pub const DECIMAL_MATRIX: &[(Symbol, u32)] = &[
-    (Symbol::Zero, DECIMALS_0),
-    (Symbol::Two, DECIMALS_2),
-    (Symbol::Seven, DECIMALS_7),
-    (Symbol::Eighteen, DECIMALS_18),
-    (Symbol::ThirtyEight, DECIMALS_38),
+pub const DECIMAL_MATRIX: &[(DecimalVariant, u32)] = &[
+    (DecimalVariant::Zero, DECIMALS_0),
+    (DecimalVariant::Two, DECIMALS_2),
+    (DecimalVariant::Seven, DECIMALS_7),
+    (DecimalVariant::Eighteen, DECIMALS_18),
+    (DecimalVariant::ThirtyEight, DECIMALS_38),
 ];
 
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u8)]
-pub enum Symbol {
+pub enum DecimalVariant {
     Zero = 0,
     Two = 1,
     Seven = 2,

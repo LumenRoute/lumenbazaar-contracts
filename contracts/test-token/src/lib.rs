@@ -70,7 +70,9 @@ impl TestTokenContract {
 
         admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::MintCeiling, &ceiling);
+        env.storage()
+            .instance()
+            .set(&DataKey::MintCeiling, &ceiling);
         env.storage().instance().set(&DataKey::TotalSupply, &0_i128);
 
         Ok(())

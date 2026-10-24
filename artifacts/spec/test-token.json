@@ -52,6 +52,36 @@
   },
   {
     "function_v0": {
+      "doc": "One-time initialization with an immutable, positive total mint ceiling.\\n\\nThe ceiling is bound at initialization and can never change. Passing a\\nnon-positive ceiling is rejected so a misconfiguration cannot silently\\ndisable minting or enable unbounded issuance.",
+      "inputs": [
+        {
+          "doc": "",
+          "name": "admin",
+          "type": "address"
+        },
+        {
+          "doc": "",
+          "name": "ceiling",
+          "type": "i128"
+        }
+      ],
+      "name": "initialize_with_ceiling",
+      "outputs": [
+        {
+          "result": {
+            "error_type": {
+              "udt": {
+                "name": "TokenError"
+              }
+            },
+            "ok_type": "void"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "function_v0": {
       "doc": "",
       "inputs": [
         {
@@ -82,6 +112,16 @@
   },
   {
     "function_v0": {
+      "doc": "Immutable test-only total mint ceiling configured at initialization.",
+      "inputs": [],
+      "name": "mint_ceiling",
+      "outputs": [
+        "i128"
+      ]
+    }
+  },
+  {
+    "function_v0": {
       "doc": "",
       "inputs": [],
       "name": "name",
@@ -97,6 +137,16 @@
       "name": "symbol",
       "outputs": [
         "string"
+      ]
+    }
+  },
+  {
+    "function_v0": {
+      "doc": "Sum of all successful mint amounts since initialization.",
+      "inputs": [],
+      "name": "total_supply",
+      "outputs": [
+        "i128"
       ]
     }
   },
@@ -172,6 +222,11 @@
           "doc": "",
           "name": "BalanceOverflow",
           "value": 5
+        },
+        {
+          "doc": "",
+          "name": "MintCeilingExceeded",
+          "value": 6
         }
       ],
       "doc": "",

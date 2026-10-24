@@ -18,3 +18,8 @@ soroban-sdk = "28.0.0"
 
 [profile.release]
 overflow-checks = true
+# Keep deployable WASM small without removing checked arithmetic or contract APIs.
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = "symbols"

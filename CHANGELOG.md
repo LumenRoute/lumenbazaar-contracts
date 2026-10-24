@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Add bounded, read-only session queries with ordered found/missing results and preserved
+  duplicate IDs. Compatibility: additive method and result types; existing session and
+  error definitions are unchanged. Migration: none beyond the planned v3 release.
+
 ### Breaking
 
 - Reconcile the unreleased v3 generated interface with merged contract source, including
@@ -11,6 +17,16 @@
   Migration: [v2-to-v3 replacement routing](artifacts/interface/migrations/v2-to-v3.json).
 
 ### Fixed
+
+- Optimize release WASM for size with link-time optimization, one codegen unit and
+  stripped compiler symbols, retaining checked arithmetic and all contract APIs.
+  Compatibility: contract behavior, storage and wire interfaces are unchanged.
+  Migration: none; the existing WASM size limits remain unchanged.
+
+- Repair SDK conformance test registration, authorization probes, and decimal fixtures,
+  and preserve handwritten binding helpers and tests during generation.
+  Compatibility: test and generation tooling only; contract behavior is unchanged.
+  Migration: none.
 
 - Refresh stale resource and WASM budgets from the restored merged-feature build,
   retaining existing percentage headroom and documenting every changed ceiling.

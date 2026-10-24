@@ -277,7 +277,8 @@ lifecycle cleanup.
 `settle` rejects sessions at or after `expires_at_ledger` with
 `ExpiredSession`, before seller authorization or token transfer. Expiry does not
 rewrite stored session state by itself: the session remains observable through
-`get_session` so backend indexers can retain the original cap, parties, asset,
+`get_session` (or in bounded batches of up to eight IDs via `get_session_batch`)
+so backend indexers can retain the original cap, parties, asset,
 and resource hash.
 
 The buyer may cancel only before expiry. At the exact expiry ledger and later,
