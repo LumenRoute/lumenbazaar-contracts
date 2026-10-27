@@ -19,6 +19,8 @@ export interface SessionIdInputV3 {
   expiresAtLedger: number;
   resourceHash: string;
   sequence: string | bigint | number;
+  /** 32-byte lowercase hex; the contract binds it as the final payload field. */
+  idempotencyKey: string;
   interfaceVersion?: number;
 }
 
@@ -121,6 +123,10 @@ export function validateSessionIdInput(
   if (parsedSequence < 0n) {
     throw new Error("sequence cannot be negative");
   }
+
+  if (typeof value.idempotencyKey !== "string" || !/^[0-9a-f]{64}$/.test(value.idempotencyKey)) {
+    throw new Error("idempotencyKey must be a 64-character lowercase hex string");
+  }
 }
 
 export function deriveSessionIdPreimage(input: SessionIdInputV3): Buffer {
@@ -151,6 +157,7 @@ export function deriveSessionIdPreimage(input: SessionIdInputV3): Buffer {
     xdr.ScVal.scvU32(input.expiresAtLedger),
     xdr.ScVal.scvBytes(Buffer.from(input.resourceHash, "hex")),
     xdr.ScVal.scvU64(xdr.Uint64.fromString(sequenceBig.toString())),
+    xdr.ScVal.scvBytes(Buffer.from(input.idempotencyKey, "hex")),
   ]);
 
   const topScVal = xdr.ScVal.scvVec([
