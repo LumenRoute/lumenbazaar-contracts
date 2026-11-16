@@ -16,6 +16,13 @@ cargo test --workspace --all-features
 stellar contract build --locked
 ```
 
+Enable the repository hook and run the dependency-free Python malware checks before pushing:
+
+```bash
+git config core.hooksPath .githooks
+cargo security-malware-scan
+cargo security-malware-test
+```
 ## Scope
 
 - Keep `upto-session` focused on capped metered payment sessions.
