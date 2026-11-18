@@ -64,6 +64,7 @@ impl Harness {
             &CAP,
             &expires_at_ledger,
             &BytesN::from_array(&self.env, &[7; 32]),
+            &next_idempotency_key(&self.env),
         )
     }
 
@@ -171,17 +172,17 @@ fn instance_ttl_extension_boundary_is_exact_for_config_changes() {
     // One ledger above the threshold: the admin call must not extend.
     harness.ledger(AT_THRESHOLD - 1);
     assert_eq!(harness.instance_ttl(), DEFAULT_TTL_THRESHOLD + 1);
-    client.set_asset_max_session_amount(&harness.asset, &(CAP * 2));
+    client.set_asset_max_session_amount(&harness.asset, &(CAP * 3));
     assert_eq!(harness.instance_ttl(), DEFAULT_TTL_THRESHOLD + 1);
 
     // Exactly at the threshold: the same call extends to the full amount.
     harness.ledger(AT_THRESHOLD);
     assert_eq!(harness.instance_ttl(), DEFAULT_TTL_THRESHOLD);
-    client.set_asset_max_session_amount(&harness.asset, &(CAP * 3));
+    client.set_asset_max_session_amount(&harness.asset, &(CAP * 2));
     assert_eq!(harness.instance_ttl(), TTL_EXTENSION_AMOUNT);
     assert_eq!(
         client.get_asset_max_session_amount(&harness.asset),
-        CAP * 3
+        CAP * 2
     );
 }
 
@@ -499,6 +500,7 @@ fn lapsed_instance_config_fails_closed_for_admin_and_new_sessions_only() {
             &CAP,
             &SESSION_EXPIRY,
             &BytesN::from_array(&harness.env, &[9; 32]),
+            &next_idempotency_key(&harness.env),
         ),
         Err(Ok(ContractError::NotInitialized))
     );
@@ -563,6 +565,7 @@ fn creation_and_rotation_expiry_windows_have_exact_bounds() {
             &1,
             &expires_at_ledger,
             &hash,
+            &next_idempotency_key(&harness.env),
         )
     };
 

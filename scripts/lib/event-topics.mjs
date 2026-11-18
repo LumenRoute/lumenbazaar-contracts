@@ -71,6 +71,12 @@ export const EXPECTED_EVENT_LAYOUT = {
     topicType: "address",
     version: 3,
   },
+  AssetExposureCeilingUpdated: {
+    prefix: "asset_exposure_ceiling_updated",
+    topic: "asset",
+    topicType: "address",
+    version: 3,
+  },
   AssetRemoved: {
     prefix: "asset_removed",
     topic: "asset",
@@ -79,6 +85,12 @@ export const EXPECTED_EVENT_LAYOUT = {
   },
   AssetSessionCapUpdated: {
     prefix: "asset_session_cap_updated",
+    topic: "asset",
+    topicType: "address",
+    version: 3,
+  },
+  BuyerExposureCeilingUpdated: {
+    prefix: "buyer_exposure_ceiling_updated",
     topic: "asset",
     topicType: "address",
     version: 3,
@@ -95,17 +107,35 @@ export const EXPECTED_EVENT_LAYOUT = {
     topicType: "bytes_n:32",
     version: 2,
   },
+  SessionExpiryExtended: {
+    prefix: "session_expiry_extended",
+    topic: "session_id",
+    topicType: "bytes_n:32",
+    version: 1,
+  },
   SessionRecovered: {
     prefix: "session_recovered",
     topic: "session_id",
     topicType: "bytes_n:32",
     version: 2,
   },
+  SessionRejected: {
+    prefix: "session_rejected",
+    topic: "session_id",
+    topicType: "bytes_n:32",
+    version: 1,
+  },
   SessionSettled: {
     prefix: "session_settled",
     topic: "session_id",
     topicType: "bytes_n:32",
     version: 2,
+  },
+  SurplusRecovered: {
+    prefix: "surplus_recovered",
+    topic: "asset",
+    topicType: "address",
+    version: 3,
   },
 };
 

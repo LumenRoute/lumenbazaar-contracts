@@ -1,5 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { deepStrictEqual } from "node:assert";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  generateBindingApiReference,
+  loadBindingApiInputs,
+} from "./lib/binding-api-reference.mjs";
 import {
   failedPoll,
   fakeClient,
@@ -9,6 +15,14 @@ import {
   successPoll,
   transactionHashHex,
 } from "./lib/transaction-evidence-fixtures.mjs";
+
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const readmeSource = (
+  await readFile(new URL("../bindings/upto-session/README.md", import.meta.url), "utf8")
+).replace(/\r\n/g, "\n");
+if (readmeSource !== generateBindingApiReference(loadBindingApiInputs(repoRoot))) {
+  throw new Error("bindings/upto-session/README.md drifted from frozen spec and compatibility fixtures");
+}
 
 const bindings = await import("../bindings/upto-session/dist/index.js");
 const distSource = await readFile(
@@ -80,11 +94,14 @@ if (bindings.ContractError?.[32]?.message !== "InvalidAssetInterface") {
 if (bindings.ContractError?.[35]?.message !== "AssetLiabilityOutstanding") {
   throw new Error("Expected complete asset lifecycle error mapping");
 }
-if (bindings.ContractError?.[36]?.message !== "SessionRejected") {
-  throw new Error("Expected SessionRejected error mapping");
+if (bindings.ContractError?.[36]?.message !== "CreationPaused") {
+  throw new Error("Expected CreationPaused error mapping");
 }
 if (bindings.ContractError?.[37]?.message !== "OperationalStateUnchanged") {
   throw new Error("Expected complete operational state error mapping");
+}
+if (bindings.ContractError?.[50]?.message !== "SessionRejected") {
+  throw new Error("Expected SessionRejected error mapping");
 }
 if (packageJson.version !== "3.0.0") {
   throw new Error("Expected generated binding package version 3.0.0");

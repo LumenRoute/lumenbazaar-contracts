@@ -4,6 +4,27 @@
 
 ### Added
 
+- Generate a deterministic TypeScript API reference in `bindings/upto-session/README.md` from
+  the frozen contract specification (`artifacts/spec/upto-session.json`) and compatibility
+  fixtures (`artifacts/interface/upto-session-v3.json`, `artifacts/interface/upto-session-v2.json`)
+  covering all public methods, types, errors, events, authorization boundaries, and lifecycle guidance.
+  Compatibility: documentation and binding generation check only; runtime contract interface is unchanged.
+  Migration: none.
+
+- Add cross-version behavioral differential traces (`artifacts/interface/cross-version-behavior-traces.json`,
+  `scripts/local/cross-version-traces.mjs`, and `formal/escrow-model`) that replay shared v2 and v3
+  operations with explicit expected-difference fixtures and fail closed on unapproved state, balance,
+  error, event, or cross-deployment identifier differences.
+  Compatibility: test and verification fixtures only; existing v2 and v3 deployment routes are unchanged.
+  Migration: [v2-to-v3 replacement routing](artifacts/interface/migrations/v2-to-v3.json).
+
+- Add bounded per-asset payment and daily spending ceilings (`AssetSpendingLimit`, `asset_limits`,
+  and `spent_today_asset`) to `policy-wallet-example`, requiring an explicit ceiling for every
+  allowed asset and isolating daily spend counters per asset without cross-asset conversion.
+  Compatibility: `SpendingPolicy` in `policy-wallet-example` now requires `asset_limits` matching
+  `allowed_assets` and exposes `spent_today_asset(agent, asset)`.
+  Migration: include an `AssetSpendingLimit` entry in `asset_limits` for each asset in `allowed_assets`.
+
 - Add typed transaction evidence helpers to the TypeScript binding
   (`createSessionWithEvidence`, `settleWithEvidence`, `cancelWithEvidence`,
   `extendTtlWithEvidence`) that sign through an injected signer, confirm through RPC and

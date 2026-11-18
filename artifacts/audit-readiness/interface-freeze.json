@@ -4,52 +4,27 @@
   "files": [
     {
       "path": "contracts/upto-session/src/lib.rs",
-      "sha256": "83d9f6917b67ffb0c85e6213f502d5f03532ce68a1b32588e6608cbaea8c2ff6"
-      "sha256": "fc5750c120a6b3fe09820cd0a1c7680cb5102d67fe8739095b86f98000186b09"
-      "sha256": "f93cd9644ae83c6d8df0b7ba9c984d0393c707c3d548e4109ff4362bec5ecf08"
+      "sha256": "b7e062a4a4406bb376e8d282c462c7b0cdec94b302fcaaa94017699624e8987b"
     },
     {
       "path": "contracts/upto-session/src/types.rs",
-      "sha256": "b0d5d2e51c3f3c252515ffb415554ff0fe1837d4de16a7dc77a295e8398e3dd5"
-      "sha256": "d79211afafb81d323628a25bd0b383edac802be154593a16827673775ea575d0"
+      "sha256": "499cdb74367feaae2beffa2487f55a286ba1254b8744d10214d48c0abafd3013"
     },
     {
       "path": "contracts/upto-session/src/errors.rs",
-      "sha256": "f378fa8f043fdd854ffd21229eb96af8093c95dc744c19952b983ee84f5df0ba"
+      "sha256": "005e11986e1b4bb31daeb1753e076a771813909e37c0b60ff6ce554b8ed1885f"
     },
     {
       "path": "contracts/upto-session/src/events.rs",
-      "sha256": "de39a65d9616285bc6e2edca94261a8fdc3a252ffa58cda6e9bbc19d92ac2a8f"
+      "sha256": "2bfe8a9a0937aefe867e12ce7a911249e2ecc6b443be970428dcfb780d85a9d5"
     },
     {
       "path": "artifacts/spec/upto-session.json",
-      "sha256": "026dc59bcfe7c3993a8609b60250049d125371d8b5cca7b7b981aa580c044086"
+      "sha256": "bf8580094cb6569779d5249d589e8a42e44e6812810af5168ad5eca425f8fa07"
     },
     {
       "path": "bindings/upto-session/src/index.ts",
-      "sha256": "9a6e71f465c9453a155e03ce7bbd63ba677124a3f5347650468eb109cc7d85b4"
-      "sha256": "de9b274ee3992e35bec8878578856c8262c6a8ffa4c7f1cb27a9a30399c3d5fe"
-      "sha256": "cc47478bdffe4cf4ed8f977e5e66cd321804f1799e66568e8b211363bac530a7"
-    },
-    {
-      "path": "contracts/upto-session/src/types.rs",
-      "sha256": "060d15d6041af07f132d9ec937d202acea0d19fef73c63f2d5a51c781bc841e3"
-    },
-    {
-      "path": "contracts/upto-session/src/errors.rs",
-      "sha256": "e9a47edfcce990eb4264615de4d91d0dddf2907525b93e1307e6b3d12e918c8a"
-    },
-    {
-      "path": "contracts/upto-session/src/events.rs",
-      "sha256": "50a70189587108adebd3647911d0fca7469efea77884597066100c32d5058c4f"
-    },
-    {
-      "path": "artifacts/spec/upto-session.json",
-      "sha256": "d70448072290cda266851becf600afd422353c6f31b3ff85bbaf7ce24dce0aee"
-    },
-    {
-      "path": "bindings/upto-session/src/index.ts",
-      "sha256": "1cc3c73dd2777cc36dcfe7dea8028105f24b58062a511f0e1190c8db5920d0b2"
+      "sha256": "0a18ed3cffbedb740ff4bd1f5a64f6e83e8ac78b2a3b0a068e5d76dcee186aad"
     },
     {
       "path": "bindings/upto-session/package.json",
@@ -57,10 +32,7 @@
     },
     {
       "path": "artifacts/interface/upto-session-v3.json",
-      "sha256": "659ea156d0e3d62600cb68b0b68ad9015f6e875dc501bb63f392cb026925a4fe"
-      "sha256": "4d003c39754ceb73d7963e222cc34e44b4ac2b4dd6fa4edae3a96316e11f70ee"
-      "sha256": "571caa8b25ee84272e32c5c0c11cd8f22f5101c13df19fcadbc9ae2a55d1fe97"
-      "sha256": "cbf11b9427a9c3010b53132528fd296e9e6247cec48d7349830d255b35415c21"
+      "sha256": "b5c7a587c999e42f0f8ee3ae517cea1f9faf614ba634fc94100a97a0d63bf5ad"
     }
   ]
 }

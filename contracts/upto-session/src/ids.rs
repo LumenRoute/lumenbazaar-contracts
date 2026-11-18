@@ -490,6 +490,13 @@ mod tests {
             .expect("valid resource hash hex");
             let resource_hash = BytesN::from_array(&env, &resource_bytes);
 
+            let mut idempotency_bytes = [0x08u8; 32];
+            if let Some(idempotency_hex) = vec["idempotencyKeyHex"].as_str() {
+                hex::decode_to_slice(idempotency_hex, &mut idempotency_bytes)
+                    .expect("valid idempotency key hex");
+            }
+            let idempotency_key = BytesN::from_array(&env, &idempotency_bytes);
+
             let max_amount: i128 = vec["maxAmount"]
                 .as_str()
                 .expect("maxAmount")
@@ -510,6 +517,7 @@ mod tests {
                 max_amount,
                 expires_at_ledger,
                 resource_hash: &resource_hash,
+                idempotency_key: &idempotency_key,
                 sequence,
             };
 

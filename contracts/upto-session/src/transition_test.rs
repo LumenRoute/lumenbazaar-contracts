@@ -227,6 +227,7 @@ fn run_sequence(actions: &[Action]) -> Outcome {
         &CAP,
         &EXPIRES_AT,
         &BytesN::from_array(&env, &[41; 32]),
+        &next_idempotency_key(&env),
     );
 
     let mut model = Model {

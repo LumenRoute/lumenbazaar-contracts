@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertErrorMapMatchesFixture } from "./lib/contract-error-map.mjs";
+import { generateBindingApiReference, loadBindingApiInputs } from "./lib/binding-api-reference.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const skipBuild = process.argv.includes("--skip-build");
@@ -106,16 +107,15 @@ if (!canonicalBinding.includes(transactionEvidenceExport)) {
 }
 writeFileSync(bindingPath, canonicalBinding, "utf8");
 
-// The CLI rewrites README.md; re-append the hand-written helper documentation.
+// The CLI rewrites README.md with generic boilerplate; replace it with the
+// deterministic LumenBazaar API reference generated from the frozen spec and
+// compatibility fixtures.
 const readmePath = join(outputDir, "README.md");
-const readme = readFileSync(readmePath, "utf8");
-const evidenceReadme = readFileSync(
-  join(repoRoot, "scripts", "templates", "README.transactionEvidence.md"),
+writeFileSync(
+  readmePath,
+  generateBindingApiReference(loadBindingApiInputs(repoRoot)),
   "utf8",
 );
-if (!readme.includes("<!-- lumenbazaar:transaction-evidence")) {
-  writeFileSync(readmePath, `${readme.trimEnd()}\n\n${evidenceReadme}`, "utf8");
-}
 
 const packagePath = join(outputDir, "package.json");
 const packageJson = JSON.parse(readFileSync(packagePath, "utf8"));

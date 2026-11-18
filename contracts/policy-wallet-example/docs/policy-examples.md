@@ -10,6 +10,9 @@ Spending policy validity boundaries are inclusive: a policy is active for ledger
 | Blocked payment | `documentation_blocked_payment_example_reports_amount_cap` | A payment over the per-payment cap returns `AmountExceedsPaymentCap`. |
 | Seller payment cap | `documentation_seller_payment_cap_example_reports_amount_cap` | A payment over the seller-specific per-payment cap returns `AmountExceedsPaymentCap`. |
 | Seller daily cap | `documentation_seller_daily_cap_example_reports_daily_cap` | A payment over the seller-specific daily cap returns `AmountExceedsDailyCap` while other sellers remain spendable. |
+| Asset payment cap | `documentation_asset_payment_cap_example_reports_amount_cap` | A payment over the asset-specific per-payment cap returns `AmountExceedsPaymentCap`. |
+| Asset daily cap | `documentation_asset_daily_cap_example_reports_daily_cap` | A payment over the asset-specific daily cap returns `AmountExceedsDailyCap` while other allowed assets remain spendable with isolated counters. |
+| Per-asset ceiling validation | `per_asset_spending_ceilings_isolation_and_boundaries` | Every allowed asset requires an explicit ceiling; missing, unlisted, duplicate, overflow, and exact-boundary cases fail deterministically. |
 | Resource payment cap | `documentation_resource_payment_cap_example_reports_amount_cap` | A payment over the resource-specific per-payment cap returns `AmountExceedsPaymentCap`. |
 | Resource daily cap | `documentation_resource_daily_cap_example_reports_daily_cap` | A payment over the resource-specific daily cap returns `AmountExceedsDailyCap` while other resources remain spendable. |
 | Authorization count limit | `documentation_authorization_limit_example_reports_limit_exceeded` | An authorization exceeding `max_authorizations_per_day` returns `AuthorizationLimitExceeded`. |
@@ -24,5 +27,6 @@ Spending policy validity boundaries are inclusive: a policy is active for ledger
 
 ## Policy Replacement and Day Rollover Semantics
 
-- **Policy Replacement**: When a spending policy is replaced via `set_policy`, stored same-day and historical spend counters (`DailySpend`, `DailySellerSpend`, and `DailyResourceSpend`) are preserved. New caps take effect immediately against already-accumulated daily spend.
+- **Policy Replacement**: When a spending policy is replaced via `set_policy`, stored same-day and historical spend counters (`DailySpend`, `DailySellerSpend`, `DailyAssetSpend`, and `DailyResourceSpend`) are preserved. New caps take effect immediately against already-accumulated daily spend.
 - **Day Rollover**: All daily spending counters are partitioned by ledger day (`sequence / LEDGERS_PER_DAY`). When the ledger sequence advances past the day boundary, all spend queries and authorization checks reset to zero automatically.
+- **Per-Asset Isolation**: Every asset in `allowed_assets` must have an explicit `AssetSpendingLimit` in `asset_limits`. Spend counters are tracked independently per asset (`spent_today_asset`) without exchange-rate conversion or cross-asset raw amount comparison.

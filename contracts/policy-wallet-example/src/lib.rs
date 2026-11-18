@@ -20,6 +20,7 @@ pub enum DataKey {
     Policy(Address),
     DailySpend(Address, u32),
     DailySellerSpend(Address, Address, u32),
+    DailyAssetSpend(Address, Address, u32),
     DailyResourceSpend(Address, BytesN<32>, u32),
     DailyAuthCount(Address, u32),
     /// Ledger at which the owner revoked the agent's policy.
@@ -31,6 +32,14 @@ pub enum DataKey {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SellerSpendingLimit {
     pub seller: Address,
+    pub max_amount_per_payment: i128,
+    pub max_amount_per_day: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AssetSpendingLimit {
+    pub asset: Address,
     pub max_amount_per_payment: i128,
     pub max_amount_per_day: i128,
 }
@@ -72,6 +81,7 @@ pub struct SpendingPolicy {
     pub allowed_assets: Vec<Address>,
     pub allowed_resource_hashes: Vec<BytesN<32>>,
     pub seller_limits: Vec<SellerSpendingLimit>,
+    pub asset_limits: Vec<AssetSpendingLimit>,
     pub resource_limits: Vec<ResourceSpendingLimit>,
     pub revision: u32,
 }
@@ -135,7 +145,9 @@ impl PolicyWalletExampleContract {
             example_only: true,
         };
         env.storage().instance().set(&DataKey::Config, &config);
-        env.storage().instance().extend_ttl(DEFAULT_TTL_THRESHOLD, TTL_EXTENSION_AMOUNT);
+        env.storage()
+            .instance()
+            .extend_ttl(DEFAULT_TTL_THRESHOLD, TTL_EXTENSION_AMOUNT);
 
         Ok(())
     }
@@ -181,7 +193,9 @@ impl PolicyWalletExampleContract {
         env.storage()
             .instance()
             .set(&DataKey::Policy(agent), &policy);
-        env.storage().instance().extend_ttl(DEFAULT_TTL_THRESHOLD, TTL_EXTENSION_AMOUNT);
+        env.storage()
+            .instance()
+            .extend_ttl(DEFAULT_TTL_THRESHOLD, TTL_EXTENSION_AMOUNT);
 
         Ok(())
     }
@@ -286,6 +300,15 @@ impl PolicyWalletExampleContract {
             &next_seller_spent,
         );
 
+        let asset_spent = read_daily_asset_spend(&env, &agent, &asset, ledger_day);
+        let next_asset_spent = asset_spent
+            .checked_add(amount)
+            .ok_or(PolicyWalletError::AmountExceedsDailyCap)?;
+        env.storage().instance().set(
+            &DataKey::DailyAssetSpend(agent.clone(), asset, ledger_day),
+            &next_asset_spent,
+        );
+
         let resource_spent = read_daily_resource_spend(&env, &agent, &resource_hash, ledger_day);
         let next_resource_spent = resource_spent
             .checked_add(amount)
@@ -307,6 +330,10 @@ impl PolicyWalletExampleContract {
 
     pub fn spent_today_seller(env: Env, agent: Address, seller: Address) -> i128 {
         read_daily_seller_spend(&env, &agent, &seller, current_ledger_day(&env))
+    }
+
+    pub fn spent_today_asset(env: Env, agent: Address, asset: Address) -> i128 {
+        read_daily_asset_spend(&env, &agent, &asset, current_ledger_day(&env))
     }
 
     pub fn spent_today_resource(env: Env, agent: Address, resource_hash: BytesN<32>) -> i128 {
@@ -492,6 +519,31 @@ fn validate_policy(env: &Env, policy: &SpendingPolicy) -> Result<(), PolicyWalle
         }
     }
 
+    let asset_limits_len = policy.asset_limits.len();
+    if asset_limits_len != policy.allowed_assets.len() {
+        return Err(PolicyWalletError::InvalidPolicy);
+    }
+    for i in 0..asset_limits_len {
+        let limit = policy.asset_limits.get(i).unwrap();
+        if !policy.allowed_assets.contains(&limit.asset) {
+            return Err(PolicyWalletError::InvalidPolicy);
+        }
+        if limit.max_amount_per_payment <= 0
+            || limit.max_amount_per_day <= 0
+            || limit.max_amount_per_payment > limit.max_amount_per_day
+            || limit.max_amount_per_payment > policy.max_amount_per_payment
+            || limit.max_amount_per_day > policy.max_amount_per_day
+        {
+            return Err(PolicyWalletError::InvalidPolicy);
+        }
+        for j in (i + 1)..asset_limits_len {
+            let other = policy.asset_limits.get(j).unwrap();
+            if limit.asset == other.asset {
+                return Err(PolicyWalletError::InvalidPolicy);
+            }
+        }
+    }
+
     let resource_limits_len = policy.resource_limits.len();
     for i in 0..resource_limits_len {
         let limit = policy.resource_limits.get(i).unwrap();
@@ -583,6 +635,26 @@ fn validate_payment(
         }
     }
 
+    let mut matched_asset_limit = None;
+    for i in 0..policy.asset_limits.len() {
+        let asset_limit = policy.asset_limits.get(i).unwrap();
+        if asset_limit.asset == *asset {
+            matched_asset_limit = Some(asset_limit);
+            break;
+        }
+    }
+    let asset_limit = matched_asset_limit.ok_or(PolicyWalletError::InvalidPolicy)?;
+    if amount > asset_limit.max_amount_per_payment {
+        return Err(PolicyWalletError::AmountExceedsPaymentCap);
+    }
+    let asset_spent = read_daily_asset_spend(env, agent, asset, ledger_day);
+    let next_asset_spent = asset_spent
+        .checked_add(amount)
+        .ok_or(PolicyWalletError::AmountExceedsDailyCap)?;
+    if next_asset_spent > asset_limit.max_amount_per_day {
+        return Err(PolicyWalletError::AmountExceedsDailyCap);
+    }
+
     for i in 0..policy.resource_limits.len() {
         let resource_limit = policy.resource_limits.get(i).unwrap();
         if resource_limit.resource_hash == *resource_hash {
@@ -603,7 +675,6 @@ fn validate_payment(
     Ok(())
 }
 
-
 pub fn extend_instance_ttl(env: &Env) {
     env.storage()
         .instance()
@@ -616,6 +687,17 @@ fn read_daily_seller_spend(env: &Env, agent: &Address, seller: &Address, ledger_
         .get(&DataKey::DailySellerSpend(
             agent.clone(),
             seller.clone(),
+            ledger_day,
+        ))
+        .unwrap_or(0)
+}
+
+fn read_daily_asset_spend(env: &Env, agent: &Address, asset: &Address, ledger_day: u32) -> i128 {
+    env.storage()
+        .instance()
+        .get(&DataKey::DailyAssetSpend(
+            agent.clone(),
+            asset.clone(),
             ledger_day,
         ))
         .unwrap_or(0)

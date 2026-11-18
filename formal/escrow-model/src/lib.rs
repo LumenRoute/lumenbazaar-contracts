@@ -760,3 +760,722 @@ mod tests {
         .is_ok());
     }
 }
+
+#[cfg(test)]
+mod cross_version_differential_tests {
+    use std::collections::{BTreeMap, BTreeSet};
+    use std::path::PathBuf;
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+    enum Version {
+        V2 = 2,
+        V3 = 3,
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+    enum ExpectedDiff {
+        InterfaceVersion,
+        InitializeActivationEvent,
+        CreateSessionDomainId,
+        SessionAuditMetadata,
+    }
+
+    impl ExpectedDiff {
+        fn all() -> BTreeSet<Self> {
+            BTreeSet::from([
+                Self::InterfaceVersion,
+                Self::InitializeActivationEvent,
+                Self::CreateSessionDomainId,
+                Self::SessionAuditMetadata,
+            ])
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum SessionStatus {
+        Open,
+        Settled,
+        Cancelled,
+        Expired,
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    struct SessionRecord {
+        raw_id: String,
+        handle: String,
+        max_amount: i128,
+        escrowed_amount: i128,
+        settled_amount: i128,
+        expires_at_ledger: u32,
+        status: SessionStatus,
+        ttl_extended_at: u32,
+        creation_ledger: Option<u32>,
+        finalized_ledger: Option<u32>,
+        resource_scheme_version: Option<u32>,
+        usage_scheme_version: Option<u32>,
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    enum EventRecord {
+        AssetActivated {
+            asset: String,
+            event_version: u32,
+        },
+        SessionCreated {
+            handle: String,
+            max_amount: i128,
+            escrowed_amount: i128,
+            expires_at_ledger: u32,
+            event_version: u32,
+        },
+        SessionSettled {
+            handle: String,
+            actual_amount: i128,
+            refunded_amount: i128,
+            event_version: u32,
+        },
+        SessionCancelled {
+            handle: String,
+            refunded_amount: i128,
+            event_version: u32,
+        },
+        SessionRecovered {
+            handle: String,
+            refunded_amount: i128,
+            expired_at_ledger: u32,
+            recovered_at_ledger: u32,
+            event_version: u32,
+        },
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum ContractError {
+        AlreadyInitialized = 1,
+        Unauthorized = 2,
+        InvalidAmount = 3,
+        ExpiredSession = 4,
+        SessionNotFound = 5,
+        SessionAlreadySettled = 6,
+        SessionCancelled = 7,
+        AmountExceedsCap = 8,
+        TtlExtensionFailed = 11,
+        UnsupportedAsset = 14,
+        NotInitialized = 20,
+        SessionExpired = 21,
+        SessionNotExpired = 22,
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    enum SharedOp {
+        InterfaceVersion,
+        Initialize {
+            admin_authorized: bool,
+            asset: &'static str,
+        },
+        CreateSession {
+            buyer_authorized: bool,
+            handle: &'static str,
+            asset: &'static str,
+            max_amount: i128,
+            expires_at_ledger: u32,
+        },
+        GetSession {
+            handle: &'static str,
+            cross_deployment_raw_id: Option<String>,
+        },
+        Settle {
+            seller_authorized: bool,
+            handle: &'static str,
+            actual_amount: i128,
+        },
+        Cancel {
+            buyer_authorized: bool,
+            handle: &'static str,
+        },
+        RecoverExpired {
+            handle: &'static str,
+        },
+        ExtendTtl {
+            handle: &'static str,
+        },
+        AdvanceLedger(u32),
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    struct SessionAuditFields {
+        creation_ledger: Option<u32>,
+        finalized_ledger: Option<u32>,
+        resource_scheme_version: Option<u32>,
+        usage_scheme_version: Option<u32>,
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    enum NormalizedResult {
+        Void,
+        InterfaceVersionNormalized,
+        InterfaceVersionRaw(u32),
+        Created {
+            handle: String,
+            scheme: String,
+        },
+        Session {
+            handle: String,
+            max_amount: i128,
+            escrowed_amount: i128,
+            settled_amount: i128,
+            expires_at_ledger: u32,
+            status: SessionStatus,
+            audit_fields: Option<SessionAuditFields>,
+        },
+        Ledger(u32),
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    struct StepObservation {
+        outcome: Result<NormalizedResult, ContractError>,
+        events: Vec<EventRecord>,
+        buyer_balance: i128,
+        seller_balance: i128,
+        contract_balance: i128,
+        liability: i128,
+        terminal_states: BTreeMap<String, SessionStatus>,
+    }
+
+    struct Runtime {
+        version: Version,
+        initialized: bool,
+        ledger: u32,
+        sequence: u64,
+        supported_assets: BTreeSet<String>,
+        buyer_balance: i128,
+        seller_balance: i128,
+        contract_balance: i128,
+        liability: i128,
+        sessions: BTreeMap<String, SessionRecord>,
+        handles: BTreeMap<String, String>,
+    }
+
+    impl Runtime {
+        fn new(version: Version, initial_buyer_balance: i128) -> Self {
+            Self {
+                version,
+                initialized: false,
+                ledger: 10,
+                sequence: 0,
+                supported_assets: BTreeSet::new(),
+                buyer_balance: initial_buyer_balance,
+                seller_balance: 0,
+                contract_balance: 0,
+                liability: 0,
+                sessions: BTreeMap::new(),
+                handles: BTreeMap::new(),
+            }
+        }
+
+        fn prefix(&self) -> &'static str {
+            match self.version {
+                Version::V2 => "v2:",
+                Version::V3 => "v3:",
+            }
+        }
+
+        fn step(
+            &mut self,
+            op: &SharedOp,
+            allowed_diffs: &BTreeSet<ExpectedDiff>,
+        ) -> Result<StepObservation, &'static str> {
+            let mut events = Vec::new();
+            let outcome = match op {
+                SharedOp::AdvanceLedger(target) => {
+                    self.ledger = *target;
+                    Ok(NormalizedResult::Ledger(self.ledger))
+                }
+                SharedOp::InterfaceVersion => {
+                    if allowed_diffs.contains(&ExpectedDiff::InterfaceVersion) {
+                        Ok(NormalizedResult::InterfaceVersionNormalized)
+                    } else {
+                        Ok(NormalizedResult::InterfaceVersionRaw(self.version as u32))
+                    }
+                }
+                SharedOp::Initialize {
+                    admin_authorized,
+                    asset,
+                } => {
+                    if !admin_authorized {
+                        Err(ContractError::Unauthorized)
+                    } else if self.initialized {
+                        Err(ContractError::AlreadyInitialized)
+                    } else {
+                        self.initialized = true;
+                        self.supported_assets.insert((*asset).to_string());
+                        if self.version == Version::V3
+                            && !allowed_diffs.contains(&ExpectedDiff::InitializeActivationEvent)
+                        {
+                            events.push(EventRecord::AssetActivated {
+                                asset: (*asset).to_string(),
+                                event_version: 3,
+                            });
+                        }
+                        Ok(NormalizedResult::Void)
+                    }
+                }
+                SharedOp::CreateSession {
+                    buyer_authorized,
+                    handle,
+                    asset,
+                    max_amount,
+                    expires_at_ledger,
+                } => {
+                    if !self.initialized {
+                        Err(ContractError::NotInitialized)
+                    } else if !buyer_authorized {
+                        Err(ContractError::Unauthorized)
+                    } else if !self.supported_assets.contains(*asset) {
+                        Err(ContractError::UnsupportedAsset)
+                    } else if *max_amount <= 0 {
+                        Err(ContractError::InvalidAmount)
+                    } else if *expires_at_ledger <= self.ledger {
+                        Err(ContractError::ExpiredSession)
+                    } else {
+                        let seq = self.sequence;
+                        self.sequence += 1;
+                        let raw_id = format!(
+                            "{}session-{seq}-{max_amount}-{expires_at_ledger}",
+                            self.prefix()
+                        );
+                        self.handles.insert((*handle).to_string(), raw_id.clone());
+                        self.buyer_balance -= *max_amount;
+                        self.contract_balance += *max_amount;
+                        self.liability += *max_amount;
+
+                        let record = SessionRecord {
+                            raw_id: raw_id.clone(),
+                            handle: (*handle).to_string(),
+                            max_amount: *max_amount,
+                            escrowed_amount: *max_amount,
+                            settled_amount: 0,
+                            expires_at_ledger: *expires_at_ledger,
+                            status: SessionStatus::Open,
+                            ttl_extended_at: self.ledger,
+                            creation_ledger: (self.version == Version::V3).then_some(self.ledger),
+                            finalized_ledger: None,
+                            resource_scheme_version: (self.version == Version::V3).then_some(1),
+                            usage_scheme_version: None,
+                        };
+                        self.sessions.insert(raw_id, record);
+                        events.push(EventRecord::SessionCreated {
+                            handle: (*handle).to_string(),
+                            max_amount: *max_amount,
+                            escrowed_amount: *max_amount,
+                            expires_at_ledger: *expires_at_ledger,
+                            event_version: 2,
+                        });
+                        let scheme = if allowed_diffs.contains(&ExpectedDiff::CreateSessionDomainId)
+                        {
+                            "DEPLOYMENT_SCOPED_SESSION_ID".to_string()
+                        } else if self.version == Version::V2 {
+                            "v2-flat-tuple-sha256".to_string()
+                        } else {
+                            "v3-domain-separated-xdr-sha256".to_string()
+                        };
+                        Ok(NormalizedResult::Created {
+                            handle: (*handle).to_string(),
+                            scheme,
+                        })
+                    }
+                }
+                SharedOp::GetSession {
+                    handle,
+                    cross_deployment_raw_id,
+                } => {
+                    let raw_id = if let Some(explicit) = cross_deployment_raw_id {
+                        if !explicit.starts_with(self.prefix()) {
+                            return Err("cross-deployment identifier reinterpretation forbidden");
+                        }
+                        explicit.clone()
+                    } else {
+                        self.handles
+                            .get(*handle)
+                            .cloned()
+                            .unwrap_or_else(|| format!("{}missing:{handle}", self.prefix()))
+                    };
+                    match self.sessions.get(&raw_id) {
+                        None => Err(ContractError::SessionNotFound),
+                        Some(s) => {
+                            let audit_fields =
+                                if allowed_diffs.contains(&ExpectedDiff::SessionAuditMetadata) {
+                                    None
+                                } else {
+                                    Some(SessionAuditFields {
+                                        creation_ledger: s.creation_ledger,
+                                        finalized_ledger: s.finalized_ledger,
+                                        resource_scheme_version: s.resource_scheme_version,
+                                        usage_scheme_version: s.usage_scheme_version,
+                                    })
+                                };
+                            Ok(NormalizedResult::Session {
+                                handle: s.handle.clone(),
+                                max_amount: s.max_amount,
+                                escrowed_amount: s.escrowed_amount,
+                                settled_amount: s.settled_amount,
+                                expires_at_ledger: s.expires_at_ledger,
+                                status: s.status,
+                                audit_fields,
+                            })
+                        }
+                    }
+                }
+                SharedOp::Settle {
+                    seller_authorized,
+                    handle,
+                    actual_amount,
+                } => {
+                    let raw_id = self
+                        .handles
+                        .get(*handle)
+                        .cloned()
+                        .unwrap_or_else(|| format!("{}missing:{handle}", self.prefix()));
+                    match self.sessions.get_mut(&raw_id) {
+                        None => Err(ContractError::SessionNotFound),
+                        Some(s) => match s.status {
+                            SessionStatus::Settled => Err(ContractError::SessionAlreadySettled),
+                            SessionStatus::Cancelled => Err(ContractError::SessionCancelled),
+                            SessionStatus::Expired => Err(ContractError::SessionExpired),
+                            SessionStatus::Open => {
+                                if self.ledger >= s.expires_at_ledger {
+                                    Err(ContractError::ExpiredSession)
+                                } else if !seller_authorized {
+                                    Err(ContractError::Unauthorized)
+                                } else if *actual_amount <= 0 {
+                                    Err(ContractError::InvalidAmount)
+                                } else if *actual_amount > s.max_amount {
+                                    Err(ContractError::AmountExceedsCap)
+                                } else {
+                                    let refund = s.escrowed_amount - *actual_amount;
+                                    s.status = SessionStatus::Settled;
+                                    s.settled_amount = *actual_amount;
+                                    s.escrowed_amount = 0;
+                                    if self.version == Version::V3 {
+                                        s.finalized_ledger = Some(self.ledger);
+                                        s.usage_scheme_version = Some(1);
+                                    }
+                                    self.contract_balance -= s.max_amount;
+                                    self.seller_balance += *actual_amount;
+                                    self.buyer_balance += refund;
+                                    self.liability -= s.max_amount;
+                                    events.push(EventRecord::SessionSettled {
+                                        handle: s.handle.clone(),
+                                        actual_amount: *actual_amount,
+                                        refunded_amount: refund,
+                                        event_version: 2,
+                                    });
+                                    Ok(NormalizedResult::Void)
+                                }
+                            }
+                        },
+                    }
+                }
+                SharedOp::Cancel {
+                    buyer_authorized,
+                    handle,
+                } => {
+                    let raw_id = self
+                        .handles
+                        .get(*handle)
+                        .cloned()
+                        .unwrap_or_else(|| format!("{}missing:{handle}", self.prefix()));
+                    match self.sessions.get_mut(&raw_id) {
+                        None => Err(ContractError::SessionNotFound),
+                        Some(s) => match s.status {
+                            SessionStatus::Settled => Err(ContractError::SessionAlreadySettled),
+                            SessionStatus::Cancelled => Err(ContractError::SessionCancelled),
+                            SessionStatus::Expired => Err(ContractError::SessionExpired),
+                            SessionStatus::Open => {
+                                if self.ledger >= s.expires_at_ledger {
+                                    Err(ContractError::ExpiredSession)
+                                } else if !buyer_authorized {
+                                    Err(ContractError::Unauthorized)
+                                } else {
+                                    let refund = s.escrowed_amount;
+                                    s.status = SessionStatus::Cancelled;
+                                    s.escrowed_amount = 0;
+                                    if self.version == Version::V3 {
+                                        s.finalized_ledger = Some(self.ledger);
+                                    }
+                                    self.contract_balance -= refund;
+                                    self.buyer_balance += refund;
+                                    self.liability -= refund;
+                                    events.push(EventRecord::SessionCancelled {
+                                        handle: s.handle.clone(),
+                                        refunded_amount: refund,
+                                        event_version: 2,
+                                    });
+                                    Ok(NormalizedResult::Void)
+                                }
+                            }
+                        },
+                    }
+                }
+                SharedOp::RecoverExpired { handle } => {
+                    let raw_id = self
+                        .handles
+                        .get(*handle)
+                        .cloned()
+                        .unwrap_or_else(|| format!("{}missing:{handle}", self.prefix()));
+                    match self.sessions.get_mut(&raw_id) {
+                        None => Err(ContractError::SessionNotFound),
+                        Some(s) => match s.status {
+                            SessionStatus::Settled => Err(ContractError::SessionAlreadySettled),
+                            SessionStatus::Cancelled => Err(ContractError::SessionCancelled),
+                            SessionStatus::Expired => Err(ContractError::SessionExpired),
+                            SessionStatus::Open => {
+                                if self.ledger < s.expires_at_ledger {
+                                    Err(ContractError::SessionNotExpired)
+                                } else {
+                                    let refund = s.escrowed_amount;
+                                    s.status = SessionStatus::Expired;
+                                    s.escrowed_amount = 0;
+                                    if self.version == Version::V3 {
+                                        s.finalized_ledger = Some(self.ledger);
+                                    }
+                                    self.contract_balance -= refund;
+                                    self.buyer_balance += refund;
+                                    self.liability -= refund;
+                                    events.push(EventRecord::SessionRecovered {
+                                        handle: s.handle.clone(),
+                                        refunded_amount: refund,
+                                        expired_at_ledger: s.expires_at_ledger,
+                                        recovered_at_ledger: self.ledger,
+                                        event_version: 2,
+                                    });
+                                    Ok(NormalizedResult::Void)
+                                }
+                            }
+                        },
+                    }
+                }
+                SharedOp::ExtendTtl { handle } => {
+                    let raw_id = self
+                        .handles
+                        .get(*handle)
+                        .cloned()
+                        .unwrap_or_else(|| format!("{}missing:{handle}", self.prefix()));
+                    match self.sessions.get_mut(&raw_id) {
+                        None => Err(ContractError::SessionNotFound),
+                        Some(s) => {
+                            if s.status != SessionStatus::Open {
+                                Err(ContractError::TtlExtensionFailed)
+                            } else {
+                                s.ttl_extended_at = self.ledger;
+                                Ok(NormalizedResult::Void)
+                            }
+                        }
+                    }
+                }
+            };
+
+            let terminal_states = self
+                .sessions
+                .values()
+                .map(|s| (s.handle.clone(), s.status))
+                .collect();
+
+            Ok(StepObservation {
+                outcome,
+                events,
+                buyer_balance: self.buyer_balance,
+                seller_balance: self.seller_balance,
+                contract_balance: self.contract_balance,
+                liability: self.liability,
+                terminal_states,
+            })
+        }
+    }
+
+    fn compare_trace(
+        name: &str,
+        ops: &[SharedOp],
+        allowed_diffs: &BTreeSet<ExpectedDiff>,
+    ) -> Result<(), String> {
+        let mut v2 = Runtime::new(Version::V2, 1_000);
+        let mut v3 = Runtime::new(Version::V3, 1_000);
+
+        for (idx, op) in ops.iter().enumerate() {
+            let obs_v2 = v2.step(op, allowed_diffs).map_err(|e| e.to_string())?;
+            let obs_v3 = v3.step(op, allowed_diffs).map_err(|e| e.to_string())?;
+            if obs_v2 != obs_v3 {
+                return Err(format!(
+                    "trace {name} step {idx} ({op:?}) diverged:\n  v2: {obs_v2:?}\n  v3: {obs_v3:?}"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn shared_v2_and_v3_traces_match_under_documented_expected_differences() {
+        let diffs = ExpectedDiff::all();
+        let traces: &[(&str, &[SharedOp])] = &[
+            (
+                "partial_settlement_lifecycle",
+                &[
+                    SharedOp::InterfaceVersion,
+                    SharedOp::Initialize {
+                        admin_authorized: true,
+                        asset: "asset:LBT",
+                    },
+                    SharedOp::CreateSession {
+                        buyer_authorized: true,
+                        handle: "s0",
+                        asset: "asset:LBT",
+                        max_amount: 500,
+                        expires_at_ledger: 50,
+                    },
+                    SharedOp::GetSession {
+                        handle: "s0",
+                        cross_deployment_raw_id: None,
+                    },
+                    SharedOp::Settle {
+                        seller_authorized: true,
+                        handle: "s0",
+                        actual_amount: 300,
+                    },
+                    SharedOp::GetSession {
+                        handle: "s0",
+                        cross_deployment_raw_id: None,
+                    },
+                ],
+            ),
+            (
+                "buyer_cancellation_and_ttl_extension_lifecycle",
+                &[
+                    SharedOp::Initialize {
+                        admin_authorized: true,
+                        asset: "asset:LBT",
+                    },
+                    SharedOp::CreateSession {
+                        buyer_authorized: true,
+                        handle: "s0",
+                        asset: "asset:LBT",
+                        max_amount: 400,
+                        expires_at_ledger: 50,
+                    },
+                    SharedOp::ExtendTtl { handle: "s0" },
+                    SharedOp::Cancel {
+                        buyer_authorized: true,
+                        handle: "s0",
+                    },
+                    SharedOp::GetSession {
+                        handle: "s0",
+                        cross_deployment_raw_id: None,
+                    },
+                ],
+            ),
+            (
+                "expiry_recovery_and_boundary_rejections",
+                &[
+                    SharedOp::Initialize {
+                        admin_authorized: true,
+                        asset: "asset:LBT",
+                    },
+                    SharedOp::CreateSession {
+                        buyer_authorized: true,
+                        handle: "s0",
+                        asset: "asset:LBT",
+                        max_amount: 600,
+                        expires_at_ledger: 50,
+                    },
+                    SharedOp::RecoverExpired { handle: "s0" },
+                    SharedOp::AdvanceLedger(50),
+                    SharedOp::Settle {
+                        seller_authorized: true,
+                        handle: "s0",
+                        actual_amount: 100,
+                    },
+                    SharedOp::Cancel {
+                        buyer_authorized: true,
+                        handle: "s0",
+                    },
+                    SharedOp::RecoverExpired { handle: "s0" },
+                    SharedOp::RecoverExpired { handle: "s0" },
+                    SharedOp::ExtendTtl { handle: "s0" },
+                ],
+            ),
+        ];
+
+        for (name, ops) in traces {
+            compare_trace(name, ops, &diffs).expect("normalized trace must match across v2 and v3");
+        }
+    }
+
+    #[test]
+    fn unapproved_version_differences_and_cross_deployment_identifiers_fail_closed() {
+        let trace = [
+            SharedOp::InterfaceVersion,
+            SharedOp::Initialize {
+                admin_authorized: true,
+                asset: "asset:LBT",
+            },
+            SharedOp::CreateSession {
+                buyer_authorized: true,
+                handle: "s0",
+                asset: "asset:LBT",
+                max_amount: 500,
+                expires_at_ledger: 50,
+            },
+            SharedOp::GetSession {
+                handle: "s0",
+                cross_deployment_raw_id: None,
+            },
+        ];
+
+        for missing in ExpectedDiff::all() {
+            let mut partial = ExpectedDiff::all();
+            partial.remove(&missing);
+            assert!(
+                compare_trace("missing_diff_fixture", &trace, &partial).is_err(),
+                "removing expected difference {missing:?} must cause differential failure"
+            );
+        }
+
+        // Cross-deployment identifier reinterpretation must fail
+        let mut v3 = Runtime::new(Version::V3, 1_000);
+        let res = v3.step(
+            &SharedOp::GetSession {
+                handle: "s0",
+                cross_deployment_raw_id: Some("v2:session-0-500-50".to_string()),
+            },
+            &ExpectedDiff::all(),
+        );
+        assert_eq!(
+            res,
+            Err("cross-deployment identifier reinterpretation forbidden")
+        );
+    }
+
+    #[test]
+    fn committed_cross_version_trace_artifact_is_present_and_complete() {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../artifacts/interface/cross-version-behavior-traces.json");
+        let text = std::fs::read_to_string(&path).expect("cross-version trace artifact must exist");
+        for required in [
+            "\"lumenbazaar/cross-version-behavior-traces\"",
+            "\"diff-interface-version\"",
+            "\"diff-initialize-asset-policies-and-event\"",
+            "\"diff-create-session-domain-id\"",
+            "\"diff-session-audit-metadata\"",
+            "\"partial_settlement_lifecycle\"",
+            "\"exact_cap_settlement_lifecycle\"",
+            "\"buyer_cancellation_and_ttl_extension_lifecycle\"",
+            "\"expiry_recovery_lifecycle\"",
+            "\"terminal_immutability_and_double_exit_rejections\"",
+            "\"expiry_and_amount_boundary_rejections\"",
+            "\"unauthorized_and_missing_session_rejections\"",
+        ] {
+            assert!(
+                text.contains(required),
+                "cross-version-behavior-traces.json is missing {required}"
+            );
+        }
+    }
+}

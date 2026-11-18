@@ -1,0 +1,1561 @@
+{
+  "schema": "lumenbazaar/cross-version-behavior-traces",
+  "version": 1,
+  "fromInterfaceVersion": 2,
+  "toInterfaceVersion": 3,
+  "sharedOperations": [
+    "cancel",
+    "create_session",
+    "extend_ttl",
+    "get_session",
+    "initialize",
+    "interface_version",
+    "recover_expired",
+    "settle"
+  ],
+  "identifierIsolationRule": "Session IDs are deployment-scoped (v2: legacy tuple hash; v3: domain-separated ScVal XDR hash with idempotency_key). Traces normalize session handles within each deployment and forbid cross-deployment identifier reinterpretation.",
+  "expectedDifferences": [
+    {
+      "id": "diff-interface-version",
+      "operation": "interface_version",
+      "field": "result",
+      "v2Value": 2,
+      "v3Value": 3,
+      "rationale": "Each replacement deployment reports its frozen major interface version."
+    },
+    {
+      "id": "diff-initialize-asset-policies-and-event",
+      "operation": "initialize",
+      "field": "events",
+      "v2Value": [],
+      "v3Value": [
+        "AssetActivated"
+      ],
+      "rationale": "v2 records a boolean supported-asset flag with no event; v3 validates SEP-41 asset policies, sets AssetStatus::Active, and emits AssetActivated (event_version 3)."
+    },
+    {
+      "id": "diff-create-session-domain-id",
+      "operation": "create_session",
+      "field": "session_id_scheme",
+      "v2Value": "v2-flat-tuple-sha256",
+      "v3Value": "v3-domain-separated-xdr-sha256",
+      "rationale": "v3 session IDs hash domain-separated ScVal XDR (domain_xdr, payload_xdr) including idempotency_key; identifiers are deployment-scoped and never reinterpreted across contracts."
+    },
+    {
+      "id": "diff-session-audit-metadata",
+      "operation": "get_session",
+      "field": "v3_only_session_fields",
+      "v2Value": null,
+      "v3Value": [
+        "creation_ledger",
+        "finalized_ledger",
+        "resource_scheme_version",
+        "usage_scheme_version"
+      ],
+      "rationale": "v3 appends audit ledger and commitment scheme version metadata to Session while preserving all shared v2 session fields, status transitions, events, and balances."
+    }
+  ],
+  "traces": [
+    {
+      "name": "partial_settlement_lifecycle",
+      "description": "Shared initialize, create_session, get_session, and partial settle preserve seller payout, buyer refund, events, zero liability, and Settled terminal state.",
+      "initialBuyerBalance": 1000,
+      "steps": [
+        {
+          "op": "interface_version"
+        },
+        {
+          "op": "initialize",
+          "assets": [
+            "asset:LBT"
+          ]
+        },
+        {
+          "op": "create_session",
+          "assignHandle": "s0",
+          "asset": "asset:LBT",
+          "maxAmount": 500,
+          "expiresAtLedger": 50
+        },
+        {
+          "op": "get_session",
+          "sessionHandle": "s0"
+        },
+        {
+          "op": "settle",
+          "sessionHandle": "s0",
+          "actualAmount": 300
+        },
+        {
+          "op": "get_session",
+          "sessionHandle": "s0"
+        }
+      ],
+      "normalizedSteps": [
+        {
+          "stepIndex": 0,
+          "op": "interface_version",
+          "outcome": "ok",
+          "error": null,
+          "result": "INTERFACE_VERSION_MATCHED_FIXTURE",
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {},
+          "appliedDifferences": [
+            "diff-interface-version"
+          ]
+        },
+        {
+          "stepIndex": 1,
+          "op": "initialize",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {},
+          "appliedDifferences": [
+            "diff-initialize-asset-policies-and-event"
+          ]
+        },
+        {
+          "stepIndex": 2,
+          "op": "create_session",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "sessionHandle": "s0",
+            "sessionIdScheme": "DEPLOYMENT_SCOPED_SESSION_ID"
+          },
+          "events": [
+            {
+              "name": "SessionCreated",
+              "prefixTopic": "session_created",
+              "topic": "s0",
+              "eventVersion": 2,
+              "data": {
+                "buyer": "addr:buyer",
+                "seller": "addr:seller",
+                "asset": "asset:LBT",
+                "max_amount": 500,
+                "escrowed_amount": 500,
+                "expires_at_ledger": 50,
+                "resource_hash": "0909090909090909090909090909090909090909090909090909090909090909"
+              }
+            }
+          ],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": [
+            "diff-create-session-domain-id"
+          ]
+        },
+        {
+          "stepIndex": 3,
+          "op": "get_session",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "handle": "s0",
+            "buyer": "addr:buyer",
+            "seller": "addr:seller",
+            "asset": "asset:LBT",
+            "max_amount": 500,
+            "escrowed_amount": 500,
+            "settled_amount": 0,
+            "expires_at_ledger": 50,
+            "resource_hash": "0909090909090909090909090909090909090909090909090909090909090909",
+            "usage_hash": null,
+            "status": "Open",
+            "ttl_extended_at_ledger": 10
+          },
+          "events": [],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": [
+            "diff-session-audit-metadata"
+          ]
+        },
+        {
+          "stepIndex": 4,
+          "op": "settle",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [
+            {
+              "name": "SessionSettled",
+              "prefixTopic": "session_settled",
+              "topic": "s0",
+              "eventVersion": 2,
+              "data": {
+                "seller": "addr:seller",
+                "asset": "asset:LBT",
+                "actual_amount": 300,
+                "refunded_amount": 200,
+                "usage_hash": "1111111111111111111111111111111111111111111111111111111111111111"
+              }
+            }
+          ],
+          "balances": {
+            "buyer": 700,
+            "seller": 300,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Settled"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 5,
+          "op": "get_session",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "handle": "s0",
+            "buyer": "addr:buyer",
+            "seller": "addr:seller",
+            "asset": "asset:LBT",
+            "max_amount": 500,
+            "escrowed_amount": 0,
+            "settled_amount": 300,
+            "expires_at_ledger": 50,
+            "resource_hash": "0909090909090909090909090909090909090909090909090909090909090909",
+            "usage_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+            "status": "Settled",
+            "ttl_extended_at_ledger": 10
+          },
+          "events": [],
+          "balances": {
+            "buyer": 700,
+            "seller": 300,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Settled"
+          },
+          "appliedDifferences": [
+            "diff-session-audit-metadata"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "exact_cap_settlement_lifecycle",
+      "description": "Settling for the exact escrowed cap transfers 100% to seller, refunds 0 to buyer, clears liability, and transitions to Settled.",
+      "initialBuyerBalance": 1000,
+      "steps": [
+        {
+          "op": "initialize",
+          "assets": [
+            "asset:LBT"
+          ]
+        },
+        {
+          "op": "create_session",
+          "assignHandle": "s0",
+          "asset": "asset:LBT",
+          "maxAmount": 500,
+          "expiresAtLedger": 50
+        },
+        {
+          "op": "settle",
+          "sessionHandle": "s0",
+          "actualAmount": 500
+        },
+        {
+          "op": "get_session",
+          "sessionHandle": "s0"
+        }
+      ],
+      "normalizedSteps": [
+        {
+          "stepIndex": 0,
+          "op": "initialize",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {},
+          "appliedDifferences": [
+            "diff-initialize-asset-policies-and-event"
+          ]
+        },
+        {
+          "stepIndex": 1,
+          "op": "create_session",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "sessionHandle": "s0",
+            "sessionIdScheme": "DEPLOYMENT_SCOPED_SESSION_ID"
+          },
+          "events": [
+            {
+              "name": "SessionCreated",
+              "prefixTopic": "session_created",
+              "topic": "s0",
+              "eventVersion": 2,
+              "data": {
+                "buyer": "addr:buyer",
+                "seller": "addr:seller",
+                "asset": "asset:LBT",
+                "max_amount": 500,
+                "escrowed_amount": 500,
+                "expires_at_ledger": 50,
+                "resource_hash": "0909090909090909090909090909090909090909090909090909090909090909"
+              }
+            }
+          ],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": [
+            "diff-create-session-domain-id"
+          ]
+        },
+        {
+          "stepIndex": 2,
+          "op": "settle",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [
+            {
+              "name": "SessionSettled",
+              "prefixTopic": "session_settled",
+              "topic": "s0",
+              "eventVersion": 2,
+              "data": {
+                "seller": "addr:seller",
+                "asset": "asset:LBT",
+                "actual_amount": 500,
+                "refunded_amount": 0,
+                "usage_hash": "1111111111111111111111111111111111111111111111111111111111111111"
+              }
+            }
+          ],
+          "balances": {
+            "buyer": 500,
+            "seller": 500,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Settled"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 3,
+          "op": "get_session",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "handle": "s0",
+            "buyer": "addr:buyer",
+            "seller": "addr:seller",
+            "asset": "asset:LBT",
+            "max_amount": 500,
+            "escrowed_amount": 0,
+            "settled_amount": 500,
+            "expires_at_ledger": 50,
+            "resource_hash": "0909090909090909090909090909090909090909090909090909090909090909",
+            "usage_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+            "status": "Settled",
+            "ttl_extended_at_ledger": 10
+          },
+          "events": [],
+          "balances": {
+            "buyer": 500,
+            "seller": 500,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Settled"
+          },
+          "appliedDifferences": [
+            "diff-session-audit-metadata"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "buyer_cancellation_and_ttl_extension_lifecycle",
+      "description": "Open session TTL extension emits no event and preserves state; buyer cancellation before expiry refunds full cap and transitions to Cancelled.",
+      "initialBuyerBalance": 1000,
+      "steps": [
+        {
+          "op": "initialize",
+          "assets": [
+            "asset:LBT"
+          ]
+        },
+        {
+          "op": "create_session",
+          "assignHandle": "s0",
+          "asset": "asset:LBT",
+          "maxAmount": 400,
+          "expiresAtLedger": 50
+        },
+        {
+          "op": "extend_ttl",
+          "sessionHandle": "s0"
+        },
+        {
+          "op": "cancel",
+          "sessionHandle": "s0"
+        },
+        {
+          "op": "get_session",
+          "sessionHandle": "s0"
+        }
+      ],
+      "normalizedSteps": [
+        {
+          "stepIndex": 0,
+          "op": "initialize",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {},
+          "appliedDifferences": [
+            "diff-initialize-asset-policies-and-event"
+          ]
+        },
+        {
+          "stepIndex": 1,
+          "op": "create_session",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "sessionHandle": "s0",
+            "sessionIdScheme": "DEPLOYMENT_SCOPED_SESSION_ID"
+          },
+          "events": [
+            {
+              "name": "SessionCreated",
+              "prefixTopic": "session_created",
+              "topic": "s0",
+              "eventVersion": 2,
+              "data": {
+                "buyer": "addr:buyer",
+                "seller": "addr:seller",
+                "asset": "asset:LBT",
+                "max_amount": 400,
+                "escrowed_amount": 400,
+                "expires_at_ledger": 50,
+                "resource_hash": "0909090909090909090909090909090909090909090909090909090909090909"
+              }
+            }
+          ],
+          "balances": {
+            "buyer": 600,
+            "seller": 0,
+            "contract": 400
+          },
+          "liability": 400,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": [
+            "diff-create-session-domain-id"
+          ]
+        },
+        {
+          "stepIndex": 2,
+          "op": "extend_ttl",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [],
+          "balances": {
+            "buyer": 600,
+            "seller": 0,
+            "contract": 400
+          },
+          "liability": 400,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 3,
+          "op": "cancel",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [
+            {
+              "name": "SessionCancelled",
+              "prefixTopic": "session_cancelled",
+              "topic": "s0",
+              "eventVersion": 2,
+              "data": {
+                "buyer": "addr:buyer",
+                "asset": "asset:LBT",
+                "refunded_amount": 400
+              }
+            }
+          ],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Cancelled"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 4,
+          "op": "get_session",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "handle": "s0",
+            "buyer": "addr:buyer",
+            "seller": "addr:seller",
+            "asset": "asset:LBT",
+            "max_amount": 400,
+            "escrowed_amount": 0,
+            "settled_amount": 0,
+            "expires_at_ledger": 50,
+            "resource_hash": "0909090909090909090909090909090909090909090909090909090909090909",
+            "usage_hash": null,
+            "status": "Cancelled",
+            "ttl_extended_at_ledger": 10
+          },
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Cancelled"
+          },
+          "appliedDifferences": [
+            "diff-session-audit-metadata"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "expiry_recovery_lifecycle",
+      "description": "At or after expires_at_ledger, recover_expired refunds the full escrowed amount to the stored buyer and transitions to Expired.",
+      "initialBuyerBalance": 1000,
+      "steps": [
+        {
+          "op": "initialize",
+          "assets": [
+            "asset:LBT"
+          ]
+        },
+        {
+          "op": "create_session",
+          "assignHandle": "s0",
+          "asset": "asset:LBT",
+          "maxAmount": 600,
+          "expiresAtLedger": 50
+        },
+        {
+          "op": "advance_ledger",
+          "ledger": 50
+        },
+        {
+          "op": "recover_expired",
+          "sessionHandle": "s0"
+        },
+        {
+          "op": "get_session",
+          "sessionHandle": "s0"
+        }
+      ],
+      "normalizedSteps": [
+        {
+          "stepIndex": 0,
+          "op": "initialize",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {},
+          "appliedDifferences": [
+            "diff-initialize-asset-policies-and-event"
+          ]
+        },
+        {
+          "stepIndex": 1,
+          "op": "create_session",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "sessionHandle": "s0",
+            "sessionIdScheme": "DEPLOYMENT_SCOPED_SESSION_ID"
+          },
+          "events": [
+            {
+              "name": "SessionCreated",
+              "prefixTopic": "session_created",
+              "topic": "s0",
+              "eventVersion": 2,
+              "data": {
+                "buyer": "addr:buyer",
+                "seller": "addr:seller",
+                "asset": "asset:LBT",
+                "max_amount": 600,
+                "escrowed_amount": 600,
+                "expires_at_ledger": 50,
+                "resource_hash": "0909090909090909090909090909090909090909090909090909090909090909"
+              }
+            }
+          ],
+          "balances": {
+            "buyer": 400,
+            "seller": 0,
+            "contract": 600
+          },
+          "liability": 600,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": [
+            "diff-create-session-domain-id"
+          ]
+        },
+        {
+          "stepIndex": 2,
+          "op": "advance_ledger",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "ledger": 50
+          },
+          "events": [],
+          "balances": {
+            "buyer": 400,
+            "seller": 0,
+            "contract": 600
+          },
+          "liability": 600,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 3,
+          "op": "recover_expired",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [
+            {
+              "name": "SessionRecovered",
+              "prefixTopic": "session_recovered",
+              "topic": "s0",
+              "eventVersion": 2,
+              "data": {
+                "buyer": "addr:buyer",
+                "asset": "asset:LBT",
+                "refunded_amount": 600,
+                "expired_at_ledger": 50,
+                "recovered_at_ledger": 50
+              }
+            }
+          ],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Expired"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 4,
+          "op": "get_session",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "handle": "s0",
+            "buyer": "addr:buyer",
+            "seller": "addr:seller",
+            "asset": "asset:LBT",
+            "max_amount": 600,
+            "escrowed_amount": 0,
+            "settled_amount": 0,
+            "expires_at_ledger": 50,
+            "resource_hash": "0909090909090909090909090909090909090909090909090909090909090909",
+            "usage_hash": null,
+            "status": "Expired",
+            "ttl_extended_at_ledger": 10
+          },
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Expired"
+          },
+          "appliedDifferences": [
+            "diff-session-audit-metadata"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "terminal_immutability_and_double_exit_rejections",
+      "description": "Once finalized (Settled, Cancelled, or Expired), every subsequent settle, cancel, recover_expired, or extend_ttl fails with identical error codes and zero state change.",
+      "initialBuyerBalance": 1000,
+      "steps": [
+        {
+          "op": "initialize",
+          "assets": [
+            "asset:LBT"
+          ]
+        },
+        {
+          "op": "create_session",
+          "assignHandle": "s0",
+          "asset": "asset:LBT",
+          "maxAmount": 500,
+          "expiresAtLedger": 50
+        },
+        {
+          "op": "settle",
+          "sessionHandle": "s0",
+          "actualAmount": 200
+        },
+        {
+          "op": "settle",
+          "sessionHandle": "s0",
+          "actualAmount": 100
+        },
+        {
+          "op": "cancel",
+          "sessionHandle": "s0"
+        },
+        {
+          "op": "recover_expired",
+          "sessionHandle": "s0"
+        },
+        {
+          "op": "extend_ttl",
+          "sessionHandle": "s0"
+        }
+      ],
+      "normalizedSteps": [
+        {
+          "stepIndex": 0,
+          "op": "initialize",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {},
+          "appliedDifferences": [
+            "diff-initialize-asset-policies-and-event"
+          ]
+        },
+        {
+          "stepIndex": 1,
+          "op": "create_session",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "sessionHandle": "s0",
+            "sessionIdScheme": "DEPLOYMENT_SCOPED_SESSION_ID"
+          },
+          "events": [
+            {
+              "name": "SessionCreated",
+              "prefixTopic": "session_created",
+              "topic": "s0",
+              "eventVersion": 2,
+              "data": {
+                "buyer": "addr:buyer",
+                "seller": "addr:seller",
+                "asset": "asset:LBT",
+                "max_amount": 500,
+                "escrowed_amount": 500,
+                "expires_at_ledger": 50,
+                "resource_hash": "0909090909090909090909090909090909090909090909090909090909090909"
+              }
+            }
+          ],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": [
+            "diff-create-session-domain-id"
+          ]
+        },
+        {
+          "stepIndex": 2,
+          "op": "settle",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [
+            {
+              "name": "SessionSettled",
+              "prefixTopic": "session_settled",
+              "topic": "s0",
+              "eventVersion": 2,
+              "data": {
+                "seller": "addr:seller",
+                "asset": "asset:LBT",
+                "actual_amount": 200,
+                "refunded_amount": 300,
+                "usage_hash": "1111111111111111111111111111111111111111111111111111111111111111"
+              }
+            }
+          ],
+          "balances": {
+            "buyer": 800,
+            "seller": 200,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Settled"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 3,
+          "op": "settle",
+          "outcome": "err",
+          "error": {
+            "name": "SessionAlreadySettled",
+            "code": 6
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 800,
+            "seller": 200,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Settled"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 4,
+          "op": "cancel",
+          "outcome": "err",
+          "error": {
+            "name": "SessionAlreadySettled",
+            "code": 6
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 800,
+            "seller": 200,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Settled"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 5,
+          "op": "recover_expired",
+          "outcome": "err",
+          "error": {
+            "name": "SessionAlreadySettled",
+            "code": 6
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 800,
+            "seller": 200,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Settled"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 6,
+          "op": "extend_ttl",
+          "outcome": "err",
+          "error": {
+            "name": "TtlExtensionFailed",
+            "code": 11
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 800,
+            "seller": 200,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Settled"
+          },
+          "appliedDifferences": []
+        }
+      ]
+    },
+    {
+      "name": "expiry_and_amount_boundary_rejections",
+      "description": "Zero/negative amounts, over-cap settlements, premature recovery before expiry, and settle/cancel at expiry fail with identical error codes without moving funds.",
+      "initialBuyerBalance": 1000,
+      "steps": [
+        {
+          "op": "initialize",
+          "assets": [
+            "asset:LBT"
+          ]
+        },
+        {
+          "op": "create_session",
+          "assignHandle": "s_invalid",
+          "asset": "asset:LBT",
+          "maxAmount": 0,
+          "expiresAtLedger": 50
+        },
+        {
+          "op": "create_session",
+          "assignHandle": "s0",
+          "asset": "asset:LBT",
+          "maxAmount": 500,
+          "expiresAtLedger": 50
+        },
+        {
+          "op": "settle",
+          "sessionHandle": "s0",
+          "actualAmount": 0
+        },
+        {
+          "op": "settle",
+          "sessionHandle": "s0",
+          "actualAmount": 501
+        },
+        {
+          "op": "advance_ledger",
+          "ledger": 49
+        },
+        {
+          "op": "recover_expired",
+          "sessionHandle": "s0"
+        },
+        {
+          "op": "advance_ledger",
+          "ledger": 50
+        },
+        {
+          "op": "settle",
+          "sessionHandle": "s0",
+          "actualAmount": 100
+        },
+        {
+          "op": "cancel",
+          "sessionHandle": "s0"
+        },
+        {
+          "op": "extend_ttl",
+          "sessionHandle": "s0"
+        },
+        {
+          "op": "recover_expired",
+          "sessionHandle": "s0"
+        },
+        {
+          "op": "recover_expired",
+          "sessionHandle": "s0"
+        }
+      ],
+      "normalizedSteps": [
+        {
+          "stepIndex": 0,
+          "op": "initialize",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {},
+          "appliedDifferences": [
+            "diff-initialize-asset-policies-and-event"
+          ]
+        },
+        {
+          "stepIndex": 1,
+          "op": "create_session",
+          "outcome": "err",
+          "error": {
+            "name": "InvalidAmount",
+            "code": 3
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {},
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 2,
+          "op": "create_session",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "sessionHandle": "s0",
+            "sessionIdScheme": "DEPLOYMENT_SCOPED_SESSION_ID"
+          },
+          "events": [
+            {
+              "name": "SessionCreated",
+              "prefixTopic": "session_created",
+              "topic": "s0",
+              "eventVersion": 2,
+              "data": {
+                "buyer": "addr:buyer",
+                "seller": "addr:seller",
+                "asset": "asset:LBT",
+                "max_amount": 500,
+                "escrowed_amount": 500,
+                "expires_at_ledger": 50,
+                "resource_hash": "0909090909090909090909090909090909090909090909090909090909090909"
+              }
+            }
+          ],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": [
+            "diff-create-session-domain-id"
+          ]
+        },
+        {
+          "stepIndex": 3,
+          "op": "settle",
+          "outcome": "err",
+          "error": {
+            "name": "InvalidAmount",
+            "code": 3
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 4,
+          "op": "settle",
+          "outcome": "err",
+          "error": {
+            "name": "AmountExceedsCap",
+            "code": 8
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 5,
+          "op": "advance_ledger",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "ledger": 49
+          },
+          "events": [],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 6,
+          "op": "recover_expired",
+          "outcome": "err",
+          "error": {
+            "name": "SessionNotExpired",
+            "code": 22
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 7,
+          "op": "advance_ledger",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "ledger": 50
+          },
+          "events": [],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 8,
+          "op": "settle",
+          "outcome": "err",
+          "error": {
+            "name": "ExpiredSession",
+            "code": 4
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 9,
+          "op": "cancel",
+          "outcome": "err",
+          "error": {
+            "name": "ExpiredSession",
+            "code": 4
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 10,
+          "op": "extend_ttl",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 11,
+          "op": "recover_expired",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [
+            {
+              "name": "SessionRecovered",
+              "prefixTopic": "session_recovered",
+              "topic": "s0",
+              "eventVersion": 2,
+              "data": {
+                "buyer": "addr:buyer",
+                "asset": "asset:LBT",
+                "refunded_amount": 500,
+                "expired_at_ledger": 50,
+                "recovered_at_ledger": 50
+              }
+            }
+          ],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Expired"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 12,
+          "op": "recover_expired",
+          "outcome": "err",
+          "error": {
+            "name": "SessionExpired",
+            "code": 21
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {
+            "s0": "Expired"
+          },
+          "appliedDifferences": []
+        }
+      ]
+    },
+    {
+      "name": "unauthorized_and_missing_session_rejections",
+      "description": "Missing session lookups and unauthenticated initialize, create_session, settle, and cancel calls fail closed with identical error codes.",
+      "initialBuyerBalance": 1000,
+      "steps": [
+        {
+          "op": "initialize",
+          "assets": [
+            "asset:LBT"
+          ],
+          "adminAuthorized": false
+        },
+        {
+          "op": "initialize",
+          "assets": [
+            "asset:LBT"
+          ]
+        },
+        {
+          "op": "get_session",
+          "sessionHandle": "unknown"
+        },
+        {
+          "op": "create_session",
+          "assignHandle": "s_unauth",
+          "asset": "asset:LBT",
+          "maxAmount": 500,
+          "expiresAtLedger": 50,
+          "buyerAuthorized": false
+        },
+        {
+          "op": "create_session",
+          "assignHandle": "s0",
+          "asset": "asset:LBT",
+          "maxAmount": 500,
+          "expiresAtLedger": 50
+        },
+        {
+          "op": "settle",
+          "sessionHandle": "s0",
+          "actualAmount": 100,
+          "sellerAuthorized": false
+        },
+        {
+          "op": "cancel",
+          "sessionHandle": "s0",
+          "buyerAuthorized": false
+        }
+      ],
+      "normalizedSteps": [
+        {
+          "stepIndex": 0,
+          "op": "initialize",
+          "outcome": "err",
+          "error": {
+            "name": "Unauthorized",
+            "code": 2
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {},
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 1,
+          "op": "initialize",
+          "outcome": "ok",
+          "error": null,
+          "result": "void",
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {},
+          "appliedDifferences": [
+            "diff-initialize-asset-policies-and-event"
+          ]
+        },
+        {
+          "stepIndex": 2,
+          "op": "get_session",
+          "outcome": "err",
+          "error": {
+            "name": "SessionNotFound",
+            "code": 5
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {},
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 3,
+          "op": "create_session",
+          "outcome": "err",
+          "error": {
+            "name": "Unauthorized",
+            "code": 2
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 1000,
+            "seller": 0,
+            "contract": 0
+          },
+          "liability": 0,
+          "terminalStates": {},
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 4,
+          "op": "create_session",
+          "outcome": "ok",
+          "error": null,
+          "result": {
+            "sessionHandle": "s0",
+            "sessionIdScheme": "DEPLOYMENT_SCOPED_SESSION_ID"
+          },
+          "events": [
+            {
+              "name": "SessionCreated",
+              "prefixTopic": "session_created",
+              "topic": "s0",
+              "eventVersion": 2,
+              "data": {
+                "buyer": "addr:buyer",
+                "seller": "addr:seller",
+                "asset": "asset:LBT",
+                "max_amount": 500,
+                "escrowed_amount": 500,
+                "expires_at_ledger": 50,
+                "resource_hash": "0909090909090909090909090909090909090909090909090909090909090909"
+              }
+            }
+          ],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": [
+            "diff-create-session-domain-id"
+          ]
+        },
+        {
+          "stepIndex": 5,
+          "op": "settle",
+          "outcome": "err",
+          "error": {
+            "name": "Unauthorized",
+            "code": 2
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": []
+        },
+        {
+          "stepIndex": 6,
+          "op": "cancel",
+          "outcome": "err",
+          "error": {
+            "name": "Unauthorized",
+            "code": 2
+          },
+          "result": null,
+          "events": [],
+          "balances": {
+            "buyer": 500,
+            "seller": 0,
+            "contract": 500
+          },
+          "liability": 500,
+          "terminalStates": {
+            "s0": "Open"
+          },
+          "appliedDifferences": []
+        }
+      ]
+    }
+  ]
+}

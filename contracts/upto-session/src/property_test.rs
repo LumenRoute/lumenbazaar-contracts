@@ -122,6 +122,10 @@ fn create_session(
     contract: &Address,
     input: CreateInput<'_>,
 ) -> BytesN<32> {
+    let sequence = env.as_contract(contract, || storage::read_next_session_sequence(env));
+    let mut key_bytes = [0u8; 32];
+    key_bytes[0..8].copy_from_slice(&sequence.to_be_bytes());
+    let idempotency_key = BytesN::from_array(env, &key_bytes);
     client
         .mock_auths(&[MockAuth {
             address: input.buyer,
@@ -135,6 +139,7 @@ fn create_session(
                     input.cap,
                     EXPIRY_LEDGER,
                     input.resource_hash.clone(),
+                    idempotency_key.clone(),
                 )
                     .into_val(env),
                 sub_invokes: &[MockAuthInvoke {
@@ -157,6 +162,7 @@ fn create_session(
             &input.cap,
             &EXPIRY_LEDGER,
             input.resource_hash,
+            &idempotency_key,
         )
 }
 

@@ -124,7 +124,7 @@ test("the committed vectors verify against the TypeScript encoding path", () => 
 });
 
 for (const [name, tamper, pattern] of [
-  ["session preimage", (v) => (v.sessionIds[0].preimageXdrHex = `00${v.sessionIds[0].preimageXdrHex.slice(2)}`), /preimage differs/],
+  ["session preimage", (v) => (v.sessionIds[0].preimageXdrHex = `ff${v.sessionIds[0].preimageXdrHex.slice(2)}`), /preimage differs/],
   ["session idempotency key", (v) => (v.sessionIds[0].idempotencyKeyHex = "07".repeat(32)), /differs/],
   ["NFC flag", (v) => (v.networkPassphrases.find((p) => p.name === "latin-decomposed-nfd").nfc = true), /NFC flag/],
   ["usage hash", (v) => (v.usageCommitments[0].usageHashHex = "00".repeat(32)), /usage hash differs/],

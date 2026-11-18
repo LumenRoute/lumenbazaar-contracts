@@ -73,30 +73,51 @@ administrator-rotation, and creation pause/resume events use version `3`.
 | `interface_version()` | Require result `3` before encoding v3 initialization, configuration, cap-policy, administrator-rotation, liability, or batch-recovery calls. |
 | `initialize(admin, asset_policies)` | One-time deployment setup with one to 16 unique assets and explicit positive session bounds (`min_session_amount` <= `max_session_amount`). Every asset must pass the bounded read-only probe. Do not call from request handlers. |
 | `get_asset_max_session_amount(asset)` | Read the active creation cap for a supported asset. |
+| `get_asset_min_session_amount(asset)` | Read the active creation floor (`min_session_amount`) for a supported asset. |
+| `get_asset_policy(asset)` | Read the full `AssetPolicy` (`asset`, `max_session_amount`, `min_session_amount`, `max_asset_exposure`, `max_buyer_exposure`) for a configured asset. |
+| `activate_asset(policy)` | Admin-authorized post-initialization activation of a new SEP-41 asset within `MAX_SUPPORTED_ASSETS`. |
 | `set_asset_max_session_amount(asset, max_session_amount)` | Authenticated administrator update for future sessions only; immediate for cap decreases, rejects cap increases with `CapIncreasePending`. |
 | `propose_asset_cap_increase(asset, proposed_max_amount, active_at_ledger, expires_at_ledger)` | Admin-authorized proposal to increase an asset cap after a bounded delay between 100 and 17,280 ledgers. |
 | `accept_asset_cap_increase(asset)` | Admin-authorized acceptance of an active cap increase proposal before expiry. |
 | `cancel_asset_cap_increase(asset)` | Admin-authorized cancellation of a pending cap increase proposal. |
 | `get_asset_cap_increase(asset)` | Read the optional pending cap increase proposal for an asset. |
+| `set_asset_exposure_ceiling(asset, max_asset_exposure)` | Admin-authorized update to an asset's aggregate escrow liability ceiling. |
+| `get_asset_exposure_ceiling(asset)` | Read the active aggregate escrow liability ceiling for an asset. |
+| `set_buyer_exposure_ceiling(asset, max_buyer_exposure)` | Admin-authorized update to the per-buyer open escrow ceiling for an asset. |
+| `get_buyer_exposure_ceiling(asset)` | Read the active per-buyer open escrow ceiling for an asset. |
+| `get_buyer_exposure(buyer, asset)` | Read a buyer's open escrow exposure for an asset. |
+| `set_seller_exposure_ceiling(asset, ceiling)` | Admin-authorized update to the per-seller open escrow ceiling for an asset. |
+| `get_seller_exposure_ceiling(asset)` | Read the optional per-seller open escrow ceiling for an asset. |
+| `get_seller_exposure(seller, asset)` | Read a seller's open escrow exposure for an asset. |
+| `set_max_buyer_open_sessions(limit)` | Admin-authorized update to the global per-buyer open session count limit. |
+| `get_max_buyer_open_sessions()` | Read the optional per-buyer open session count limit. |
+| `get_buyer_open_sessions(buyer)` | Read a buyer's active open session count. |
+| `set_max_seller_open_sessions(limit)` | Admin-authorized update to the global per-seller open session count limit. |
+| `get_max_seller_open_sessions()` | Read the optional per-seller open session count limit. |
+| `get_seller_open_sessions(seller)` | Read a seller's active open session count. |
 | `get_admin()` | Read the active administrator. |
 | `get_admin_rotation()` | Read the optional pending administrator and expiry ledger. |
 | `propose_admin(pending_admin, expires_at_ledger)` | Current-admin-authorized proposal with a lifetime bounded between 1 and 17,280 ledgers; does not transfer privileges. |
 | `accept_admin()` | Pending-admin-authorized acceptance before expiry. |
 | `cancel_admin_rotation()` | Current-admin-authorized removal of a pending or expired proposal. |
-| `get_configuration()` | Read response/interface/storage versions, administrator, bounded supported assets, operational state, and instance TTL policy without authorization. |
+| `get_configuration()` | Read response/interface/storage versions, administrator, bounded supported assets, operational state, instance TTL policy, and `max_session_duration_ledgers` without authorization. |
+| `max_session_duration_ledgers()` | Read the maximum permitted session duration in ledgers without authorization. |
 | `get_commitment_domain_metadata()` | Read versioned commitment domain metadata, interface version, receipt schema version, and domain hash constants without authorization. |
-| `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash)` | Create a buyer-authorized spending cap and escrow the full cap for a resource. |
+| `create_session(buyer, seller, asset, max_amount, expires_at_ledger, resource_hash, idempotency_key)` | Create a buyer-authorized spending cap with per-buyer idempotency key and escrow the full cap for a resource. |
 | `deprecate_asset(asset, reason_commitment)` | Admin-authorized transition from active to deprecated with fixed-size reason commitment; blocks new sessions without changing existing sessions. |
 | `remove_asset(asset, reason_commitment)` | Admin-authorized final removal with fixed-size reason commitment after deprecation and only when recorded liability is exactly zero. |
 | `get_session(session_id)` | Read current session state for API responses, reconciliation, and settlement guards. |
 | `get_session_batch(session_ids)` | Read up to eight caller-supplied session IDs in request order with explicit `Found(Session)` or `NotFound` per-item status. Repeated IDs preserve request order and count toward the eight-item bound. |
 | `get_session_status(session_id)` | Read lightweight session status (exists, status, expires_at_ledger) without decoding commitment fields. |
 | `get_escrow_liability(asset)` | Read aggregate open-session escrow accounting for a supported asset and compare it with contract token custody. |
+| `get_asset_solvency(asset)` | Read single-asset `AssetSolvency` (`asset`, `state`, `balance`, `liability`, `surplus`) for a configured asset. |
 | `get_solvency(assets)` | Read ordered multi-asset solvency (`AssetSolvency`: `asset`, `state`, `balance`, `liability`, `surplus`) for 1 to 16 assets without authorization. Rejects empty or oversized input with `InvalidBatchSize`. |
+| `recover_surplus(asset, recipient, amount)` | Admin-authorized recovery of unencumbered token surplus (`balance - liability`) above open-session escrow liability. |
 | `settle(session_id, actual_amount, usage_hash)` | Seller-authorized settlement for actual usage. |
 | `preview_settle(session_id, actual_amount)` | Read-only, authorization-free preview returning `SettlementPreview` (eligibility, seller payout, buyer refund, expiry state, `SettlementRejectionReason`). Point-in-time only; does not guarantee future ledger eligibility. |
 | `cancel(session_id)` | Buyer-authorized cancellation before settlement. |
 | `reject(session_id)` | Seller-authorized rejection and full refund to the buyer before expiry. |
+| `reduce_session_cap(session_id, new_max_amount)` | Buyer-authorized reduction of an open session's cap with immediate partial refund of the difference. |
 | `extend_session_expiry(session_id, new_expires_at_ledger)` | Buyer-and-seller-authorized extension of an open, unexpired session within the maximum duration limit. |
 | `recover_expired(session_id)` | Permissionless full refund to the stored buyer at or after expiry. |
 | `get_recoverability(session_id)` | Read-only, authorization-free versioned (`response_version` 1) `SessionRecoverability`: status (`NotFound`, `NotExpired`, `Recoverable`, terminal states), expiry and current ledger, stored buyer recipient, asset, and refundable amount. Recoverable exactly when `recover_expired` would succeed (ledger >= expiry). |
@@ -281,15 +302,31 @@ codes 23 through 32 without changing the earlier mappings.
 | 33 | `AssetNotActive` | Do not deprecate an unknown or already deprecated asset. |
 | 34 | `AssetNotDeprecated` | Deprecate the asset before requesting final removal. |
 | 35 | `AssetLiabilityOutstanding` | Settle, cancel, or recover every open session before removal. |
-| 36 | `SessionRejected` | Treat as finalized by seller rejection; do not settle or cancel. |
-| 36 | `CapIncreasePending` | A cap increase proposal is already pending or an immediate cap increase was attempted. |
-| 37 | `CapIncreaseNotReady` | Cannot accept proposal before the configured activation ledger. |
-| 38 | `CapIncreaseNotFound` | Proposal does not exist or was already cancelled/accepted. |
-| 39 | `CapIncreaseExpired` | Cannot accept proposal at or after the expiration ledger. |
-| 40 | `InvalidCapIncreaseDelay` | Activation or expiration delay violates minimum (100) or maximum (17,280) ledgers. |
-| 41 | `UnsupportedCommitmentScheme` | Commitment scheme version is unsupported by the contract. |
 | 36 | `CreationPaused` | New sessions are paused by the administrator; surface the operational state and stop submitting `create_session`. |
 | 37 | `OperationalStateUnchanged` | The requested pause or resume already matches the current operational state; refresh `get_configuration` instead of retrying. |
+| 38 | `CapIncreasePending` | A cap increase proposal is already pending or an immediate cap increase was attempted. |
+| 39 | `CapIncreaseNotReady` | Cannot accept proposal before the configured activation ledger. |
+| 40 | `CapIncreaseNotFound` | Proposal does not exist or was already cancelled/accepted. |
+| 41 | `CapIncreaseExpired` | Cannot accept proposal at or after the expiration ledger. |
+| 42 | `InvalidCapIncreaseDelay` | Activation or expiration delay violates minimum (100) or maximum (17,280) ledgers. |
+| 43 | `UnsupportedCommitmentScheme` | Commitment scheme version is unsupported by the contract. |
+| 44 | `SellerExposureCeilingExceeded` | New session would exceed the configured per-seller open escrow ceiling for the asset. |
+| 45 | `SellerExposureCeilingNotConfigured` | No per-seller open escrow ceiling is configured for the asset. |
+| 46 | `BuyerOpenSessionsExceeded` | Buyer has reached the configured maximum concurrent open session count. |
+| 47 | `InvalidSessionCountLimit` | Session count limit must be strictly positive. |
+| 48 | `SellerOpenSessionsExceeded` | Seller has reached the configured maximum concurrent open session count. |
+| 49 | `InvalidCapReduction` | Reduced session cap must be positive, at least the asset minimum, and strictly below the current cap. |
+| 50 | `SessionRejected` | Treat as finalized by seller rejection; do not settle or cancel. |
+| 51 | `AssetAlreadyActive` | Asset is already active; do not re-activate. |
+| 52 | `AssetDeprecated` | Asset is deprecated; new sessions cannot be created for it. |
+| 53 | `AssetLimitReached` | Active and deprecated assets have reached `MAX_SUPPORTED_ASSETS` (16). |
+| 54 | `AssetExposureCeilingExceeded` | New session would exceed the asset's aggregate escrow liability ceiling. |
+| 55 | `InvalidExposureCeiling` | Exposure ceiling must be positive and compatible with the asset's session cap and current liability. |
+| 56 | `ExposureCeilingNotConfigured` | Exposure ceiling is not configured for the asset. |
+| 57 | `BuyerExposureCeilingExceeded` | New session would exceed the per-buyer open escrow ceiling for the asset. |
+| 58 | `BuyerExposureUnderflow` | Stop and investigate per-buyer exposure accounting. |
+| 59 | `SequenceExhausted` | Contract session sequence counter reached `u64::MAX`; rotate to a replacement deployment. |
+| 60 | `IdempotencyConflict` | Idempotency key was already used by the same buyer with different session parameters. |
 
 ## Hash Inputs
 
