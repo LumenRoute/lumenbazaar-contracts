@@ -80,6 +80,11 @@ fn settle_seeded_corpus() {
 }
 
 #[test]
+fn transitions_seeded_corpus() {
+    campaign("transitions");
+}
+
+#[test]
 fn policy_seeded_corpus() {
     campaign("policy");
 }
@@ -92,7 +97,10 @@ fn token_amount_seeded_corpus() {
 #[test]
 fn every_target_has_seeds() {
     let names: Vec<&str> = TARGETS.iter().map(|(name, _)| *name).collect();
-    assert_eq!(names, ["create", "settle", "policy", "token_amount"]);
+    assert_eq!(
+        names,
+        ["create", "settle", "transitions", "policy", "token_amount"]
+    );
     for name in names {
         assert!(!seeds(name).is_empty());
     }

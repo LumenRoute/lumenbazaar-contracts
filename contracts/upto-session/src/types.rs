@@ -211,6 +211,10 @@ pub struct SessionRecoverability {
     pub recipient: Option<Address>,
     pub asset: Option<Address>,
     pub refundable_amount: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommitmentDomainMetadata {
     pub response_version: u32,
     pub interface_version: u32,
@@ -235,6 +239,10 @@ pub struct AssetSolvency {
     pub balance: i128,
     pub liability: i128,
     pub surplus: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SessionStatusResponse {
     pub exists: bool,
     pub status: SessionStatus,

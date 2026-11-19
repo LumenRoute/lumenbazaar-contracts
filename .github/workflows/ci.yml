@@ -97,8 +97,11 @@ jobs:
       - name: Audit dependencies
         run: |
           cargo install cargo-audit --version 0.22.2 --locked
+          cargo install cargo-deny --version 0.20.2 --locked
+          node --test scripts/lib/dependency-exceptions.test.mjs
           node scripts/check-dependency-exceptions.mjs
           cargo audit --deny warnings --ignore RUSTSEC-2024-0436
+          cargo deny check licenses bans sources
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -195,6 +198,8 @@ jobs:
         run: |
           node scripts/check-domain-vectors.mjs
           node scripts/check-backend-handoff.mjs
+          node --test scripts/lib/error-surface-matrix.test.mjs
+          node scripts/generate-error-surface-matrix.mjs --check
 
       - name: Check encoding compatibility vectors
         env:

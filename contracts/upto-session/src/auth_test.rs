@@ -296,6 +296,7 @@ fn production_escrow_funds_and_settles_with_exact_authorization_trees() {
                     500_i128,
                     50_u32,
                     resource_hash.clone(),
+                    resource_hash.clone(),
                 )
                     .into_val(&env),
                 sub_invokes: &[MockAuthInvoke {
@@ -317,6 +318,7 @@ fn production_escrow_funds_and_settles_with_exact_authorization_trees() {
             &asset,
             &500,
             &50,
+            &resource_hash,
             &resource_hash,
         );
 

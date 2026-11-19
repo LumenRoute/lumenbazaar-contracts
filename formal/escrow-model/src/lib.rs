@@ -759,4 +759,418 @@ mod tests {
         )
         .is_ok());
     }
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    struct MultiSessionSlot {
+        buyer: u8,
+        seller: u8,
+        asset: u8,
+        cap: u8,
+        escrowed: u8,
+        settled: u8,
+        status: Status,
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    struct MultiEscrowState {
+        ledger: u8,
+        sessions: [MultiSessionSlot; 2],
+        contract_balance: [u8; 2],
+        liability: [u8; 2],
+        deposited: [u8; 2],
+        seller_paid: [u8; 2],
+        buyer_refunded: [u8; 2],
+        other_refunded: [u8; 2],
+    }
+
+    impl Default for MultiEscrowState {
+        fn default() -> Self {
+            let empty = MultiSessionSlot {
+                buyer: 0,
+                seller: 0,
+                asset: 0,
+                cap: 0,
+                escrowed: 0,
+                settled: 0,
+                status: Status::Absent,
+            };
+            Self {
+                ledger: 0,
+                sessions: [empty, empty],
+                contract_balance: [0, 0],
+                liability: [0, 0],
+                deposited: [0, 0],
+                seller_paid: [0, 0],
+                buyer_refunded: [0, 0],
+                other_refunded: [0, 0],
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum MultiAction {
+        Create {
+            slot: usize,
+            buyer: u8,
+            seller: u8,
+            asset: u8,
+            cap: u8,
+        },
+        Settle {
+            slot: usize,
+            caller: u8,
+            amount: u8,
+        },
+        Cancel {
+            slot: usize,
+            caller: u8,
+        },
+        Reject {
+            slot: usize,
+            caller: u8,
+        },
+        ReduceCap {
+            slot: usize,
+            caller: u8,
+            new_cap: u8,
+        },
+        AdvanceToExpiry,
+        Recover {
+            slot: usize,
+            caller: u8,
+        },
+    }
+
+    fn apply_multi(state: &mut MultiEscrowState, action: MultiAction) -> Result<(), Rejection> {
+        match action {
+            MultiAction::Create {
+                slot,
+                buyer,
+                seller,
+                asset,
+                cap,
+            } => {
+                if state.sessions[slot].status != Status::Absent {
+                    return Err(Rejection::InvalidState);
+                }
+                if cap == 0 || buyer == seller {
+                    return Err(Rejection::InvalidAmount);
+                }
+                let a = usize::from(asset);
+                state.sessions[slot] = MultiSessionSlot {
+                    buyer,
+                    seller,
+                    asset,
+                    cap,
+                    escrowed: cap,
+                    settled: 0,
+                    status: Status::Open,
+                };
+                state.contract_balance[a] += cap;
+                state.liability[a] += cap;
+                state.deposited[a] += cap;
+            }
+            MultiAction::Settle {
+                slot,
+                caller,
+                amount,
+            } => {
+                let s = state.sessions[slot];
+                if s.status != Status::Open {
+                    return Err(Rejection::InvalidState);
+                }
+                if state.ledger >= EXPIRY_LEDGER {
+                    return Err(Rejection::Expired);
+                }
+                if caller != s.seller {
+                    return Err(Rejection::Unauthorized);
+                }
+                if amount == 0 || amount > s.cap {
+                    return Err(Rejection::InvalidAmount);
+                }
+                let a = usize::from(s.asset);
+                let refund = s.escrowed - amount;
+                state.contract_balance[a] -= s.escrowed;
+                state.liability[a] -= s.escrowed;
+                state.seller_paid[a] += amount;
+                state.buyer_refunded[a] += refund;
+                state.sessions[slot].escrowed = 0;
+                state.sessions[slot].settled = amount;
+                state.sessions[slot].status = Status::Settled;
+            }
+            MultiAction::Cancel { slot, caller } => {
+                let s = state.sessions[slot];
+                if s.status != Status::Open {
+                    return Err(Rejection::InvalidState);
+                }
+                if state.ledger >= EXPIRY_LEDGER {
+                    return Err(Rejection::Expired);
+                }
+                if caller != s.buyer {
+                    return Err(Rejection::Unauthorized);
+                }
+                let a = usize::from(s.asset);
+                state.contract_balance[a] -= s.escrowed;
+                state.liability[a] -= s.escrowed;
+                state.buyer_refunded[a] += s.escrowed;
+                state.sessions[slot].escrowed = 0;
+                state.sessions[slot].status = Status::Cancelled;
+            }
+            MultiAction::Reject { slot, caller } => {
+                let s = state.sessions[slot];
+                if s.status != Status::Open {
+                    return Err(Rejection::InvalidState);
+                }
+                if state.ledger >= EXPIRY_LEDGER {
+                    return Err(Rejection::Expired);
+                }
+                if caller != s.seller {
+                    return Err(Rejection::Unauthorized);
+                }
+                let a = usize::from(s.asset);
+                state.contract_balance[a] -= s.escrowed;
+                state.liability[a] -= s.escrowed;
+                // Seller rejection always refunds strictly to the original buyer.
+                state.buyer_refunded[a] += s.escrowed;
+                state.sessions[slot].escrowed = 0;
+                state.sessions[slot].status = Status::Rejected;
+            }
+            MultiAction::ReduceCap {
+                slot,
+                caller,
+                new_cap,
+            } => {
+                let s = state.sessions[slot];
+                if s.status != Status::Open {
+                    return Err(Rejection::InvalidState);
+                }
+                if state.ledger >= EXPIRY_LEDGER {
+                    return Err(Rejection::Expired);
+                }
+                if new_cap == 0 || new_cap >= s.cap {
+                    return Err(Rejection::InvalidAmount);
+                }
+                if caller != s.buyer {
+                    return Err(Rejection::Unauthorized);
+                }
+                let a = usize::from(s.asset);
+                let diff = s.cap - new_cap;
+                state.contract_balance[a] -= diff;
+                state.liability[a] -= diff;
+                state.buyer_refunded[a] += diff;
+                state.sessions[slot].cap = new_cap;
+                state.sessions[slot].escrowed = new_cap;
+            }
+            MultiAction::AdvanceToExpiry => {
+                state.ledger = EXPIRY_LEDGER;
+            }
+            MultiAction::Recover { slot, caller: _ } => {
+                let s = state.sessions[slot];
+                if s.status != Status::Open {
+                    return Err(Rejection::InvalidState);
+                }
+                if state.ledger < EXPIRY_LEDGER {
+                    return Err(Rejection::NotExpired);
+                }
+                let a = usize::from(s.asset);
+                state.contract_balance[a] -= s.escrowed;
+                state.liability[a] -= s.escrowed;
+                // Permissionless recovery ignores caller and refunds strictly to stored buyer.
+                state.buyer_refunded[a] += s.escrowed;
+                state.sessions[slot].escrowed = 0;
+                state.sessions[slot].status = Status::Expired;
+            }
+        }
+        Ok(())
+    }
+
+    fn multi_invariant_violation(state: &MultiEscrowState) -> Option<&'static str> {
+        for a in 0..2 {
+            if state.other_refunded[a] != 0 {
+                return Some("refund was redirected away from original buyer");
+            }
+            let open_sum: u8 = state
+                .sessions
+                .iter()
+                .filter(|s| s.status == Status::Open && usize::from(s.asset) == a)
+                .map(|s| s.escrowed)
+                .sum();
+            if state.liability[a] != open_sum {
+                return Some("aggregate liability diverged from sum of open session escrows");
+            }
+            if state.contract_balance[a] != open_sum {
+                return Some("contract token balance diverged from aggregate liability");
+            }
+            if state.contract_balance[a] + state.seller_paid[a] + state.buyer_refunded[a]
+                != state.deposited[a]
+            {
+                return Some("aggregate escrow value was not conserved across transitions");
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn multi_session_multi_asset_conserves_liabilities_across_transitions() {
+        const MULTI_ACTIONS: [MultiAction; 18] = [
+            MultiAction::Create {
+                slot: 0,
+                buyer: 1,
+                seller: 2,
+                asset: 0,
+                cap: 2,
+            },
+            MultiAction::Create {
+                slot: 1,
+                buyer: 3,
+                seller: 4,
+                asset: 0,
+                cap: 2,
+            },
+            MultiAction::Create {
+                slot: 1,
+                buyer: 3,
+                seller: 2,
+                asset: 1,
+                cap: 2,
+            },
+            MultiAction::Settle {
+                slot: 0,
+                caller: 2,
+                amount: 1,
+            },
+            MultiAction::Settle {
+                slot: 1,
+                caller: 4,
+                amount: 2,
+            },
+            MultiAction::Settle {
+                slot: 1,
+                caller: 2,
+                amount: 1,
+            },
+            MultiAction::Cancel { slot: 0, caller: 1 },
+            MultiAction::Cancel { slot: 0, caller: 2 }, // adversarial seller cancel
+            MultiAction::Cancel { slot: 1, caller: 3 },
+            MultiAction::Cancel { slot: 1, caller: 9 }, // adversarial admin/attacker cancel
+            MultiAction::Reject { slot: 0, caller: 2 },
+            MultiAction::Reject { slot: 0, caller: 9 }, // adversarial admin/attacker reject
+            MultiAction::Reject { slot: 1, caller: 4 },
+            MultiAction::ReduceCap {
+                slot: 0,
+                caller: 1,
+                new_cap: 1,
+            },
+            MultiAction::ReduceCap {
+                slot: 0,
+                caller: 2, // adversarial seller reduce
+                new_cap: 1,
+            },
+            MultiAction::AdvanceToExpiry,
+            MultiAction::Recover { slot: 0, caller: 9 }, // adversarial caller recover
+            MultiAction::Recover { slot: 1, caller: 2 }, // seller-triggered recover
+        ];
+
+        let initial = MultiEscrowState::default();
+        let mut queue = VecDeque::from([(initial, 0usize)]);
+        let mut visited = std::collections::HashSet::from([initial]);
+
+        while let Some((state, depth)) = queue.pop_front() {
+            if depth == 5 {
+                continue;
+            }
+            for action in MULTI_ACTIONS {
+                let mut next = state;
+                let res = apply_multi(&mut next, action);
+                if res.is_err() {
+                    assert_eq!(
+                        next, state,
+                        "rejected multi-session action mutated state: {action:?}"
+                    );
+                }
+                if let Some(violation) = multi_invariant_violation(&next) {
+                    panic!(
+                        "multi-session invariant failed: {violation} after {action:?} -> {next:?}"
+                    );
+                }
+                if visited.insert(next) {
+                    queue.push_back((next, depth + 1));
+                }
+            }
+        }
+
+        assert!(
+            visited.len() >= 40,
+            "multi-session exploration was unexpectedly small: {}",
+            visited.len()
+        );
+    }
+
+    #[test]
+    fn adversarial_refund_redirection_cannot_divert_escrow() {
+        let mut state = MultiEscrowState::default();
+        apply_multi(
+            &mut state,
+            MultiAction::Create {
+                slot: 0,
+                buyer: 1,
+                seller: 2,
+                asset: 0,
+                cap: 2,
+            },
+        )
+        .unwrap();
+
+        // Adversarial seller/admin cannot cancel or reduce cap.
+        assert_eq!(
+            apply_multi(&mut state, MultiAction::Cancel { slot: 0, caller: 2 }),
+            Err(Rejection::Unauthorized)
+        );
+        assert_eq!(
+            apply_multi(&mut state, MultiAction::Cancel { slot: 0, caller: 9 }),
+            Err(Rejection::Unauthorized)
+        );
+        assert_eq!(
+            apply_multi(
+                &mut state,
+                MultiAction::ReduceCap {
+                    slot: 0,
+                    caller: 9,
+                    new_cap: 1,
+                }
+            ),
+            Err(Rejection::Unauthorized)
+        );
+        assert_eq!(state.other_refunded[0], 0);
+        assert_eq!(state.liability[0], 2);
+
+        // Adversarial admin/buyer cannot reject; valid seller reject refunds strictly to buyer.
+        assert_eq!(
+            apply_multi(&mut state, MultiAction::Reject { slot: 0, caller: 9 }),
+            Err(Rejection::Unauthorized)
+        );
+        let mut reject_branch = state;
+        apply_multi(
+            &mut reject_branch,
+            MultiAction::Reject { slot: 0, caller: 2 },
+        )
+        .unwrap();
+        assert_eq!(reject_branch.buyer_refunded[0], 2);
+        assert_eq!(reject_branch.seller_paid[0], 0);
+        assert_eq!(reject_branch.other_refunded[0], 0);
+        assert_eq!(multi_invariant_violation(&reject_branch), None);
+
+        // Permissionless recovery triggered by seller or admin refunds strictly to buyer.
+        let mut recover_branch = state;
+        apply_multi(&mut recover_branch, MultiAction::AdvanceToExpiry).unwrap();
+        apply_multi(
+            &mut recover_branch,
+            MultiAction::Recover { slot: 0, caller: 9 },
+        )
+        .unwrap();
+        assert_eq!(recover_branch.buyer_refunded[0], 2);
+        assert_eq!(recover_branch.seller_paid[0], 0);
+        assert_eq!(recover_branch.other_refunded[0], 0);
+        assert_eq!(multi_invariant_violation(&recover_branch), None);
+    }
 }

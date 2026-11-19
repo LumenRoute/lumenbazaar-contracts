@@ -19,6 +19,8 @@
 
 extern crate std;
 
+use std::string::ToString;
+
 use crate::{
     events,
     ids::{self, SessionIdInput, UsageCommitmentInput},
@@ -865,7 +867,7 @@ fn classify_resource_hash(text: &str) -> Result<[u8; 32], &'static str> {
             "invalid_hex"
         });
     }
-    if text.len() % 2 != 0 {
+    if !text.len().is_multiple_of(2) {
         return Err("invalid_hex");
     }
     if text.len() != 64 {

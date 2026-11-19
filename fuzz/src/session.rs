@@ -10,7 +10,8 @@ use soroban_sdk::{
 use upto_session::{
     storage::{self, DataKey},
     validation::MAX_SESSION_DURATION_LEDGERS,
-    AssetPolicy, Session, SessionStatus, UptoSessionContract, UptoSessionContractClient,
+    AssetPolicy, BatchRecoveryStatus, Session, SessionStatus, UptoSessionContract,
+    UptoSessionContractClient,
 };
 
 const SESSION_LENGTH: u32 = 500;
@@ -65,6 +66,8 @@ impl Escrow {
                     asset: asset.clone(),
                     max_session_amount: i128::MAX,
                     min_session_amount: 1,
+                    max_asset_exposure: i128::MAX,
+                    max_buyer_exposure: i128::MAX,
                 },
             ],
         );
@@ -164,6 +167,7 @@ pub fn create(data: &[u8]) {
         _ => 0,
     };
     let resource = input.hash(env, 30, 7);
+    let idempotency_key = input.hash(env, 64, 9);
     let before = h.observe();
 
     if input.u8(63) % 2 == 1 {
@@ -175,6 +179,7 @@ pub fn create(data: &[u8]) {
             amount.into_val(env),
             expires.into_val(env),
             wrong_length_bytes(env, raw[0]).into_val(env),
+            idempotency_key.into_val(env),
         ];
         h.invoke_raw_rejected("create_session", args);
         assert_eq!(h.observe(), before, "rejected create changed state");
@@ -189,10 +194,15 @@ pub fn create(data: &[u8]) {
         && expires - ledger <= MAX_SESSION_DURATION_LEDGERS
         && resource != BytesN::from_array(env, &[0; 32])
         && asset == h.asset;
-    let result = defined(
-        h.client()
-            .try_create_session(&buyer, &seller, &asset, &amount, &expires, &resource),
-    );
+    let result = defined(h.client().try_create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &amount,
+        &expires,
+        &resource,
+        &idempotency_key,
+    ));
     match (result, valid) {
         (Ok(id), true) => {
             let session = h.session(&id).expect("created session is readable");
@@ -245,6 +255,7 @@ pub fn settle(data: &[u8]) {
         &cap,
         &expiry,
         &BytesN::from_array(env, &[7; 32]),
+        &BytesN::from_array(env, &[9; 32]),
     );
     let state = input.u8(17) % 5;
     match state {
@@ -335,6 +346,302 @@ pub fn settle(data: &[u8]) {
                 session_before,
                 "rejected settle changed session"
             );
+        }
+    }
+}
+
+/// Multi-buyer, multi-seller, multi-asset transition sequence target verifying aggregate escrow
+/// liability conservation (#178) and refund destination pinning (#177) across all refund paths.
+pub fn transitions(data: &[u8]) {
+    let input = Input::new(data);
+    let env = Env::default();
+    env.ledger().set_sequence_number(DEFAULT_LEDGER);
+    env.ledger().set_min_persistent_entry_ttl(ENTRY_TTL);
+
+    let contract = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract);
+    let admin = Address::generate(&env);
+    let attacker = Address::generate(&env);
+    let buyers = [Address::generate(&env), Address::generate(&env)];
+    let sellers = [Address::generate(&env), Address::generate(&env)];
+
+    const INITIAL_MINT: i128 = 10_000_000;
+    let mut assets = std::vec::Vec::with_capacity(2);
+    for _ in 0..2 {
+        let token_admin = Address::generate(&env);
+        let asset = env
+            .register_stellar_asset_contract_v2(token_admin.clone())
+            .address();
+        let mint = token::StellarAssetClient::new(&env, &asset);
+        env.mock_all_auths_allowing_non_root_auth();
+        for buyer in &buyers {
+            mint.mint(buyer, &INITIAL_MINT);
+        }
+        assets.push(asset);
+    }
+
+    client.initialize(
+        &admin,
+        &vec![
+            &env,
+            AssetPolicy {
+                asset: assets[0].clone(),
+                max_session_amount: i128::MAX,
+                min_session_amount: 1,
+                max_asset_exposure: i128::MAX,
+                max_buyer_exposure: i128::MAX,
+            },
+            AssetPolicy {
+                asset: assets[1].clone(),
+                max_session_amount: i128::MAX,
+                min_session_amount: 1,
+                max_asset_exposure: i128::MAX,
+                max_buyer_exposure: i128::MAX,
+            },
+        ],
+    );
+
+    struct Tracked {
+        id: BytesN<32>,
+        buyer: usize,
+        seller: usize,
+        asset: usize,
+        cap: i128,
+        escrowed: i128,
+        open: bool,
+    }
+
+    let mut sessions: std::vec::Vec<Tracked> = std::vec::Vec::new();
+    let mut deposited = [0_i128; 2];
+    let mut settled = [0_i128; 2];
+    let mut refunded = [0_i128; 2];
+    let mut ledger = DEFAULT_LEDGER;
+
+    let steps = (usize::from(input.u8(0)) % 12).max(1);
+    for step in 0..steps {
+        let base = 1 + step * 5;
+        let op = input.u8(base) % 9;
+        let b_idx = usize::from(input.u8(base + 1) % 2);
+        let s_idx = usize::from(input.u8(base + 2) % 2);
+        let a_idx = usize::from(input.u8(base + 3) % 2);
+        let arg = input.u8(base + 4);
+
+        let before_admin: [i128; 2] = [
+            token::Client::new(&env, &assets[0]).balance(&admin),
+            token::Client::new(&env, &assets[1]).balance(&admin),
+        ];
+        let before_attacker: [i128; 2] = [
+            token::Client::new(&env, &assets[0]).balance(&attacker),
+            token::Client::new(&env, &assets[1]).balance(&attacker),
+        ];
+        let before_sellers: [[i128; 2]; 2] = [
+            [
+                token::Client::new(&env, &assets[0]).balance(&sellers[0]),
+                token::Client::new(&env, &assets[1]).balance(&sellers[0]),
+            ],
+            [
+                token::Client::new(&env, &assets[0]).balance(&sellers[1]),
+                token::Client::new(&env, &assets[1]).balance(&sellers[1]),
+            ],
+        ];
+
+        let mut expected_seller_payout: Option<(usize, usize, i128)> = None;
+
+        match op {
+            0 | 1 => {
+                let cap = i128::from(arg % 100) * 10 + 10;
+                let expiry = ledger + u32::from(arg % 30) + 5;
+                let mut rbytes = [0u8; 32];
+                rbytes[0] = (step as u8).wrapping_add(1);
+                rbytes[1] = arg.wrapping_add(1);
+                let rhash = BytesN::from_array(&env, &rbytes);
+                let mut kbytes = [0u8; 32];
+                kbytes[0] = 0xAA;
+                kbytes[1] = step as u8;
+                let ikey = BytesN::from_array(&env, &kbytes);
+                if let Ok(id) = defined(client.try_create_session(
+                    &buyers[b_idx],
+                    &sellers[s_idx],
+                    &assets[a_idx],
+                    &cap,
+                    &expiry,
+                    &rhash,
+                    &ikey,
+                )) {
+                    deposited[a_idx] += cap;
+                    sessions.push(Tracked {
+                        id,
+                        buyer: b_idx,
+                        seller: s_idx,
+                        asset: a_idx,
+                        cap,
+                        escrowed: cap,
+                        open: true,
+                    });
+                }
+            }
+            2 if !sessions.is_empty() => {
+                let idx = usize::from(arg) % sessions.len();
+                let amount = (sessions[idx].cap / 2).max(1);
+                let usage = BytesN::from_array(&env, &[(step as u8).wrapping_add(0x40); 32]);
+                if defined(client.try_settle(&sessions[idx].id, &amount, &usage)).is_ok() {
+                    let a = sessions[idx].asset;
+                    let s = sessions[idx].seller;
+                    let rem = sessions[idx].escrowed - amount;
+                    settled[a] += amount;
+                    refunded[a] += rem;
+                    expected_seller_payout = Some((s, a, amount));
+                    sessions[idx].escrowed = 0;
+                    sessions[idx].open = false;
+                }
+            }
+            3 if !sessions.is_empty() => {
+                let idx = usize::from(arg) % sessions.len();
+                let buyer_before = token::Client::new(&env, &assets[sessions[idx].asset])
+                    .balance(&buyers[sessions[idx].buyer]);
+                if defined(client.try_cancel(&sessions[idx].id)).is_ok() {
+                    let a = sessions[idx].asset;
+                    let b = sessions[idx].buyer;
+                    let amt = sessions[idx].escrowed;
+                    let buyer_after = token::Client::new(&env, &assets[a]).balance(&buyers[b]);
+                    assert_eq!(
+                        buyer_after - buyer_before,
+                        amt,
+                        "cancel refund not pinned to buyer"
+                    );
+                    refunded[a] += amt;
+                    sessions[idx].escrowed = 0;
+                    sessions[idx].open = false;
+                }
+            }
+            4 if !sessions.is_empty() => {
+                let idx = usize::from(arg) % sessions.len();
+                let buyer_before = token::Client::new(&env, &assets[sessions[idx].asset])
+                    .balance(&buyers[sessions[idx].buyer]);
+                if defined(client.try_reject(&sessions[idx].id)).is_ok() {
+                    let a = sessions[idx].asset;
+                    let b = sessions[idx].buyer;
+                    let amt = sessions[idx].escrowed;
+                    let buyer_after = token::Client::new(&env, &assets[a]).balance(&buyers[b]);
+                    assert_eq!(
+                        buyer_after - buyer_before,
+                        amt,
+                        "reject refund not pinned to buyer"
+                    );
+                    refunded[a] += amt;
+                    sessions[idx].escrowed = 0;
+                    sessions[idx].open = false;
+                }
+            }
+            5 if !sessions.is_empty() => {
+                let idx = usize::from(arg) % sessions.len();
+                let cur = sessions[idx].cap;
+                if cur > 1 {
+                    let new_cap = cur / 2;
+                    let buyer_before = token::Client::new(&env, &assets[sessions[idx].asset])
+                        .balance(&buyers[sessions[idx].buyer]);
+                    if defined(client.try_reduce_session_cap(&sessions[idx].id, &new_cap)).is_ok() {
+                        let a = sessions[idx].asset;
+                        let b = sessions[idx].buyer;
+                        let diff = cur - new_cap;
+                        let buyer_after = token::Client::new(&env, &assets[a]).balance(&buyers[b]);
+                        assert_eq!(
+                            buyer_after - buyer_before,
+                            diff,
+                            "reduce_session_cap refund not pinned to buyer"
+                        );
+                        refunded[a] += diff;
+                        sessions[idx].cap = new_cap;
+                        sessions[idx].escrowed = new_cap;
+                    }
+                }
+            }
+            6 => {
+                ledger += u32::from(arg % 40) + 1;
+                env.ledger().set_sequence_number(ledger);
+            }
+            7 if !sessions.is_empty() => {
+                let idx = usize::from(arg) % sessions.len();
+                let buyer_before = token::Client::new(&env, &assets[sessions[idx].asset])
+                    .balance(&buyers[sessions[idx].buyer]);
+                if defined(client.try_recover_expired(&sessions[idx].id)).is_ok() {
+                    let a = sessions[idx].asset;
+                    let b = sessions[idx].buyer;
+                    let amt = sessions[idx].escrowed;
+                    let buyer_after = token::Client::new(&env, &assets[a]).balance(&buyers[b]);
+                    assert_eq!(
+                        buyer_after - buyer_before,
+                        amt,
+                        "recover_expired refund not pinned to buyer"
+                    );
+                    refunded[a] += amt;
+                    sessions[idx].escrowed = 0;
+                    sessions[idx].open = false;
+                }
+            }
+            8 if !sessions.is_empty() => {
+                let ia = usize::from(arg) % sessions.len();
+                let ib = usize::from(arg.wrapping_add(1)) % sessions.len();
+                let batch = vec![&env, sessions[ia].id.clone(), sessions[ib].id.clone()];
+                let results = client.recover_expired_batch(&batch);
+                for (pos, idx) in [ia, ib].into_iter().enumerate() {
+                    if results.get(pos as u32).unwrap().status == BatchRecoveryStatus::Recovered {
+                        let a = sessions[idx].asset;
+                        let amt = sessions[idx].escrowed;
+                        refunded[a] += amt;
+                        sessions[idx].escrowed = 0;
+                        sessions[idx].open = false;
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        // Assert liability conservation and refund destination pinning after every step.
+        for (a, asset) in assets.iter().enumerate() {
+            let tok = token::Client::new(&env, asset);
+            assert_eq!(
+                tok.balance(&admin),
+                before_admin[a],
+                "admin received diverted funds"
+            );
+            assert_eq!(
+                tok.balance(&attacker),
+                before_attacker[a],
+                "attacker received diverted funds"
+            );
+            for (s, seller) in sellers.iter().enumerate() {
+                let expected_delta = match expected_seller_payout {
+                    Some((ps, pa, amt)) if ps == s && pa == a => amt,
+                    _ => 0,
+                };
+                assert_eq!(
+                    tok.balance(seller) - before_sellers[s][a],
+                    expected_delta,
+                    "seller received unexpected funds on non-settlement path"
+                );
+            }
+
+            let escrow_bal = tok.balance(&contract);
+            let liability = client.get_escrow_liability(asset);
+            let expected_open: i128 = sessions
+                .iter()
+                .filter(|s| s.asset == a && s.open)
+                .map(|s| s.escrowed)
+                .sum();
+            assert_eq!(liability, expected_open, "aggregate liability mismatch");
+            assert_eq!(escrow_bal, expected_open, "escrow balance != liability");
+            assert_eq!(
+                escrow_bal + settled[a] + refunded[a],
+                deposited[a],
+                "escrow value not conserved"
+            );
+            let total_held = escrow_bal
+                + tok.balance(&buyers[0])
+                + tok.balance(&buyers[1])
+                + tok.balance(&sellers[0])
+                + tok.balance(&sellers[1]);
+            assert_eq!(total_held, INITIAL_MINT * 2, "total asset supply drift");
         }
     }
 }

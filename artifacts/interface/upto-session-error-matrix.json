@@ -1,0 +1,3946 @@
+{
+  "schemaVersion": 1,
+  "contract": "upto-session",
+  "interfaceVersion": 3,
+  "categories": [
+    "validation",
+    "authorization",
+    "token",
+    "state"
+  ],
+  "errorCount": 60,
+  "methodCount": 55,
+  "errors": [
+    {
+      "error": "AlreadyInitialized",
+      "code": 1,
+      "category": "state",
+      "methods": [
+        "initialize"
+      ],
+      "tests": [
+        "initialize_stores_admin_once"
+      ],
+      "handoff": "Treat setup as already complete; do not retry blindly."
+    },
+    {
+      "error": "Unauthorized",
+      "code": 2,
+      "category": "authorization",
+      "methods": [
+        "accept_admin",
+        "accept_asset_cap_increase",
+        "activate_asset",
+        "cancel",
+        "cancel_admin_rotation",
+        "cancel_asset_cap_increase",
+        "create_session",
+        "deprecate_asset",
+        "extend_session_expiry",
+        "initialize",
+        "pause_creation",
+        "propose_admin",
+        "propose_asset_cap_increase",
+        "recover_surplus",
+        "reduce_session_cap",
+        "reject",
+        "remove_asset",
+        "resume_creation",
+        "set_asset_exposure_ceiling",
+        "set_asset_max_session_amount",
+        "set_buyer_exposure_ceiling",
+        "set_max_buyer_open_sessions",
+        "set_max_seller_open_sessions",
+        "set_seller_exposure_ceiling",
+        "settle"
+      ],
+      "tests": [
+        "asset_deprecation_requires_admin_and_blocks_new_sessions",
+        "cancel_requires_buyer_auth",
+        "create_session_requires_buyer_auth",
+        "settle_requires_seller_auth"
+      ],
+      "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+    },
+    {
+      "error": "InvalidAmount",
+      "code": 3,
+      "category": "validation",
+      "methods": [
+        "create_session",
+        "recover_surplus",
+        "settle"
+      ],
+      "tests": [
+        "create_validation_accepts_only_positive_amounts",
+        "encoding_vectors_generation_is_deterministic",
+        "invalid_create_inputs_do_not_consume_sequence",
+        "per_asset_minimum_enforces_boundaries_and_policy_invariants",
+        "rejects_invalid_amounts"
+      ],
+      "handoff": "Reject request validation before submitting."
+    },
+    {
+      "error": "ExpiredSession",
+      "code": 4,
+      "category": "state",
+      "methods": [
+        "cancel",
+        "create_session",
+        "extend_session_expiry",
+        "reduce_session_cap",
+        "reject",
+        "settle"
+      ],
+      "tests": [
+        "creation_and_rotation_expiry_windows_have_exact_bounds",
+        "expired_create_input_fails_before_storage_write",
+        "expired_open_session_remains_observable_and_permissionlessly_recoverable",
+        "expiry_boundary_selects_exactly_one_terminal_path",
+        "logical_expiry_boundary_is_independent_of_storage_ttl"
+      ],
+      "handoff": "Stop settlement and ask caller to create a new session."
+    },
+    {
+      "error": "SessionNotFound",
+      "code": 5,
+      "category": "state",
+      "methods": [
+        "cancel",
+        "create_session",
+        "extend_session_expiry",
+        "extend_ttl",
+        "get_session",
+        "get_session_status",
+        "recover_expired",
+        "reduce_session_cap",
+        "reject",
+        "settle"
+      ],
+      "tests": [
+        "cancel_returns_not_found_for_missing_session",
+        "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+        "extend_ttl_rejects_missing_session",
+        "get_session_returns_not_found_for_missing_session",
+        "lapsed_session_entry_cannot_be_replaced_by_extension_of_a_finalized_session"
+      ],
+      "handoff": "Return not found and trigger reconciliation if expected."
+    },
+    {
+      "error": "SessionAlreadySettled",
+      "code": 6,
+      "category": "state",
+      "methods": [
+        "cancel",
+        "extend_session_expiry",
+        "recover_expired",
+        "reduce_session_cap",
+        "reject",
+        "settle"
+      ],
+      "tests": [
+        "cancel_rejects_already_settled_session",
+        "every_terminal_path_releases_asset_capacity_exactly_once",
+        "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+        "mutation_end_to_end_auth_and_cap_guards_are_all_present",
+        "mutation_finalized_guard_in_cancel_rejects_settled_session"
+      ],
+      "handoff": "Treat as finalized and fetch state."
+    },
+    {
+      "error": "SessionCancelled",
+      "code": 7,
+      "category": "state",
+      "methods": [
+        "cancel",
+        "extend_session_expiry",
+        "recover_expired",
+        "reduce_session_cap",
+        "reject",
+        "settle"
+      ],
+      "tests": [
+        "cancel_rejects_already_cancelled_session",
+        "every_terminal_path_releases_asset_capacity_exactly_once",
+        "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+        "mutation_finalized_guard_in_cancel_rejects_already_cancelled_session",
+        "mutation_finalized_guard_in_recover_rejects_cancelled_session"
+      ],
+      "handoff": "Treat as finalized and do not settle."
+    },
+    {
+      "error": "AmountExceedsCap",
+      "code": 8,
+      "category": "validation",
+      "methods": [
+        "create_session",
+        "settle"
+      ],
+      "tests": [
+        "admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions",
+        "mutation_asset_cap_inversion_in_create_session_is_caught",
+        "mutation_end_to_end_auth_and_cap_guards_are_all_present",
+        "mutation_settlement_cap_inversion_is_caught",
+        "per_asset_caps_enforce_boundaries_before_buyer_authorization"
+      ],
+      "handoff": "Reject settlement above buyer cap."
+    },
+    {
+      "error": "InvalidAsset",
+      "code": 9,
+      "category": "validation",
+      "methods": [
+        "activate_asset",
+        "create_session"
+      ],
+      "tests": [
+        "rejects_invalid_seller_or_asset_bindings"
+      ],
+      "handoff": "Reject requests where asset equals buyer or seller."
+    },
+    {
+      "error": "InvalidSeller",
+      "code": 10,
+      "category": "validation",
+      "methods": [
+        "create_session"
+      ],
+      "tests": [
+        "rejects_invalid_seller_or_asset_bindings"
+      ],
+      "handoff": "Reject buyer-as-seller requests."
+    },
+    {
+      "error": "TtlExtensionFailed",
+      "code": 11,
+      "category": "state",
+      "methods": [
+        "extend_ttl"
+      ],
+      "tests": [
+        "extend_ttl_rejects_cancelled_sessions",
+        "extend_ttl_rejects_settled_sessions",
+        "logical_expiry_boundary_is_independent_of_storage_ttl",
+        "public_interface_is_callable",
+        "recovery_extends_ttl_only_inside_the_finalizing_transition_at_the_threshold"
+      ],
+      "handoff": "Do not retry for finalized sessions."
+    },
+    {
+      "error": "InvalidResourceHash",
+      "code": 12,
+      "category": "validation",
+      "methods": [
+        "create_session",
+        "deprecate_asset",
+        "remove_asset"
+      ],
+      "tests": [
+        "asset_deprecation_requires_admin_and_blocks_new_sessions",
+        "deprecated_asset_terminal_paths_clear_liability_before_removal",
+        "encoding_vectors_generation_is_deterministic",
+        "rejects_empty_resource_hash"
+      ],
+      "handoff": "Reject empty or malformed resource hash input."
+    },
+    {
+      "error": "InvalidUsageHash",
+      "code": 13,
+      "category": "validation",
+      "methods": [
+        "settle"
+      ],
+      "tests": [
+        "rejects_empty_usage_hash",
+        "settle_rejects_empty_usage_hash_before_transfer"
+      ],
+      "handoff": "Reject empty or malformed usage hash input."
+    },
+    {
+      "error": "UnsupportedAsset",
+      "code": 14,
+      "category": "state",
+      "methods": [
+        "accept_asset_cap_increase",
+        "cancel_asset_cap_increase",
+        "create_session",
+        "get_asset_exposure_ceiling",
+        "get_asset_max_session_amount",
+        "get_asset_min_session_amount",
+        "get_asset_solvency",
+        "get_buyer_exposure",
+        "get_buyer_exposure_ceiling",
+        "get_escrow_liability",
+        "get_seller_exposure",
+        "get_seller_exposure_ceiling",
+        "propose_asset_cap_increase",
+        "recover_surplus",
+        "set_asset_exposure_ceiling",
+        "set_asset_max_session_amount",
+        "set_buyer_exposure_ceiling",
+        "set_seller_exposure_ceiling"
+      ],
+      "tests": [
+        "asset_deprecation_requires_admin_and_blocks_new_sessions",
+        "ceiling_updates_are_admin_only_validated_and_evented",
+        "create_rejects_uninitialized_unsupported_and_excessive_duration",
+        "deprecated_assets_reject_creation_but_still_release_capacity",
+        "initialize_requires_positive_exposure_ceilings_for_every_asset"
+      ],
+      "handoff": "Reject assets outside the active deployment allowlist."
+    },
+    {
+      "error": "InvalidSupportedAssets",
+      "code": 15,
+      "category": "validation",
+      "methods": [
+        "initialize"
+      ],
+      "tests": [
+        "initialize_rejects_empty_duplicate_or_invalid_asset_policies"
+      ],
+      "handoff": "Reject an empty, oversized, or duplicate initialization allowlist."
+    },
+    {
+      "error": "SessionDurationTooLong",
+      "code": 16,
+      "category": "validation",
+      "methods": [
+        "create_session",
+        "extend_session_expiry"
+      ],
+      "tests": [
+        "create_rejects_uninitialized_unsupported_and_excessive_duration",
+        "creation_and_rotation_expiry_windows_have_exact_bounds",
+        "validates_session_lifetime_boundary_and_near_u32_limit_ledgers"
+      ],
+      "handoff": "Reject an expiry more than 518,400 ledgers ahead."
+    },
+    {
+      "error": "LiabilityOverflow",
+      "code": 17,
+      "category": "state",
+      "methods": [
+        "create_session"
+      ],
+      "tests": [
+        "liability_arithmetic_is_checked",
+        "liability_overflow_is_rejected_before_funds_move"
+      ],
+      "handoff": "Stop and investigate liability arithmetic or corrupted state."
+    },
+    {
+      "error": "LiabilityUnderflow",
+      "code": 18,
+      "category": "state",
+      "methods": [
+        "cancel",
+        "recover_expired",
+        "reduce_session_cap",
+        "reject",
+        "settle"
+      ],
+      "tests": [
+        "lapsed_liability_entry_fails_closed_and_keeps_escrow_in_the_contract",
+        "liability_arithmetic_is_checked",
+        "sr8_missing_aggregate_counter_fails_closed_without_payout"
+      ],
+      "handoff": "Stop and investigate liability arithmetic or corrupted state."
+    },
+    {
+      "error": "EscrowUnderfunded",
+      "code": 19,
+      "category": "token",
+      "methods": [
+        "cancel",
+        "create_session",
+        "recover_expired",
+        "recover_surplus",
+        "reduce_session_cap",
+        "reject",
+        "settle"
+      ],
+      "tests": [
+        "undercollateralized_settlement_fails_without_state_transition"
+      ],
+      "handoff": "Reject creation or exit if token custody does not cover aggregate liability."
+    },
+    {
+      "error": "NotInitialized",
+      "code": 20,
+      "category": "state",
+      "methods": [
+        "accept_admin",
+        "accept_asset_cap_increase",
+        "activate_asset",
+        "cancel_admin_rotation",
+        "cancel_asset_cap_increase",
+        "create_session",
+        "deprecate_asset",
+        "get_admin",
+        "get_asset_policy",
+        "get_asset_solvency",
+        "get_buyer_exposure",
+        "get_buyer_open_sessions",
+        "get_configuration",
+        "get_escrow_liability",
+        "get_seller_exposure",
+        "get_seller_open_sessions",
+        "get_solvency",
+        "pause_creation",
+        "propose_admin",
+        "propose_asset_cap_increase",
+        "recover_surplus",
+        "remove_asset",
+        "resume_creation",
+        "set_asset_exposure_ceiling",
+        "set_asset_max_session_amount",
+        "set_buyer_exposure_ceiling",
+        "set_max_buyer_open_sessions",
+        "set_max_seller_open_sessions",
+        "set_seller_exposure_ceiling"
+      ],
+      "tests": [
+        "admin_rotation_queries_are_deterministic_before_initialization",
+        "buyer_exposure_query_requires_initialization",
+        "configuration_query_returns_bounded_versioned_public_state",
+        "create_rejects_uninitialized_unsupported_and_excessive_duration",
+        "creation_pause_and_resume_require_initialization"
+      ],
+      "handoff": "Initialize a new deployment before creating sessions."
+    },
+    {
+      "error": "SessionExpired",
+      "code": 21,
+      "category": "state",
+      "methods": [
+        "cancel",
+        "extend_session_expiry",
+        "recover_expired",
+        "reduce_session_cap",
+        "reject",
+        "settle"
+      ],
+      "tests": [
+        "every_terminal_path_releases_asset_capacity_exactly_once",
+        "expiry_recovery_is_permissionless_fixed_recipient_and_single_use",
+        "logical_expiry_boundary_is_independent_of_storage_ttl",
+        "mutation_finalized_guard_in_recover_rejects_already_expired_session",
+        "mutation_finalized_guard_in_settle_rejects_expired_session"
+      ],
+      "handoff": "Treat as finalized by expiry recovery."
+    },
+    {
+      "error": "SessionNotExpired",
+      "code": 22,
+      "category": "state",
+      "methods": [
+        "recover_expired"
+      ],
+      "tests": [
+        "expiry_boundary_selects_exactly_one_terminal_path",
+        "logical_expiry_boundary_is_independent_of_storage_ttl",
+        "mutation_recover_not_expired_check_inversion_is_caught",
+        "recoverability_query_matches_recover_expired_boundary_and_terminal_states"
+      ],
+      "handoff": "Do not recover before the exact expiry ledger."
+    },
+    {
+      "error": "InvalidAssetCap",
+      "code": 23,
+      "category": "validation",
+      "methods": [
+        "activate_asset",
+        "initialize",
+        "propose_asset_cap_increase",
+        "set_asset_max_session_amount",
+        "set_seller_exposure_ceiling"
+      ],
+      "tests": [
+        "asset_caps_must_be_positive",
+        "cap_updates_accept_only_positive_values_and_keep_the_previous_cap_on_failure",
+        "decimal_scaled_cap_boundaries_are_exact_for_every_supported_decimal_count",
+        "initialize_rejects_empty_duplicate_or_invalid_asset_policies",
+        "per_asset_minimum_enforces_boundaries_and_policy_invariants"
+      ],
+      "handoff": "Reject zero or negative caps or minimums, a minimum above the maximum, or a cap update below the minimum."
+    },
+    {
+      "error": "AssetCapNotConfigured",
+      "code": 24,
+      "category": "state",
+      "methods": [
+        "accept_asset_cap_increase",
+        "create_session",
+        "get_asset_max_session_amount",
+        "get_asset_min_session_amount",
+        "get_asset_policy",
+        "propose_asset_cap_increase",
+        "set_asset_max_session_amount"
+      ],
+      "tests": [
+        "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+      ],
+      "handoff": "Stop creation and investigate incomplete asset policy state."
+    },
+    {
+      "error": "InvalidAdmin",
+      "code": 25,
+      "category": "validation",
+      "methods": [
+        "propose_admin"
+      ],
+      "tests": [
+        "validates_admin_rotation_parties_and_expiry"
+      ],
+      "handoff": "Reject proposals that target the active administrator."
+    },
+    {
+      "error": "InvalidAdminRotationExpiry",
+      "code": 26,
+      "category": "validation",
+      "methods": [
+        "propose_admin"
+      ],
+      "tests": [
+        "creation_and_rotation_expiry_windows_have_exact_bounds",
+        "validates_admin_rotation_parties_and_expiry"
+      ],
+      "handoff": "Reject expired or excessively long proposal windows."
+    },
+    {
+      "error": "AdminRotationPending",
+      "code": 27,
+      "category": "state",
+      "methods": [
+        "propose_admin"
+      ],
+      "tests": [
+        "admin_rotation_expiry_boundary_is_exact_and_expired_state_fails_closed",
+        "admin_rotation_rejects_overwrite_expiry_and_replay"
+      ],
+      "handoff": "Cancel or complete the existing proposal before creating another."
+    },
+    {
+      "error": "AdminRotationNotFound",
+      "code": 28,
+      "category": "state",
+      "methods": [
+        "accept_admin",
+        "cancel_admin_rotation"
+      ],
+      "tests": [
+        "admin_rotation_rejects_overwrite_expiry_and_replay"
+      ],
+      "handoff": "Treat acceptance or cancellation as stale and refresh state."
+    },
+    {
+      "error": "AdminRotationExpired",
+      "code": 29,
+      "category": "state",
+      "methods": [
+        "accept_admin"
+      ],
+      "tests": [
+        "admin_rotation_expiry_boundary_is_exact_and_expired_state_fails_closed",
+        "admin_rotation_rejects_overwrite_expiry_and_replay"
+      ],
+      "handoff": "Do not accept at or after the recorded expiry ledger."
+    },
+    {
+      "error": "TokenInvariantViolation",
+      "code": 30,
+      "category": "token",
+      "methods": [
+        "cancel",
+        "create_session",
+        "recover_expired",
+        "recover_expired_batch",
+        "recover_surplus",
+        "reduce_session_cap",
+        "reject",
+        "settle"
+      ],
+      "tests": [
+        "adversarial_create_failures_roll_back_funds_liability_and_sequence",
+        "adversarial_terminal_failures_leave_the_session_open_and_funded"
+      ],
+      "handoff": "Stop processing and quarantine the configured asset; an observed transfer balance delta did not match the requested amount."
+    },
+    {
+      "error": "InvalidBatchSize",
+      "code": 31,
+      "category": "validation",
+      "methods": [
+        "get_session_batch",
+        "get_solvency",
+        "recover_expired_batch"
+      ],
+      "tests": [
+        "batch_recovery_is_bounded_and_reports_partial_results_in_order",
+        "get_session_batch_enforces_nonzero_and_max_batch_size_bounds",
+        "solvency_query_reports_ordered_mixed_health_with_defined_edge_cases"
+      ],
+      "handoff": "Supply a batch size within the documented non-zero upper bound."
+    },
+    {
+      "error": "InvalidAssetInterface",
+      "code": 32,
+      "category": "token",
+      "methods": [
+        "activate_asset",
+        "initialize"
+      ],
+      "tests": [
+        "activation_rejects_missing_incompatible_reverting_and_malformed_assets"
+      ],
+      "handoff": "Reject an asset whose read-only SEP-41 behavior or metadata is malformed."
+    },
+    {
+      "error": "AssetNotActive",
+      "code": 33,
+      "category": "state",
+      "methods": [
+        "deprecate_asset"
+      ],
+      "tests": [
+        "asset_deprecation_requires_admin_and_blocks_new_sessions"
+      ],
+      "handoff": "Do not deprecate an unknown or already deprecated asset."
+    },
+    {
+      "error": "AssetNotDeprecated",
+      "code": 34,
+      "category": "state",
+      "methods": [
+        "remove_asset"
+      ],
+      "tests": [
+        "deprecated_asset_terminal_paths_clear_liability_before_removal"
+      ],
+      "handoff": "Deprecate the asset before requesting final removal."
+    },
+    {
+      "error": "AssetLiabilityOutstanding",
+      "code": 35,
+      "category": "state",
+      "methods": [
+        "remove_asset"
+      ],
+      "tests": [
+        "deprecated_asset_terminal_paths_clear_liability_before_removal"
+      ],
+      "handoff": "Settle, cancel, or recover every open session before removal."
+    },
+    {
+      "error": "CreationPaused",
+      "code": 36,
+      "category": "state",
+      "methods": [
+        "create_session"
+      ],
+      "tests": [
+        "creation_pause_rejects_repeated_calls_and_resume_restores_creation",
+        "creation_pause_requires_admin_and_fails_closed_before_transfer"
+      ],
+      "handoff": "New sessions are paused by the administrator; surface the operational state and stop submitting `create_session`."
+    },
+    {
+      "error": "OperationalStateUnchanged",
+      "code": 37,
+      "category": "state",
+      "methods": [
+        "pause_creation",
+        "resume_creation"
+      ],
+      "tests": [
+        "creation_pause_rejects_repeated_calls_and_resume_restores_creation"
+      ],
+      "handoff": "The requested pause or resume already matches the current operational state; refresh `get_configuration` instead of retrying."
+    },
+    {
+      "error": "CapIncreasePending",
+      "code": 38,
+      "category": "state",
+      "methods": [
+        "propose_asset_cap_increase",
+        "set_asset_max_session_amount"
+      ],
+      "tests": [
+        "admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions",
+        "cap_updates_accept_only_positive_values_and_keep_the_previous_cap_on_failure"
+      ],
+      "handoff": "A cap increase proposal is already pending or an immediate cap increase was attempted."
+    },
+    {
+      "error": "CapIncreaseNotReady",
+      "code": 39,
+      "category": "state",
+      "methods": [
+        "accept_asset_cap_increase"
+      ],
+      "tests": [
+        "admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions"
+      ],
+      "handoff": "Cannot accept proposal before the configured activation ledger."
+    },
+    {
+      "error": "CapIncreaseNotFound",
+      "code": 40,
+      "category": "state",
+      "methods": [
+        "accept_asset_cap_increase",
+        "cancel_asset_cap_increase"
+      ],
+      "tests": [
+        "admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions"
+      ],
+      "handoff": "Proposal does not exist or was already cancelled or accepted."
+    },
+    {
+      "error": "CapIncreaseExpired",
+      "code": 41,
+      "category": "state",
+      "methods": [
+        "accept_asset_cap_increase"
+      ],
+      "tests": [
+        "admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions"
+      ],
+      "handoff": "Cannot accept proposal at or after the expiration ledger."
+    },
+    {
+      "error": "InvalidCapIncreaseDelay",
+      "code": 42,
+      "category": "validation",
+      "methods": [
+        "propose_asset_cap_increase"
+      ],
+      "tests": [
+        "error_surface_cap_increase_delay_and_session_count_limits"
+      ],
+      "handoff": "Activation or expiration delay violates minimum (100) or maximum (17,280) ledgers."
+    },
+    {
+      "error": "UnsupportedCommitmentScheme",
+      "code": 43,
+      "category": "validation",
+      "methods": [
+        "create_session",
+        "settle"
+      ],
+      "tests": [
+        "error_surface_commitment_scheme_and_idempotency_conflict"
+      ],
+      "handoff": "Commitment scheme version is unsupported by the contract."
+    },
+    {
+      "error": "SellerExposureCeilingExceeded",
+      "code": 44,
+      "category": "state",
+      "methods": [
+        "create_session"
+      ],
+      "tests": [
+        "seller_exposure_ceiling_enforces_limits_and_releases_exposure"
+      ],
+      "handoff": "Reject session creation that would push seller open exposure above the configured ceiling."
+    },
+    {
+      "error": "SellerExposureCeilingNotConfigured",
+      "code": 45,
+      "category": "state",
+      "methods": [
+        "get_seller_exposure_ceiling"
+      ],
+      "tests": [
+        "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+      ],
+      "handoff": "No seller exposure ceiling is configured for the queried asset."
+    },
+    {
+      "error": "BuyerOpenSessionsExceeded",
+      "code": 46,
+      "category": "state",
+      "methods": [
+        "create_session"
+      ],
+      "tests": [
+        "buyer_open_session_limits_enforces_boundaries_and_maintains_isolation"
+      ],
+      "handoff": "Reject session creation because the buyer reached the open-session count limit."
+    },
+    {
+      "error": "InvalidSessionCountLimit",
+      "code": 47,
+      "category": "validation",
+      "methods": [
+        "set_max_buyer_open_sessions",
+        "set_max_seller_open_sessions"
+      ],
+      "tests": [
+        "error_surface_cap_increase_delay_and_session_count_limits"
+      ],
+      "handoff": "Reject zero session count limits when configuring buyer or seller open-session caps."
+    },
+    {
+      "error": "SellerOpenSessionsExceeded",
+      "code": 48,
+      "category": "state",
+      "methods": [
+        "create_session"
+      ],
+      "tests": [
+        "seller_open_session_limits_enforces_boundaries_and_maintains_isolation"
+      ],
+      "handoff": "Reject session creation because the seller reached the open-session count limit."
+    },
+    {
+      "error": "InvalidCapReduction",
+      "code": 49,
+      "category": "validation",
+      "methods": [
+        "reduce_session_cap"
+      ],
+      "tests": [
+        "reduce_session_cap_lowers_cap_refunds_buyer_and_reduces_liability"
+      ],
+      "handoff": "Reject cap reductions that are non-positive or not strictly below the current session cap."
+    },
+    {
+      "error": "SessionRejected",
+      "code": 50,
+      "category": "state",
+      "methods": [
+        "cancel",
+        "extend_session_expiry",
+        "recover_expired",
+        "reduce_session_cap",
+        "reject",
+        "settle"
+      ],
+      "tests": [
+        "reject_rejects_terminal_and_expired_states"
+      ],
+      "handoff": "Treat as finalized by seller rejection; do not settle or cancel."
+    },
+    {
+      "error": "AssetAlreadyActive",
+      "code": 51,
+      "category": "state",
+      "methods": [
+        "activate_asset"
+      ],
+      "tests": [
+        "error_surface_asset_activation_lifecycle_errors"
+      ],
+      "handoff": "Do not re-activate an asset that is already active."
+    },
+    {
+      "error": "AssetDeprecated",
+      "code": 52,
+      "category": "state",
+      "methods": [
+        "activate_asset"
+      ],
+      "tests": [
+        "error_surface_asset_activation_lifecycle_errors"
+      ],
+      "handoff": "Do not re-activate a deprecated asset without removing and re-onboarding it."
+    },
+    {
+      "error": "AssetLimitReached",
+      "code": 53,
+      "category": "state",
+      "methods": [
+        "activate_asset"
+      ],
+      "tests": [
+        "error_surface_asset_activation_lifecycle_errors"
+      ],
+      "handoff": "Do not activate more than 16 supported assets on a single deployment."
+    },
+    {
+      "error": "AssetExposureCeilingExceeded",
+      "code": 54,
+      "category": "state",
+      "methods": [
+        "create_session"
+      ],
+      "tests": [
+        "asset_ceiling_is_exact_and_checked_before_authorization_or_transfer",
+        "asset_ceilings_are_independent_per_asset",
+        "ceiling_updates_gate_only_new_sessions",
+        "every_terminal_path_releases_asset_capacity_exactly_once"
+      ],
+      "handoff": "Reject session creation that would push aggregate asset liability above the configured ceiling."
+    },
+    {
+      "error": "InvalidExposureCeiling",
+      "code": 55,
+      "category": "validation",
+      "methods": [
+        "initialize",
+        "set_asset_exposure_ceiling",
+        "set_buyer_exposure_ceiling"
+      ],
+      "tests": [
+        "ceiling_updates_are_admin_only_validated_and_evented",
+        "initialize_requires_positive_exposure_ceilings_for_every_asset"
+      ],
+      "handoff": "Reject zero or negative asset or buyer exposure ceilings."
+    },
+    {
+      "error": "ExposureCeilingNotConfigured",
+      "code": 56,
+      "category": "state",
+      "methods": [
+        "create_session",
+        "get_asset_exposure_ceiling",
+        "get_buyer_exposure_ceiling",
+        "set_asset_exposure_ceiling",
+        "set_buyer_exposure_ceiling"
+      ],
+      "tests": [
+        "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+      ],
+      "handoff": "Stop creation and investigate missing exposure ceiling configuration for the asset."
+    },
+    {
+      "error": "BuyerExposureCeilingExceeded",
+      "code": 57,
+      "category": "state",
+      "methods": [
+        "create_session"
+      ],
+      "tests": [
+        "buyer_ceiling_is_checked_before_buyer_authorization",
+        "buyer_ceiling_is_exact_and_isolated_across_buyers_and_assets",
+        "many_sessions_from_one_buyer_track_the_running_total"
+      ],
+      "handoff": "Reject session creation that would push the buyer's open exposure above the configured ceiling."
+    },
+    {
+      "error": "BuyerExposureUnderflow",
+      "code": 58,
+      "category": "state",
+      "methods": [
+        "cancel",
+        "recover_expired",
+        "reduce_session_cap",
+        "reject",
+        "settle"
+      ],
+      "tests": [
+        "corrupted_buyer_exposure_fails_atomically_and_cannot_underflow"
+      ],
+      "handoff": "Stop and investigate corrupted buyer exposure accounting before retrying."
+    },
+    {
+      "error": "SequenceExhausted",
+      "code": 59,
+      "category": "state",
+      "methods": [
+        "create_session"
+      ],
+      "tests": [
+        "session_sequence_exhaustion_behavior"
+      ],
+      "handoff": "Session sequence reached `u64::MAX`; deploy a replacement contract for new sessions."
+    },
+    {
+      "error": "IdempotencyConflict",
+      "code": 60,
+      "category": "state",
+      "methods": [
+        "create_session"
+      ],
+      "tests": [
+        "error_surface_commitment_scheme_and_idempotency_conflict"
+      ],
+      "handoff": "Reused `idempotency_key` with different session parameters; generate a fresh key for distinct sessions."
+    }
+  ],
+  "methods": [
+    {
+      "method": "accept_admin",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "AdminRotationNotFound",
+          "code": 28,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_rejects_overwrite_expiry_and_replay"
+          ],
+          "handoff": "Treat acceptance or cancellation as stale and refresh state."
+        },
+        {
+          "error": "AdminRotationExpired",
+          "code": 29,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_expiry_boundary_is_exact_and_expired_state_fails_closed",
+            "admin_rotation_rejects_overwrite_expiry_and_replay"
+          ],
+          "handoff": "Do not accept at or after the recorded expiry ledger."
+        }
+      ]
+    },
+    {
+      "method": "accept_asset_cap_increase",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "AssetCapNotConfigured",
+          "code": 24,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+          ],
+          "handoff": "Stop creation and investigate incomplete asset policy state."
+        },
+        {
+          "error": "CapIncreaseNotReady",
+          "code": 39,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions"
+          ],
+          "handoff": "Cannot accept proposal before the configured activation ledger."
+        },
+        {
+          "error": "CapIncreaseNotFound",
+          "code": 40,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions"
+          ],
+          "handoff": "Proposal does not exist or was already cancelled or accepted."
+        },
+        {
+          "error": "CapIncreaseExpired",
+          "code": 41,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions"
+          ],
+          "handoff": "Cannot accept proposal at or after the expiration ledger."
+        }
+      ]
+    },
+    {
+      "method": "activate_asset",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "InvalidAsset",
+          "code": 9,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "rejects_invalid_seller_or_asset_bindings"
+          ],
+          "handoff": "Reject requests where asset equals buyer or seller."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "InvalidAssetCap",
+          "code": 23,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "asset_caps_must_be_positive",
+            "cap_updates_accept_only_positive_values_and_keep_the_previous_cap_on_failure",
+            "decimal_scaled_cap_boundaries_are_exact_for_every_supported_decimal_count",
+            "initialize_rejects_empty_duplicate_or_invalid_asset_policies",
+            "per_asset_minimum_enforces_boundaries_and_policy_invariants"
+          ],
+          "handoff": "Reject zero or negative caps or minimums, a minimum above the maximum, or a cap update below the minimum."
+        },
+        {
+          "error": "InvalidAssetInterface",
+          "code": 32,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "activation_rejects_missing_incompatible_reverting_and_malformed_assets"
+          ],
+          "handoff": "Reject an asset whose read-only SEP-41 behavior or metadata is malformed."
+        },
+        {
+          "error": "AssetAlreadyActive",
+          "code": 51,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_activation_lifecycle_errors"
+          ],
+          "handoff": "Do not re-activate an asset that is already active."
+        },
+        {
+          "error": "AssetDeprecated",
+          "code": 52,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_activation_lifecycle_errors"
+          ],
+          "handoff": "Do not re-activate a deprecated asset without removing and re-onboarding it."
+        },
+        {
+          "error": "AssetLimitReached",
+          "code": 53,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_activation_lifecycle_errors"
+          ],
+          "handoff": "Do not activate more than 16 supported assets on a single deployment."
+        }
+      ]
+    },
+    {
+      "method": "cancel",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "ExpiredSession",
+          "code": 4,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "creation_and_rotation_expiry_windows_have_exact_bounds",
+            "expired_create_input_fails_before_storage_write",
+            "expired_open_session_remains_observable_and_permissionlessly_recoverable",
+            "expiry_boundary_selects_exactly_one_terminal_path",
+            "logical_expiry_boundary_is_independent_of_storage_ttl"
+          ],
+          "handoff": "Stop settlement and ask caller to create a new session."
+        },
+        {
+          "error": "SessionNotFound",
+          "code": 5,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_returns_not_found_for_missing_session",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "extend_ttl_rejects_missing_session",
+            "get_session_returns_not_found_for_missing_session",
+            "lapsed_session_entry_cannot_be_replaced_by_extension_of_a_finalized_session"
+          ],
+          "handoff": "Return not found and trigger reconciliation if expected."
+        },
+        {
+          "error": "SessionAlreadySettled",
+          "code": 6,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_rejects_already_settled_session",
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "mutation_end_to_end_auth_and_cap_guards_are_all_present",
+            "mutation_finalized_guard_in_cancel_rejects_settled_session"
+          ],
+          "handoff": "Treat as finalized and fetch state."
+        },
+        {
+          "error": "SessionCancelled",
+          "code": 7,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_rejects_already_cancelled_session",
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "mutation_finalized_guard_in_cancel_rejects_already_cancelled_session",
+            "mutation_finalized_guard_in_recover_rejects_cancelled_session"
+          ],
+          "handoff": "Treat as finalized and do not settle."
+        },
+        {
+          "error": "LiabilityUnderflow",
+          "code": 18,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "lapsed_liability_entry_fails_closed_and_keeps_escrow_in_the_contract",
+            "liability_arithmetic_is_checked",
+            "sr8_missing_aggregate_counter_fails_closed_without_payout"
+          ],
+          "handoff": "Stop and investigate liability arithmetic or corrupted state."
+        },
+        {
+          "error": "EscrowUnderfunded",
+          "code": 19,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "undercollateralized_settlement_fails_without_state_transition"
+          ],
+          "handoff": "Reject creation or exit if token custody does not cover aggregate liability."
+        },
+        {
+          "error": "SessionExpired",
+          "code": 21,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_is_permissionless_fixed_recipient_and_single_use",
+            "logical_expiry_boundary_is_independent_of_storage_ttl",
+            "mutation_finalized_guard_in_recover_rejects_already_expired_session",
+            "mutation_finalized_guard_in_settle_rejects_expired_session"
+          ],
+          "handoff": "Treat as finalized by expiry recovery."
+        },
+        {
+          "error": "TokenInvariantViolation",
+          "code": 30,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "adversarial_create_failures_roll_back_funds_liability_and_sequence",
+            "adversarial_terminal_failures_leave_the_session_open_and_funded"
+          ],
+          "handoff": "Stop processing and quarantine the configured asset; an observed transfer balance delta did not match the requested amount."
+        },
+        {
+          "error": "SessionRejected",
+          "code": 50,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "reject_rejects_terminal_and_expired_states"
+          ],
+          "handoff": "Treat as finalized by seller rejection; do not settle or cancel."
+        },
+        {
+          "error": "BuyerExposureUnderflow",
+          "code": 58,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "corrupted_buyer_exposure_fails_atomically_and_cannot_underflow"
+          ],
+          "handoff": "Stop and investigate corrupted buyer exposure accounting before retrying."
+        }
+      ]
+    },
+    {
+      "method": "cancel_admin_rotation",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "AdminRotationNotFound",
+          "code": 28,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_rejects_overwrite_expiry_and_replay"
+          ],
+          "handoff": "Treat acceptance or cancellation as stale and refresh state."
+        }
+      ]
+    },
+    {
+      "method": "cancel_asset_cap_increase",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "CapIncreaseNotFound",
+          "code": 40,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions"
+          ],
+          "handoff": "Proposal does not exist or was already cancelled or accepted."
+        }
+      ]
+    },
+    {
+      "method": "create_session",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "InvalidAmount",
+          "code": 3,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "create_validation_accepts_only_positive_amounts",
+            "encoding_vectors_generation_is_deterministic",
+            "invalid_create_inputs_do_not_consume_sequence",
+            "per_asset_minimum_enforces_boundaries_and_policy_invariants",
+            "rejects_invalid_amounts"
+          ],
+          "handoff": "Reject request validation before submitting."
+        },
+        {
+          "error": "ExpiredSession",
+          "code": 4,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "creation_and_rotation_expiry_windows_have_exact_bounds",
+            "expired_create_input_fails_before_storage_write",
+            "expired_open_session_remains_observable_and_permissionlessly_recoverable",
+            "expiry_boundary_selects_exactly_one_terminal_path",
+            "logical_expiry_boundary_is_independent_of_storage_ttl"
+          ],
+          "handoff": "Stop settlement and ask caller to create a new session."
+        },
+        {
+          "error": "SessionNotFound",
+          "code": 5,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_returns_not_found_for_missing_session",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "extend_ttl_rejects_missing_session",
+            "get_session_returns_not_found_for_missing_session",
+            "lapsed_session_entry_cannot_be_replaced_by_extension_of_a_finalized_session"
+          ],
+          "handoff": "Return not found and trigger reconciliation if expected."
+        },
+        {
+          "error": "AmountExceedsCap",
+          "code": 8,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions",
+            "mutation_asset_cap_inversion_in_create_session_is_caught",
+            "mutation_end_to_end_auth_and_cap_guards_are_all_present",
+            "mutation_settlement_cap_inversion_is_caught",
+            "per_asset_caps_enforce_boundaries_before_buyer_authorization"
+          ],
+          "handoff": "Reject settlement above buyer cap."
+        },
+        {
+          "error": "InvalidAsset",
+          "code": 9,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "rejects_invalid_seller_or_asset_bindings"
+          ],
+          "handoff": "Reject requests where asset equals buyer or seller."
+        },
+        {
+          "error": "InvalidSeller",
+          "code": 10,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "rejects_invalid_seller_or_asset_bindings"
+          ],
+          "handoff": "Reject buyer-as-seller requests."
+        },
+        {
+          "error": "InvalidResourceHash",
+          "code": 12,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "deprecated_asset_terminal_paths_clear_liability_before_removal",
+            "encoding_vectors_generation_is_deterministic",
+            "rejects_empty_resource_hash"
+          ],
+          "handoff": "Reject empty or malformed resource hash input."
+        },
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "SessionDurationTooLong",
+          "code": 16,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_and_rotation_expiry_windows_have_exact_bounds",
+            "validates_session_lifetime_boundary_and_near_u32_limit_ledgers"
+          ],
+          "handoff": "Reject an expiry more than 518,400 ledgers ahead."
+        },
+        {
+          "error": "LiabilityOverflow",
+          "code": 17,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "liability_arithmetic_is_checked",
+            "liability_overflow_is_rejected_before_funds_move"
+          ],
+          "handoff": "Stop and investigate liability arithmetic or corrupted state."
+        },
+        {
+          "error": "EscrowUnderfunded",
+          "code": 19,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "undercollateralized_settlement_fails_without_state_transition"
+          ],
+          "handoff": "Reject creation or exit if token custody does not cover aggregate liability."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "AssetCapNotConfigured",
+          "code": 24,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+          ],
+          "handoff": "Stop creation and investigate incomplete asset policy state."
+        },
+        {
+          "error": "TokenInvariantViolation",
+          "code": 30,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "adversarial_create_failures_roll_back_funds_liability_and_sequence",
+            "adversarial_terminal_failures_leave_the_session_open_and_funded"
+          ],
+          "handoff": "Stop processing and quarantine the configured asset; an observed transfer balance delta did not match the requested amount."
+        },
+        {
+          "error": "CreationPaused",
+          "code": 36,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "creation_pause_rejects_repeated_calls_and_resume_restores_creation",
+            "creation_pause_requires_admin_and_fails_closed_before_transfer"
+          ],
+          "handoff": "New sessions are paused by the administrator; surface the operational state and stop submitting `create_session`."
+        },
+        {
+          "error": "UnsupportedCommitmentScheme",
+          "code": 43,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_commitment_scheme_and_idempotency_conflict"
+          ],
+          "handoff": "Commitment scheme version is unsupported by the contract."
+        },
+        {
+          "error": "SellerExposureCeilingExceeded",
+          "code": 44,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "seller_exposure_ceiling_enforces_limits_and_releases_exposure"
+          ],
+          "handoff": "Reject session creation that would push seller open exposure above the configured ceiling."
+        },
+        {
+          "error": "BuyerOpenSessionsExceeded",
+          "code": 46,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "buyer_open_session_limits_enforces_boundaries_and_maintains_isolation"
+          ],
+          "handoff": "Reject session creation because the buyer reached the open-session count limit."
+        },
+        {
+          "error": "SellerOpenSessionsExceeded",
+          "code": 48,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "seller_open_session_limits_enforces_boundaries_and_maintains_isolation"
+          ],
+          "handoff": "Reject session creation because the seller reached the open-session count limit."
+        },
+        {
+          "error": "AssetExposureCeilingExceeded",
+          "code": 54,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_ceiling_is_exact_and_checked_before_authorization_or_transfer",
+            "asset_ceilings_are_independent_per_asset",
+            "ceiling_updates_gate_only_new_sessions",
+            "every_terminal_path_releases_asset_capacity_exactly_once"
+          ],
+          "handoff": "Reject session creation that would push aggregate asset liability above the configured ceiling."
+        },
+        {
+          "error": "ExposureCeilingNotConfigured",
+          "code": 56,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+          ],
+          "handoff": "Stop creation and investigate missing exposure ceiling configuration for the asset."
+        },
+        {
+          "error": "BuyerExposureCeilingExceeded",
+          "code": 57,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "buyer_ceiling_is_checked_before_buyer_authorization",
+            "buyer_ceiling_is_exact_and_isolated_across_buyers_and_assets",
+            "many_sessions_from_one_buyer_track_the_running_total"
+          ],
+          "handoff": "Reject session creation that would push the buyer's open exposure above the configured ceiling."
+        },
+        {
+          "error": "SequenceExhausted",
+          "code": 59,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "session_sequence_exhaustion_behavior"
+          ],
+          "handoff": "Session sequence reached `u64::MAX`; deploy a replacement contract for new sessions."
+        },
+        {
+          "error": "IdempotencyConflict",
+          "code": 60,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_commitment_scheme_and_idempotency_conflict"
+          ],
+          "handoff": "Reused `idempotency_key` with different session parameters; generate a fresh key for distinct sessions."
+        }
+      ]
+    },
+    {
+      "method": "deprecate_asset",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "InvalidResourceHash",
+          "code": 12,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "deprecated_asset_terminal_paths_clear_liability_before_removal",
+            "encoding_vectors_generation_is_deterministic",
+            "rejects_empty_resource_hash"
+          ],
+          "handoff": "Reject empty or malformed resource hash input."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "AssetNotActive",
+          "code": 33,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions"
+          ],
+          "handoff": "Do not deprecate an unknown or already deprecated asset."
+        }
+      ]
+    },
+    {
+      "method": "extend_session_expiry",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "ExpiredSession",
+          "code": 4,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "creation_and_rotation_expiry_windows_have_exact_bounds",
+            "expired_create_input_fails_before_storage_write",
+            "expired_open_session_remains_observable_and_permissionlessly_recoverable",
+            "expiry_boundary_selects_exactly_one_terminal_path",
+            "logical_expiry_boundary_is_independent_of_storage_ttl"
+          ],
+          "handoff": "Stop settlement and ask caller to create a new session."
+        },
+        {
+          "error": "SessionNotFound",
+          "code": 5,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_returns_not_found_for_missing_session",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "extend_ttl_rejects_missing_session",
+            "get_session_returns_not_found_for_missing_session",
+            "lapsed_session_entry_cannot_be_replaced_by_extension_of_a_finalized_session"
+          ],
+          "handoff": "Return not found and trigger reconciliation if expected."
+        },
+        {
+          "error": "SessionAlreadySettled",
+          "code": 6,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_rejects_already_settled_session",
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "mutation_end_to_end_auth_and_cap_guards_are_all_present",
+            "mutation_finalized_guard_in_cancel_rejects_settled_session"
+          ],
+          "handoff": "Treat as finalized and fetch state."
+        },
+        {
+          "error": "SessionCancelled",
+          "code": 7,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_rejects_already_cancelled_session",
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "mutation_finalized_guard_in_cancel_rejects_already_cancelled_session",
+            "mutation_finalized_guard_in_recover_rejects_cancelled_session"
+          ],
+          "handoff": "Treat as finalized and do not settle."
+        },
+        {
+          "error": "SessionDurationTooLong",
+          "code": 16,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_and_rotation_expiry_windows_have_exact_bounds",
+            "validates_session_lifetime_boundary_and_near_u32_limit_ledgers"
+          ],
+          "handoff": "Reject an expiry more than 518,400 ledgers ahead."
+        },
+        {
+          "error": "SessionExpired",
+          "code": 21,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_is_permissionless_fixed_recipient_and_single_use",
+            "logical_expiry_boundary_is_independent_of_storage_ttl",
+            "mutation_finalized_guard_in_recover_rejects_already_expired_session",
+            "mutation_finalized_guard_in_settle_rejects_expired_session"
+          ],
+          "handoff": "Treat as finalized by expiry recovery."
+        },
+        {
+          "error": "SessionRejected",
+          "code": 50,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "reject_rejects_terminal_and_expired_states"
+          ],
+          "handoff": "Treat as finalized by seller rejection; do not settle or cancel."
+        }
+      ]
+    },
+    {
+      "method": "extend_ttl",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "SessionNotFound",
+          "code": 5,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_returns_not_found_for_missing_session",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "extend_ttl_rejects_missing_session",
+            "get_session_returns_not_found_for_missing_session",
+            "lapsed_session_entry_cannot_be_replaced_by_extension_of_a_finalized_session"
+          ],
+          "handoff": "Return not found and trigger reconciliation if expected."
+        },
+        {
+          "error": "TtlExtensionFailed",
+          "code": 11,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "extend_ttl_rejects_cancelled_sessions",
+            "extend_ttl_rejects_settled_sessions",
+            "logical_expiry_boundary_is_independent_of_storage_ttl",
+            "public_interface_is_callable",
+            "recovery_extends_ttl_only_inside_the_finalizing_transition_at_the_threshold"
+          ],
+          "handoff": "Do not retry for finalized sessions."
+        }
+      ]
+    },
+    {
+      "method": "get_admin",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        }
+      ]
+    },
+    {
+      "method": "get_admin_rotation",
+      "authorizationEnforced": false,
+      "errors": []
+    },
+    {
+      "method": "get_asset_cap_increase",
+      "authorizationEnforced": false,
+      "errors": []
+    },
+    {
+      "method": "get_asset_exposure_ceiling",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "ExposureCeilingNotConfigured",
+          "code": 56,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+          ],
+          "handoff": "Stop creation and investigate missing exposure ceiling configuration for the asset."
+        }
+      ]
+    },
+    {
+      "method": "get_asset_max_session_amount",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "AssetCapNotConfigured",
+          "code": 24,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+          ],
+          "handoff": "Stop creation and investigate incomplete asset policy state."
+        }
+      ]
+    },
+    {
+      "method": "get_asset_min_session_amount",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "AssetCapNotConfigured",
+          "code": 24,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+          ],
+          "handoff": "Stop creation and investigate incomplete asset policy state."
+        }
+      ]
+    },
+    {
+      "method": "get_asset_policy",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "AssetCapNotConfigured",
+          "code": 24,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+          ],
+          "handoff": "Stop creation and investigate incomplete asset policy state."
+        }
+      ]
+    },
+    {
+      "method": "get_asset_solvency",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        }
+      ]
+    },
+    {
+      "method": "get_buyer_exposure",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        }
+      ]
+    },
+    {
+      "method": "get_buyer_exposure_ceiling",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "ExposureCeilingNotConfigured",
+          "code": 56,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+          ],
+          "handoff": "Stop creation and investigate missing exposure ceiling configuration for the asset."
+        }
+      ]
+    },
+    {
+      "method": "get_buyer_open_sessions",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        }
+      ]
+    },
+    {
+      "method": "get_commitment_domain_metadata",
+      "authorizationEnforced": false,
+      "errors": []
+    },
+    {
+      "method": "get_configuration",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        }
+      ]
+    },
+    {
+      "method": "get_escrow_liability",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        }
+      ]
+    },
+    {
+      "method": "get_max_buyer_open_sessions",
+      "authorizationEnforced": false,
+      "errors": []
+    },
+    {
+      "method": "get_max_seller_open_sessions",
+      "authorizationEnforced": false,
+      "errors": []
+    },
+    {
+      "method": "get_recoverability",
+      "authorizationEnforced": false,
+      "errors": []
+    },
+    {
+      "method": "get_seller_exposure",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        }
+      ]
+    },
+    {
+      "method": "get_seller_exposure_ceiling",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "SellerExposureCeilingNotConfigured",
+          "code": 45,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+          ],
+          "handoff": "No seller exposure ceiling is configured for the queried asset."
+        }
+      ]
+    },
+    {
+      "method": "get_seller_open_sessions",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        }
+      ]
+    },
+    {
+      "method": "get_session",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "SessionNotFound",
+          "code": 5,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_returns_not_found_for_missing_session",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "extend_ttl_rejects_missing_session",
+            "get_session_returns_not_found_for_missing_session",
+            "lapsed_session_entry_cannot_be_replaced_by_extension_of_a_finalized_session"
+          ],
+          "handoff": "Return not found and trigger reconciliation if expected."
+        }
+      ]
+    },
+    {
+      "method": "get_session_batch",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "InvalidBatchSize",
+          "code": 31,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "batch_recovery_is_bounded_and_reports_partial_results_in_order",
+            "get_session_batch_enforces_nonzero_and_max_batch_size_bounds",
+            "solvency_query_reports_ordered_mixed_health_with_defined_edge_cases"
+          ],
+          "handoff": "Supply a batch size within the documented non-zero upper bound."
+        }
+      ]
+    },
+    {
+      "method": "get_session_status",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "SessionNotFound",
+          "code": 5,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_returns_not_found_for_missing_session",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "extend_ttl_rejects_missing_session",
+            "get_session_returns_not_found_for_missing_session",
+            "lapsed_session_entry_cannot_be_replaced_by_extension_of_a_finalized_session"
+          ],
+          "handoff": "Return not found and trigger reconciliation if expected."
+        }
+      ]
+    },
+    {
+      "method": "get_solvency",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "InvalidBatchSize",
+          "code": 31,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "batch_recovery_is_bounded_and_reports_partial_results_in_order",
+            "get_session_batch_enforces_nonzero_and_max_batch_size_bounds",
+            "solvency_query_reports_ordered_mixed_health_with_defined_edge_cases"
+          ],
+          "handoff": "Supply a batch size within the documented non-zero upper bound."
+        }
+      ]
+    },
+    {
+      "method": "initialize",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "AlreadyInitialized",
+          "code": 1,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "initialize_stores_admin_once"
+          ],
+          "handoff": "Treat setup as already complete; do not retry blindly."
+        },
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "InvalidSupportedAssets",
+          "code": 15,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "initialize_rejects_empty_duplicate_or_invalid_asset_policies"
+          ],
+          "handoff": "Reject an empty, oversized, or duplicate initialization allowlist."
+        },
+        {
+          "error": "InvalidAssetCap",
+          "code": 23,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "asset_caps_must_be_positive",
+            "cap_updates_accept_only_positive_values_and_keep_the_previous_cap_on_failure",
+            "decimal_scaled_cap_boundaries_are_exact_for_every_supported_decimal_count",
+            "initialize_rejects_empty_duplicate_or_invalid_asset_policies",
+            "per_asset_minimum_enforces_boundaries_and_policy_invariants"
+          ],
+          "handoff": "Reject zero or negative caps or minimums, a minimum above the maximum, or a cap update below the minimum."
+        },
+        {
+          "error": "InvalidAssetInterface",
+          "code": 32,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "activation_rejects_missing_incompatible_reverting_and_malformed_assets"
+          ],
+          "handoff": "Reject an asset whose read-only SEP-41 behavior or metadata is malformed."
+        },
+        {
+          "error": "InvalidExposureCeiling",
+          "code": 55,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject zero or negative asset or buyer exposure ceilings."
+        }
+      ]
+    },
+    {
+      "method": "interface_version",
+      "authorizationEnforced": false,
+      "errors": []
+    },
+    {
+      "method": "max_session_duration_ledgers",
+      "authorizationEnforced": false,
+      "errors": []
+    },
+    {
+      "method": "pause_creation",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "OperationalStateUnchanged",
+          "code": 37,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "creation_pause_rejects_repeated_calls_and_resume_restores_creation"
+          ],
+          "handoff": "The requested pause or resume already matches the current operational state; refresh `get_configuration` instead of retrying."
+        }
+      ]
+    },
+    {
+      "method": "preview_settle",
+      "authorizationEnforced": false,
+      "errors": []
+    },
+    {
+      "method": "propose_admin",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "InvalidAdmin",
+          "code": 25,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "validates_admin_rotation_parties_and_expiry"
+          ],
+          "handoff": "Reject proposals that target the active administrator."
+        },
+        {
+          "error": "InvalidAdminRotationExpiry",
+          "code": 26,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "creation_and_rotation_expiry_windows_have_exact_bounds",
+            "validates_admin_rotation_parties_and_expiry"
+          ],
+          "handoff": "Reject expired or excessively long proposal windows."
+        },
+        {
+          "error": "AdminRotationPending",
+          "code": 27,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_expiry_boundary_is_exact_and_expired_state_fails_closed",
+            "admin_rotation_rejects_overwrite_expiry_and_replay"
+          ],
+          "handoff": "Cancel or complete the existing proposal before creating another."
+        }
+      ]
+    },
+    {
+      "method": "propose_asset_cap_increase",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "InvalidAssetCap",
+          "code": 23,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "asset_caps_must_be_positive",
+            "cap_updates_accept_only_positive_values_and_keep_the_previous_cap_on_failure",
+            "decimal_scaled_cap_boundaries_are_exact_for_every_supported_decimal_count",
+            "initialize_rejects_empty_duplicate_or_invalid_asset_policies",
+            "per_asset_minimum_enforces_boundaries_and_policy_invariants"
+          ],
+          "handoff": "Reject zero or negative caps or minimums, a minimum above the maximum, or a cap update below the minimum."
+        },
+        {
+          "error": "AssetCapNotConfigured",
+          "code": 24,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+          ],
+          "handoff": "Stop creation and investigate incomplete asset policy state."
+        },
+        {
+          "error": "CapIncreasePending",
+          "code": 38,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions",
+            "cap_updates_accept_only_positive_values_and_keep_the_previous_cap_on_failure"
+          ],
+          "handoff": "A cap increase proposal is already pending or an immediate cap increase was attempted."
+        },
+        {
+          "error": "InvalidCapIncreaseDelay",
+          "code": 42,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_cap_increase_delay_and_session_count_limits"
+          ],
+          "handoff": "Activation or expiration delay violates minimum (100) or maximum (17,280) ledgers."
+        }
+      ]
+    },
+    {
+      "method": "recover_expired",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "SessionNotFound",
+          "code": 5,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_returns_not_found_for_missing_session",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "extend_ttl_rejects_missing_session",
+            "get_session_returns_not_found_for_missing_session",
+            "lapsed_session_entry_cannot_be_replaced_by_extension_of_a_finalized_session"
+          ],
+          "handoff": "Return not found and trigger reconciliation if expected."
+        },
+        {
+          "error": "SessionAlreadySettled",
+          "code": 6,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_rejects_already_settled_session",
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "mutation_end_to_end_auth_and_cap_guards_are_all_present",
+            "mutation_finalized_guard_in_cancel_rejects_settled_session"
+          ],
+          "handoff": "Treat as finalized and fetch state."
+        },
+        {
+          "error": "SessionCancelled",
+          "code": 7,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_rejects_already_cancelled_session",
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "mutation_finalized_guard_in_cancel_rejects_already_cancelled_session",
+            "mutation_finalized_guard_in_recover_rejects_cancelled_session"
+          ],
+          "handoff": "Treat as finalized and do not settle."
+        },
+        {
+          "error": "LiabilityUnderflow",
+          "code": 18,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "lapsed_liability_entry_fails_closed_and_keeps_escrow_in_the_contract",
+            "liability_arithmetic_is_checked",
+            "sr8_missing_aggregate_counter_fails_closed_without_payout"
+          ],
+          "handoff": "Stop and investigate liability arithmetic or corrupted state."
+        },
+        {
+          "error": "EscrowUnderfunded",
+          "code": 19,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "undercollateralized_settlement_fails_without_state_transition"
+          ],
+          "handoff": "Reject creation or exit if token custody does not cover aggregate liability."
+        },
+        {
+          "error": "SessionExpired",
+          "code": 21,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_is_permissionless_fixed_recipient_and_single_use",
+            "logical_expiry_boundary_is_independent_of_storage_ttl",
+            "mutation_finalized_guard_in_recover_rejects_already_expired_session",
+            "mutation_finalized_guard_in_settle_rejects_expired_session"
+          ],
+          "handoff": "Treat as finalized by expiry recovery."
+        },
+        {
+          "error": "SessionNotExpired",
+          "code": 22,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "expiry_boundary_selects_exactly_one_terminal_path",
+            "logical_expiry_boundary_is_independent_of_storage_ttl",
+            "mutation_recover_not_expired_check_inversion_is_caught",
+            "recoverability_query_matches_recover_expired_boundary_and_terminal_states"
+          ],
+          "handoff": "Do not recover before the exact expiry ledger."
+        },
+        {
+          "error": "TokenInvariantViolation",
+          "code": 30,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "adversarial_create_failures_roll_back_funds_liability_and_sequence",
+            "adversarial_terminal_failures_leave_the_session_open_and_funded"
+          ],
+          "handoff": "Stop processing and quarantine the configured asset; an observed transfer balance delta did not match the requested amount."
+        },
+        {
+          "error": "SessionRejected",
+          "code": 50,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "reject_rejects_terminal_and_expired_states"
+          ],
+          "handoff": "Treat as finalized by seller rejection; do not settle or cancel."
+        },
+        {
+          "error": "BuyerExposureUnderflow",
+          "code": 58,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "corrupted_buyer_exposure_fails_atomically_and_cannot_underflow"
+          ],
+          "handoff": "Stop and investigate corrupted buyer exposure accounting before retrying."
+        }
+      ]
+    },
+    {
+      "method": "recover_expired_batch",
+      "authorizationEnforced": false,
+      "errors": [
+        {
+          "error": "TokenInvariantViolation",
+          "code": 30,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "adversarial_create_failures_roll_back_funds_liability_and_sequence",
+            "adversarial_terminal_failures_leave_the_session_open_and_funded"
+          ],
+          "handoff": "Stop processing and quarantine the configured asset; an observed transfer balance delta did not match the requested amount."
+        },
+        {
+          "error": "InvalidBatchSize",
+          "code": 31,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "batch_recovery_is_bounded_and_reports_partial_results_in_order",
+            "get_session_batch_enforces_nonzero_and_max_batch_size_bounds",
+            "solvency_query_reports_ordered_mixed_health_with_defined_edge_cases"
+          ],
+          "handoff": "Supply a batch size within the documented non-zero upper bound."
+        }
+      ]
+    },
+    {
+      "method": "recover_surplus",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "InvalidAmount",
+          "code": 3,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "create_validation_accepts_only_positive_amounts",
+            "encoding_vectors_generation_is_deterministic",
+            "invalid_create_inputs_do_not_consume_sequence",
+            "per_asset_minimum_enforces_boundaries_and_policy_invariants",
+            "rejects_invalid_amounts"
+          ],
+          "handoff": "Reject request validation before submitting."
+        },
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "EscrowUnderfunded",
+          "code": 19,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "undercollateralized_settlement_fails_without_state_transition"
+          ],
+          "handoff": "Reject creation or exit if token custody does not cover aggregate liability."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "TokenInvariantViolation",
+          "code": 30,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "adversarial_create_failures_roll_back_funds_liability_and_sequence",
+            "adversarial_terminal_failures_leave_the_session_open_and_funded"
+          ],
+          "handoff": "Stop processing and quarantine the configured asset; an observed transfer balance delta did not match the requested amount."
+        }
+      ]
+    },
+    {
+      "method": "reduce_session_cap",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "ExpiredSession",
+          "code": 4,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "creation_and_rotation_expiry_windows_have_exact_bounds",
+            "expired_create_input_fails_before_storage_write",
+            "expired_open_session_remains_observable_and_permissionlessly_recoverable",
+            "expiry_boundary_selects_exactly_one_terminal_path",
+            "logical_expiry_boundary_is_independent_of_storage_ttl"
+          ],
+          "handoff": "Stop settlement and ask caller to create a new session."
+        },
+        {
+          "error": "SessionNotFound",
+          "code": 5,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_returns_not_found_for_missing_session",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "extend_ttl_rejects_missing_session",
+            "get_session_returns_not_found_for_missing_session",
+            "lapsed_session_entry_cannot_be_replaced_by_extension_of_a_finalized_session"
+          ],
+          "handoff": "Return not found and trigger reconciliation if expected."
+        },
+        {
+          "error": "SessionAlreadySettled",
+          "code": 6,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_rejects_already_settled_session",
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "mutation_end_to_end_auth_and_cap_guards_are_all_present",
+            "mutation_finalized_guard_in_cancel_rejects_settled_session"
+          ],
+          "handoff": "Treat as finalized and fetch state."
+        },
+        {
+          "error": "SessionCancelled",
+          "code": 7,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_rejects_already_cancelled_session",
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "mutation_finalized_guard_in_cancel_rejects_already_cancelled_session",
+            "mutation_finalized_guard_in_recover_rejects_cancelled_session"
+          ],
+          "handoff": "Treat as finalized and do not settle."
+        },
+        {
+          "error": "LiabilityUnderflow",
+          "code": 18,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "lapsed_liability_entry_fails_closed_and_keeps_escrow_in_the_contract",
+            "liability_arithmetic_is_checked",
+            "sr8_missing_aggregate_counter_fails_closed_without_payout"
+          ],
+          "handoff": "Stop and investigate liability arithmetic or corrupted state."
+        },
+        {
+          "error": "EscrowUnderfunded",
+          "code": 19,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "undercollateralized_settlement_fails_without_state_transition"
+          ],
+          "handoff": "Reject creation or exit if token custody does not cover aggregate liability."
+        },
+        {
+          "error": "SessionExpired",
+          "code": 21,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_is_permissionless_fixed_recipient_and_single_use",
+            "logical_expiry_boundary_is_independent_of_storage_ttl",
+            "mutation_finalized_guard_in_recover_rejects_already_expired_session",
+            "mutation_finalized_guard_in_settle_rejects_expired_session"
+          ],
+          "handoff": "Treat as finalized by expiry recovery."
+        },
+        {
+          "error": "TokenInvariantViolation",
+          "code": 30,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "adversarial_create_failures_roll_back_funds_liability_and_sequence",
+            "adversarial_terminal_failures_leave_the_session_open_and_funded"
+          ],
+          "handoff": "Stop processing and quarantine the configured asset; an observed transfer balance delta did not match the requested amount."
+        },
+        {
+          "error": "InvalidCapReduction",
+          "code": 49,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "reduce_session_cap_lowers_cap_refunds_buyer_and_reduces_liability"
+          ],
+          "handoff": "Reject cap reductions that are non-positive or not strictly below the current session cap."
+        },
+        {
+          "error": "SessionRejected",
+          "code": 50,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "reject_rejects_terminal_and_expired_states"
+          ],
+          "handoff": "Treat as finalized by seller rejection; do not settle or cancel."
+        },
+        {
+          "error": "BuyerExposureUnderflow",
+          "code": 58,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "corrupted_buyer_exposure_fails_atomically_and_cannot_underflow"
+          ],
+          "handoff": "Stop and investigate corrupted buyer exposure accounting before retrying."
+        }
+      ]
+    },
+    {
+      "method": "reject",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "ExpiredSession",
+          "code": 4,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "creation_and_rotation_expiry_windows_have_exact_bounds",
+            "expired_create_input_fails_before_storage_write",
+            "expired_open_session_remains_observable_and_permissionlessly_recoverable",
+            "expiry_boundary_selects_exactly_one_terminal_path",
+            "logical_expiry_boundary_is_independent_of_storage_ttl"
+          ],
+          "handoff": "Stop settlement and ask caller to create a new session."
+        },
+        {
+          "error": "SessionNotFound",
+          "code": 5,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_returns_not_found_for_missing_session",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "extend_ttl_rejects_missing_session",
+            "get_session_returns_not_found_for_missing_session",
+            "lapsed_session_entry_cannot_be_replaced_by_extension_of_a_finalized_session"
+          ],
+          "handoff": "Return not found and trigger reconciliation if expected."
+        },
+        {
+          "error": "SessionAlreadySettled",
+          "code": 6,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_rejects_already_settled_session",
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "mutation_end_to_end_auth_and_cap_guards_are_all_present",
+            "mutation_finalized_guard_in_cancel_rejects_settled_session"
+          ],
+          "handoff": "Treat as finalized and fetch state."
+        },
+        {
+          "error": "SessionCancelled",
+          "code": 7,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_rejects_already_cancelled_session",
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "mutation_finalized_guard_in_cancel_rejects_already_cancelled_session",
+            "mutation_finalized_guard_in_recover_rejects_cancelled_session"
+          ],
+          "handoff": "Treat as finalized and do not settle."
+        },
+        {
+          "error": "LiabilityUnderflow",
+          "code": 18,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "lapsed_liability_entry_fails_closed_and_keeps_escrow_in_the_contract",
+            "liability_arithmetic_is_checked",
+            "sr8_missing_aggregate_counter_fails_closed_without_payout"
+          ],
+          "handoff": "Stop and investigate liability arithmetic or corrupted state."
+        },
+        {
+          "error": "EscrowUnderfunded",
+          "code": 19,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "undercollateralized_settlement_fails_without_state_transition"
+          ],
+          "handoff": "Reject creation or exit if token custody does not cover aggregate liability."
+        },
+        {
+          "error": "SessionExpired",
+          "code": 21,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_is_permissionless_fixed_recipient_and_single_use",
+            "logical_expiry_boundary_is_independent_of_storage_ttl",
+            "mutation_finalized_guard_in_recover_rejects_already_expired_session",
+            "mutation_finalized_guard_in_settle_rejects_expired_session"
+          ],
+          "handoff": "Treat as finalized by expiry recovery."
+        },
+        {
+          "error": "TokenInvariantViolation",
+          "code": 30,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "adversarial_create_failures_roll_back_funds_liability_and_sequence",
+            "adversarial_terminal_failures_leave_the_session_open_and_funded"
+          ],
+          "handoff": "Stop processing and quarantine the configured asset; an observed transfer balance delta did not match the requested amount."
+        },
+        {
+          "error": "SessionRejected",
+          "code": 50,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "reject_rejects_terminal_and_expired_states"
+          ],
+          "handoff": "Treat as finalized by seller rejection; do not settle or cancel."
+        },
+        {
+          "error": "BuyerExposureUnderflow",
+          "code": 58,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "corrupted_buyer_exposure_fails_atomically_and_cannot_underflow"
+          ],
+          "handoff": "Stop and investigate corrupted buyer exposure accounting before retrying."
+        }
+      ]
+    },
+    {
+      "method": "remove_asset",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "InvalidResourceHash",
+          "code": 12,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "deprecated_asset_terminal_paths_clear_liability_before_removal",
+            "encoding_vectors_generation_is_deterministic",
+            "rejects_empty_resource_hash"
+          ],
+          "handoff": "Reject empty or malformed resource hash input."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "AssetNotDeprecated",
+          "code": 34,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "deprecated_asset_terminal_paths_clear_liability_before_removal"
+          ],
+          "handoff": "Deprecate the asset before requesting final removal."
+        },
+        {
+          "error": "AssetLiabilityOutstanding",
+          "code": 35,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "deprecated_asset_terminal_paths_clear_liability_before_removal"
+          ],
+          "handoff": "Settle, cancel, or recover every open session before removal."
+        }
+      ]
+    },
+    {
+      "method": "resume_creation",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "OperationalStateUnchanged",
+          "code": 37,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "creation_pause_rejects_repeated_calls_and_resume_restores_creation"
+          ],
+          "handoff": "The requested pause or resume already matches the current operational state; refresh `get_configuration` instead of retrying."
+        }
+      ]
+    },
+    {
+      "method": "set_asset_exposure_ceiling",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "InvalidExposureCeiling",
+          "code": 55,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject zero or negative asset or buyer exposure ceilings."
+        },
+        {
+          "error": "ExposureCeilingNotConfigured",
+          "code": 56,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+          ],
+          "handoff": "Stop creation and investigate missing exposure ceiling configuration for the asset."
+        }
+      ]
+    },
+    {
+      "method": "set_asset_max_session_amount",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "InvalidAssetCap",
+          "code": 23,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "asset_caps_must_be_positive",
+            "cap_updates_accept_only_positive_values_and_keep_the_previous_cap_on_failure",
+            "decimal_scaled_cap_boundaries_are_exact_for_every_supported_decimal_count",
+            "initialize_rejects_empty_duplicate_or_invalid_asset_policies",
+            "per_asset_minimum_enforces_boundaries_and_policy_invariants"
+          ],
+          "handoff": "Reject zero or negative caps or minimums, a minimum above the maximum, or a cap update below the minimum."
+        },
+        {
+          "error": "AssetCapNotConfigured",
+          "code": 24,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+          ],
+          "handoff": "Stop creation and investigate incomplete asset policy state."
+        },
+        {
+          "error": "CapIncreasePending",
+          "code": 38,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions",
+            "cap_updates_accept_only_positive_values_and_keep_the_previous_cap_on_failure"
+          ],
+          "handoff": "A cap increase proposal is already pending or an immediate cap increase was attempted."
+        }
+      ]
+    },
+    {
+      "method": "set_buyer_exposure_ceiling",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "InvalidExposureCeiling",
+          "code": 55,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject zero or negative asset or buyer exposure ceilings."
+        },
+        {
+          "error": "ExposureCeilingNotConfigured",
+          "code": 56,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_asset_cap_and_exposure_ceiling_not_configured"
+          ],
+          "handoff": "Stop creation and investigate missing exposure ceiling configuration for the asset."
+        }
+      ]
+    },
+    {
+      "method": "set_max_buyer_open_sessions",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "InvalidSessionCountLimit",
+          "code": 47,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_cap_increase_delay_and_session_count_limits"
+          ],
+          "handoff": "Reject zero session count limits when configuring buyer or seller open-session caps."
+        }
+      ]
+    },
+    {
+      "method": "set_max_seller_open_sessions",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "InvalidSessionCountLimit",
+          "code": 47,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_cap_increase_delay_and_session_count_limits"
+          ],
+          "handoff": "Reject zero session count limits when configuring buyer or seller open-session caps."
+        }
+      ]
+    },
+    {
+      "method": "set_seller_exposure_ceiling",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "UnsupportedAsset",
+          "code": 14,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "ceiling_updates_are_admin_only_validated_and_evented",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "deprecated_assets_reject_creation_but_still_release_capacity",
+            "initialize_requires_positive_exposure_ceilings_for_every_asset"
+          ],
+          "handoff": "Reject assets outside the active deployment allowlist."
+        },
+        {
+          "error": "NotInitialized",
+          "code": 20,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "admin_rotation_queries_are_deterministic_before_initialization",
+            "buyer_exposure_query_requires_initialization",
+            "configuration_query_returns_bounded_versioned_public_state",
+            "create_rejects_uninitialized_unsupported_and_excessive_duration",
+            "creation_pause_and_resume_require_initialization"
+          ],
+          "handoff": "Initialize a new deployment before creating sessions."
+        },
+        {
+          "error": "InvalidAssetCap",
+          "code": 23,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "asset_caps_must_be_positive",
+            "cap_updates_accept_only_positive_values_and_keep_the_previous_cap_on_failure",
+            "decimal_scaled_cap_boundaries_are_exact_for_every_supported_decimal_count",
+            "initialize_rejects_empty_duplicate_or_invalid_asset_policies",
+            "per_asset_minimum_enforces_boundaries_and_policy_invariants"
+          ],
+          "handoff": "Reject zero or negative caps or minimums, a minimum above the maximum, or a cap update below the minimum."
+        }
+      ]
+    },
+    {
+      "method": "settle",
+      "authorizationEnforced": true,
+      "errors": [
+        {
+          "error": "Unauthorized",
+          "code": 2,
+          "category": "authorization",
+          "hostEnforced": true,
+          "tests": [
+            "asset_deprecation_requires_admin_and_blocks_new_sessions",
+            "cancel_requires_buyer_auth",
+            "create_session_requires_buyer_auth",
+            "settle_requires_seller_auth"
+          ],
+          "handoff": "Return authorization failure to caller; enforced at Soroban `require_auth()` boundaries."
+        },
+        {
+          "error": "InvalidAmount",
+          "code": 3,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "create_validation_accepts_only_positive_amounts",
+            "encoding_vectors_generation_is_deterministic",
+            "invalid_create_inputs_do_not_consume_sequence",
+            "per_asset_minimum_enforces_boundaries_and_policy_invariants",
+            "rejects_invalid_amounts"
+          ],
+          "handoff": "Reject request validation before submitting."
+        },
+        {
+          "error": "ExpiredSession",
+          "code": 4,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "creation_and_rotation_expiry_windows_have_exact_bounds",
+            "expired_create_input_fails_before_storage_write",
+            "expired_open_session_remains_observable_and_permissionlessly_recoverable",
+            "expiry_boundary_selects_exactly_one_terminal_path",
+            "logical_expiry_boundary_is_independent_of_storage_ttl"
+          ],
+          "handoff": "Stop settlement and ask caller to create a new session."
+        },
+        {
+          "error": "SessionNotFound",
+          "code": 5,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_returns_not_found_for_missing_session",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "extend_ttl_rejects_missing_session",
+            "get_session_returns_not_found_for_missing_session",
+            "lapsed_session_entry_cannot_be_replaced_by_extension_of_a_finalized_session"
+          ],
+          "handoff": "Return not found and trigger reconciliation if expected."
+        },
+        {
+          "error": "SessionAlreadySettled",
+          "code": 6,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_rejects_already_settled_session",
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "mutation_end_to_end_auth_and_cap_guards_are_all_present",
+            "mutation_finalized_guard_in_cancel_rejects_settled_session"
+          ],
+          "handoff": "Treat as finalized and fetch state."
+        },
+        {
+          "error": "SessionCancelled",
+          "code": 7,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "cancel_rejects_already_cancelled_session",
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_rejects_missing_settled_and_cancelled_sessions",
+            "mutation_finalized_guard_in_cancel_rejects_already_cancelled_session",
+            "mutation_finalized_guard_in_recover_rejects_cancelled_session"
+          ],
+          "handoff": "Treat as finalized and do not settle."
+        },
+        {
+          "error": "AmountExceedsCap",
+          "code": 8,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions",
+            "mutation_asset_cap_inversion_in_create_session_is_caught",
+            "mutation_end_to_end_auth_and_cap_guards_are_all_present",
+            "mutation_settlement_cap_inversion_is_caught",
+            "per_asset_caps_enforce_boundaries_before_buyer_authorization"
+          ],
+          "handoff": "Reject settlement above buyer cap."
+        },
+        {
+          "error": "InvalidUsageHash",
+          "code": 13,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "rejects_empty_usage_hash",
+            "settle_rejects_empty_usage_hash_before_transfer"
+          ],
+          "handoff": "Reject empty or malformed usage hash input."
+        },
+        {
+          "error": "LiabilityUnderflow",
+          "code": 18,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "lapsed_liability_entry_fails_closed_and_keeps_escrow_in_the_contract",
+            "liability_arithmetic_is_checked",
+            "sr8_missing_aggregate_counter_fails_closed_without_payout"
+          ],
+          "handoff": "Stop and investigate liability arithmetic or corrupted state."
+        },
+        {
+          "error": "EscrowUnderfunded",
+          "code": 19,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "undercollateralized_settlement_fails_without_state_transition"
+          ],
+          "handoff": "Reject creation or exit if token custody does not cover aggregate liability."
+        },
+        {
+          "error": "SessionExpired",
+          "code": 21,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "every_terminal_path_releases_asset_capacity_exactly_once",
+            "expiry_recovery_is_permissionless_fixed_recipient_and_single_use",
+            "logical_expiry_boundary_is_independent_of_storage_ttl",
+            "mutation_finalized_guard_in_recover_rejects_already_expired_session",
+            "mutation_finalized_guard_in_settle_rejects_expired_session"
+          ],
+          "handoff": "Treat as finalized by expiry recovery."
+        },
+        {
+          "error": "TokenInvariantViolation",
+          "code": 30,
+          "category": "token",
+          "hostEnforced": false,
+          "tests": [
+            "adversarial_create_failures_roll_back_funds_liability_and_sequence",
+            "adversarial_terminal_failures_leave_the_session_open_and_funded"
+          ],
+          "handoff": "Stop processing and quarantine the configured asset; an observed transfer balance delta did not match the requested amount."
+        },
+        {
+          "error": "UnsupportedCommitmentScheme",
+          "code": 43,
+          "category": "validation",
+          "hostEnforced": false,
+          "tests": [
+            "error_surface_commitment_scheme_and_idempotency_conflict"
+          ],
+          "handoff": "Commitment scheme version is unsupported by the contract."
+        },
+        {
+          "error": "SessionRejected",
+          "code": 50,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "reject_rejects_terminal_and_expired_states"
+          ],
+          "handoff": "Treat as finalized by seller rejection; do not settle or cancel."
+        },
+        {
+          "error": "BuyerExposureUnderflow",
+          "code": 58,
+          "category": "state",
+          "hostEnforced": false,
+          "tests": [
+            "corrupted_buyer_exposure_fails_atomically_and_cannot_underflow"
+          ],
+          "handoff": "Stop and investigate corrupted buyer exposure accounting before retrying."
+        }
+      ]
+    }
+  ]
+}

@@ -1,48 +1,25 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  validateAdvisoryExceptions,
+  validateCargoDenyExceptions,
+  validateDenyTomlAlignment,
+} from "./lib/dependency-exceptions.mjs";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const exceptionPath = join(repoRoot, "audits", "dependency-exceptions.json");
-const manifest = JSON.parse(readFileSync(exceptionPath, "utf8"));
-const requiredFields = [
-  "advisory",
-  "package",
-  "classification",
-  "owner",
-  "expiresOn",
-  "dependencyPath",
-  "resolution",
-  "risk",
-];
+const advisoryManifest = JSON.parse(
+  readFileSync(join(repoRoot, "audits", "dependency-exceptions.json"), "utf8"),
+);
+const denyManifest = JSON.parse(
+  readFileSync(join(repoRoot, "audits", "cargo-deny-exceptions.json"), "utf8"),
+);
+const denyToml = readFileSync(join(repoRoot, "deny.toml"), "utf8");
 
-if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.exceptions)) {
-  throw new Error("Dependency exception manifest must use schemaVersion 1 and contain an exceptions array.");
-}
+const advisoryIds = validateAdvisoryExceptions(advisoryManifest);
+const denyCrateIds = validateCargoDenyExceptions(denyManifest);
+validateDenyTomlAlignment(denyToml, advisoryIds, denyCrateIds);
 
-const today = new Date();
-today.setUTCHours(0, 0, 0, 0);
-const advisories = new Set();
-
-for (const exception of manifest.exceptions) {
-  for (const field of requiredFields) {
-    if (typeof exception[field] !== "string" || exception[field].trim() === "") {
-      throw new Error(`Dependency exception is missing ${field}.`);
-    }
-  }
-
-  if (advisories.has(exception.advisory)) {
-    throw new Error(`Duplicate dependency exception: ${exception.advisory}`);
-  }
-  advisories.add(exception.advisory);
-
-  const expiry = new Date(`${exception.expiresOn}T00:00:00Z`);
-  if (Number.isNaN(expiry.getTime())) {
-    throw new Error(`Invalid expiry for ${exception.advisory}: ${exception.expiresOn}`);
-  }
-  if (expiry < today) {
-    throw new Error(`Dependency exception ${exception.advisory} expired on ${exception.expiresOn}.`);
-  }
-}
-
-console.log(`Validated ${manifest.exceptions.length} dependency audit exception(s).`);
+console.log(
+  `Validated ${advisoryIds.size} advisory exception(s) and ${denyCrateIds.size} cargo-deny exception(s).`,
+);

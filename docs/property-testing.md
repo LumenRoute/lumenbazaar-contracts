@@ -101,3 +101,27 @@ Fixed seed `0x4c554d4543415053`, 128 cases. Override with `LUMENBAZAAR_CAP_SEED`
 `LUMENBAZAAR_TRANSITION_CASES`, `LUMENBAZAAR_CAP_CASES`) to 128 and uses the fixed seeds, so a CI
 failure reproduces locally with the same command. These campaigns never touch a live network and do
 not change contract behavior.
+
+## Multi-Actor Liability Conservation and Refund Destination Pinning
+
+Two additional stateful property campaigns in `contracts/upto-session/src/property_test.rs` verify
+cross-transition accounting and refund-destination invariants:
+
+- `generated_mixed_histories_conserve_escrow_liabilities_across_transitions` (fixed seed
+  `0x4c554d454c494142`, override `LUMENBAZAAR_LIABILITY_SEED`): executes generated mixed histories
+  of `create_session`, `settle`, `cancel`, `reject`, `reduce_session_cap`, `extend_session_expiry`,
+  `extend_ttl`, ledger advances, `recover_expired`, and `recover_expired_batch` across three buyers,
+  three sellers, and two assets. After every step it asserts exact conservation of token balances,
+  aggregate liabilities, buyer exposures, cumulative settlements, and cumulative refunds, printing a
+  minimal replay seed on failure.
+- `refund_destination_is_pinned_to_original_buyer_across_all_refund_paths` (fixed seed
+  `0x4c554d4552454650`, override `LUMENBAZAAR_REFUND_SEED`): exercises every refunding transition
+  (`cancel`, `reject`, `reduce_session_cap`, partial `settle`, `recover_expired`, and
+  `recover_expired_batch`) interleaved with adversarial seller, admin, rotated-admin, and attacker
+  callers plus admin rotation, asset deprecation, and creation pause/resume. It proves no non-buyer
+  address ever receives a refund and that token balances and liabilities remain conserved.
+
+Both properties are also checked by bounded exhaustive exploration in `formal/escrow-model`
+(`multi_session_multi_asset_conserves_liabilities_across_transitions` and
+`adversarial_refund_redirection_cannot_divert_escrow`) and by the `transitions` target in
+`fuzz/src/session.rs`.

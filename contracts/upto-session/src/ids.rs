@@ -454,9 +454,21 @@ mod tests {
         ))
         .expect("domain fixture must decode");
 
-        let vectors = fixture["vectors"]
-            .as_array()
-            .expect("vectors array must be present");
+        let single_vector = if fixture.get("vectors").is_none() {
+            let mut v = fixture["sessionId"].clone();
+            v["networkIdHex"] = fixture["networkIdHex"].clone();
+            v["contractId"] = fixture["contractId"].clone();
+            Some(std::vec![v])
+        } else {
+            None
+        };
+        let vectors = match single_vector.as_ref() {
+            Some(list) => list.as_slice(),
+            None => fixture["vectors"]
+                .as_array()
+                .expect("vectors array must be present")
+                .as_slice(),
+        };
 
         for vec in vectors {
             let network_id_hex = vec["networkIdHex"].as_str().expect("networkIdHex");
@@ -503,6 +515,13 @@ mod tests {
                 .parse()
                 .expect("valid u64");
 
+            let mut idempotency_bytes = [0u8; 32];
+            if let Some(hex_str) = vec["idempotencyKeyHex"].as_str() {
+                hex::decode_to_slice(hex_str, &mut idempotency_bytes)
+                    .expect("valid idempotency key hex");
+            }
+            let idempotency_key = BytesN::from_array(&env, &idempotency_bytes);
+
             let input = SessionIdInput {
                 buyer: &buyer,
                 seller: &seller,
@@ -511,6 +530,7 @@ mod tests {
                 expires_at_ledger,
                 resource_hash: &resource_hash,
                 sequence,
+                idempotency_key: &idempotency_key,
             };
 
             env.register_at(&contract, crate::UptoSessionContract, ());

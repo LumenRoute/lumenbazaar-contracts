@@ -61,6 +61,7 @@ Contract release and audit evidence must use the following exact toolchain:
 | Stellar CLI | 28.0.0 | CI release archive |
 | Node.js | 22.12.0 | CI setup |
 | cargo-audit | 0.22.2 | CI install command |
+| cargo-deny | 0.20.2 | CI install command and `deny.toml` |
 | generated Stellar SDK | 17.2.1 | Binding generator output |
 
 Historical deployments keep the toolchain they recorded. The testnet WASM release workflow
@@ -70,7 +71,7 @@ See "Testnet WASM releases" in `deployments/README.md`.
 
 ## Dependency Audit Policy
 
-CI runs `cargo audit --deny warnings` and `npm audit --omit=dev`. A Rust advisory may be ignored only when it has a matching record in `audits/dependency-exceptions.json` with an owner, dependency path, risk statement, planned resolution, and future expiry date. The exception checker fails on expired, duplicate, malformed, or incomplete records.
+CI runs `cargo audit --deny warnings`, `cargo deny check licenses bans sources`, and `npm audit --omit=dev`. `cargo-deny` enforces workspace-wide (`all-features = true`, including dev-dependencies) approved SPDX licenses, crates.io-only registries with zero git sources, wildcard bans, and duplicate-version controls in `deny.toml` without duplicating `cargo-audit` advisory output. A Rust advisory or `cargo-deny` exception may be added only when it has a matching, version-pinned record in `audits/dependency-exceptions.json` or `audits/cargo-deny-exceptions.json` with an owner, dependency path, justification/risk statement, planned resolution, and future expiry date. `scripts/check-dependency-exceptions.mjs` fails on expired, duplicate, malformed, unpinned, stale, or undocumented records.
 
 The current `RUSTSEC-2024-0436` exception covers the unmaintained `paste` crate inherited through released Soroban host-side dependencies. It is not a vulnerability report and the package is absent from deployed contract WASM. Contracts maintainers must remove the ignore as soon as a compatible Soroban release removes the dependency, and no later than the recorded recheck date without a fresh review.
 
