@@ -1,8 +1,31 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import {
+  ManifestConcurrencyError,
+  ManifestSecretError,
+  ManifestStaleWriteError,
+  ManifestValidationError,
+  atomicReplaceFile,
+  scanLocalSecrets,
+  snapshotFile,
+  validateLocalManifestSchema,
+  writeJsonAtomic,
+} from "./atomic-manifest.mjs";
 import { logDeployment, redactText, signerValues } from "./deployment-logging.mjs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+
+export {
+  ManifestConcurrencyError,
+  ManifestSecretError,
+  ManifestStaleWriteError,
+  ManifestValidationError,
+  atomicReplaceFile,
+  scanLocalSecrets,
+  snapshotFile,
+  validateLocalManifestSchema,
+  writeJsonAtomic,
+};
 
 export const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -326,7 +349,53 @@ export function getContractEntry(manifest, name) {
   return entry;
 }
 
-export function writeManifest(path, manifest, { dryRun = false } = {}) {
+export function readManifestWithSnapshot(path, { fsOps } = {}) {
+  const snapshot = snapshotFile(path, { fsOps });
+  const manifest = readManifest(path);
+  return { manifest, snapshot };
+}
+
+export function getContractWasmHash({
+  contractId,
+  network = "testnet",
+  dryRun = false,
+  exec,
+  execute,
+} = {}) {
+  if (!dryRun && (!contractId || !/^C[A-Z2-7]{55}$/.test(contractId))) {
+    throw new Error(`Invalid contract ID for WASM hash lookup: ${JSON.stringify(contractId)}`);
+  }
+  const output = runStellar(
+    ["contract", "info", "hash", "--id", contractId, ...networkArgs(network)],
+    { capture: true, dryRun, exec, execute },
+  );
+  if (dryRun) {
+    return "dry-run";
+  }
+  const hash = output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .reverse()
+    .find((line) => /^[a-f0-9]{64}$/.test(line));
+  if (!hash) {
+    throw new Error(`Failed to resolve on-chain WASM hash for contract ${contractId}`);
+  }
+  return hash;
+}
+
+export function writeManifest(
+  path,
+  manifest,
+  {
+    dryRun = false,
+    expectedSnapshot,
+    expectedSha256,
+    checkSecrets = true,
+    platform,
+    fsOps,
+    maxRetries,
+  } = {},
+) {
   const value = {
     ...manifest,
     generatedAt: new Date().toISOString(),
@@ -334,32 +403,62 @@ export function writeManifest(path, manifest, { dryRun = false } = {}) {
 
   if (dryRun) {
     logDeployment("manifest.dry-run", { path: relative(repoRoot, path), manifest: value });
-    return;
+    return null;
   }
 
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  return writeJsonAtomic(path, value, {
+    expectedSnapshot,
+    expectedSha256,
+    checkSecrets,
+    platform,
+    fsOps,
+    maxRetries,
+    validate: (doc) =>
+      validateLocalManifestSchema(doc, { supportedNetworks: SUPPORTED_NETWORKS }),
+  });
 }
 
 export function mergeContracts(
   manifestPath,
   contractEntries,
-  { dryRun = false, fields = {}, mergeEntries = false } = {},
+  {
+    dryRun = false,
+    fields = {},
+    mergeEntries = false,
+    expectedSnapshot,
+    expectedSha256,
+    checkSecrets = true,
+    platform,
+    fsOps,
+    maxRetries,
+  } = {},
 ) {
+  const snapshot =
+    dryRun || expectedSnapshot !== undefined || expectedSha256 !== undefined
+      ? expectedSnapshot
+      : snapshotFile(manifestPath, { fsOps });
   const manifest = readManifest(manifestPath);
   const contracts = { ...(manifest.contracts || {}) };
   for (const entry of contractEntries) {
     contracts[entry.name] = mergeEntries ? { ...(contracts[entry.name] || {}), ...entry } : entry;
   }
 
-  writeManifest(
+  return writeManifest(
     manifestPath,
     {
       ...manifest,
       ...fields,
       contracts,
     },
-    { dryRun },
+    {
+      dryRun,
+      expectedSnapshot: snapshot,
+      expectedSha256,
+      checkSecrets,
+      platform,
+      fsOps,
+      maxRetries,
+    },
   );
 }
 

@@ -1,0 +1,18 @@
+# multi_asset: pause and resume transitions while sessions are open across assets.
+# Verifies creation is blocked while paused, existing sessions still settle/cancel/recover,
+# and creation resumes after unpausing.
+# Synthetic. Layout: fuzz/README.md (8 bytes per step).
+00 00 00 00 00 64 00 00  # create asset 0, dur 50
+00 01 01 01 00 64 00 01  # create asset 1, dur 150
+00 02 00 01 00 64 00 03  # create asset 2, dur 10
+07 00 00 00 00 00 00 00  # pause_creation
+07 00 00 00 00 00 00 00  # duplicate pause_creation (rejected)
+00 00 00 00 00 10 00 00  # create asset 0 while paused (rejected)
+00 01 01 00 00 10 00 00  # create asset 1 while paused (rejected)
+01 00 00 20 00 00 00 00  # settle session 0 while paused (succeeds)
+02 01 00 00 00 00 00 00  # cancel session 1 while paused (succeeds)
+04 01 00 00 00 00 00 00  # advance ledger by 10 (session 2 expires)
+03 02 00 00 00 00 00 00  # recover session 2 while paused (succeeds)
+07 01 00 00 00 00 00 00  # resume_creation
+07 01 00 00 00 00 00 00  # duplicate resume_creation (rejected)
+00 02 01 00 00 50 00 00  # create asset 2 after resume (succeeds)

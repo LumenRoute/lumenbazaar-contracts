@@ -1,0 +1,10 @@
+# multi_asset: expiry boundary checks interleaved across different assets.
+# Synthetic. Layout: fuzz/README.md (8 bytes per step).
+00 00 00 00 00 50 00 03  # create asset 0, dur 10
+00 01 01 01 00 50 00 00  # create asset 1, dur 50
+04 01 00 00 00 00 00 00  # advance ledger by 10 (asset 0 at exact expiry, asset 1 still open)
+01 00 00 10 00 00 00 00  # settle expired asset 0 session (rejected)
+02 00 00 00 00 00 00 00  # cancel expired asset 0 session (rejected)
+03 01 00 00 00 00 00 00  # recover unexpired asset 1 session (rejected)
+03 00 00 00 00 00 00 00  # recover expired asset 0 session (succeeds)
+01 01 00 10 00 00 00 00  # settle unexpired asset 1 session (succeeds)

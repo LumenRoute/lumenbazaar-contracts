@@ -156,8 +156,7 @@ fn create_session(
             input.asset,
             &input.cap,
             &EXPIRY_LEDGER,
-            input.resource_hash,
-        )
+            input.resource_hash, &crate::test_idempotency_key(env))
 }
 
 fn try_settle(

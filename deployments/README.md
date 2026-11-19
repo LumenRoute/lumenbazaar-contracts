@@ -27,6 +27,61 @@ For testnet:
 
 Validate committed public evidence with `node scripts/check-deployment-evidence.mjs`.
 
+## Atomic local manifest writes
+
+Local deployment manifests (`deployments/local.json`, `deployments/testnet.json`, and
+`deployments/testnet-evidence.json`) are written atomically through `scripts/lib/atomic-manifest.mjs`
+(used by `writeManifest` and `mergeContracts` in `scripts/lib/stellar-cli.mjs`):
+
+- Before any file is modified, schema validation and secret scanning run (rejecting Stellar secret
+  seeds, mnemonic phrases, raw 64-hex private keys outside hash fields, signed XDR envelopes, and
+  configured secret environment values without echoing the secret).
+- An exclusive `.lock` file prevents concurrent writers from racing; if a lock file already exists
+  the write fails explicitly with `ManifestConcurrencyError`.
+- `mergeContracts` and callers passing `expectedSnapshot` enforce optimistic concurrency control and
+  fail explicitly with `ManifestStaleWriteError` if the target file changed since it was read.
+- Output is written to a validated temporary file in the same directory, flushed with `fsync`,
+  re-verified by SHA-256 and JSON parse, and atomically renamed over the exact target path (with
+  bounded retry for transient `EPERM`/`EACCES`/`EBUSY` handles on Windows). Existing valid manifests
+  survive failed updates, and temporary/lock files are cleaned up on failure.
+
+Run the atomic manifest tests with:
+
+```bash
+node --test scripts/lib/atomic-manifest.test.mjs scripts/lib/stellar-cli.test.mjs
+```
+
+## Resumable testnet deployments
+
+`scripts/testnet/deploy-testnet.mjs` maintains an ignored, atomically updated journal at
+`deployments/testnet.deploy-journal.json` (overridable with `--journal <path>`). Each contract's
+upload and deploy step is checkpointed as soon as its transaction receipt is recorded.
+
+```bash
+node scripts/testnet/deploy-testnet.mjs                 # fresh deployment
+node scripts/testnet/deploy-testnet.mjs --resume        # verify completed steps and resume
+node scripts/testnet/deploy-testnet.mjs --resume --journal deployments/custom.deploy-journal.json
+```
+
+When `--resume` is passed:
+
+- The script verifies the journal schema, testnet network and passphrase, source commit (`HEAD`),
+  deployer account, and selected contract list before submitting any transaction.
+- Every previously recorded step is verified against the current local WASM `artifactSha256` and
+  `interfaceSha256`, the testnet transaction receipt (status `SUCCESS`, expected deployer), and the
+  on-chain contract WASM hash (`stellar contract info hash`).
+- Verified completed uploads and deployments are never re-submitted.
+- Any corruption, wrong-network journal, hash mismatch, unverifiable receipt, or on-chain contract
+  mismatch stops execution immediately before any subsequent submission.
+- Starting a fresh run without `--resume` while an `in-progress` journal exists fails closed so an
+  interrupted deployment cannot be silently abandoned.
+
+Run the resumable deployment tests with:
+
+```bash
+node --test scripts/lib/deploy-journal.test.mjs
+```
+
 ## Generating public manifests
 
 The deploy and initialize scripts record every transaction hash in the ignored

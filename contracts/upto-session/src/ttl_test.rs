@@ -63,8 +63,7 @@ impl Harness {
             &self.asset,
             &CAP,
             &expires_at_ledger,
-            &BytesN::from_array(&self.env, &[7; 32]),
-        )
+            &BytesN::from_array(&self.env, &[7; 32]), &crate::test_idempotency_key(&self.env))
     }
 
     fn usage_hash(&self) -> BytesN<32> {
@@ -498,8 +497,7 @@ fn lapsed_instance_config_fails_closed_for_admin_and_new_sessions_only() {
             &harness.asset,
             &CAP,
             &SESSION_EXPIRY,
-            &BytesN::from_array(&harness.env, &[9; 32]),
-        ),
+            &BytesN::from_array(&harness.env, &[9; 32]), &crate::test_idempotency_key(&harness.env)),
         Err(Ok(ContractError::NotInitialized))
     );
     assert_eq!(harness.balances(), balances_before);
@@ -562,8 +560,7 @@ fn creation_and_rotation_expiry_windows_have_exact_bounds() {
             &harness.asset,
             &1,
             &expires_at_ledger,
-            &hash,
-        )
+            &hash, &crate::test_idempotency_key(&harness.env))
     };
 
     assert_eq!(create(1_000), Err(Ok(ContractError::ExpiredSession)));

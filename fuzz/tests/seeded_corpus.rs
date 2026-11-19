@@ -90,9 +90,17 @@ fn token_amount_seeded_corpus() {
 }
 
 #[test]
+fn multi_asset_seeded_corpus() {
+    campaign("multi_asset");
+}
+
+#[test]
 fn every_target_has_seeds() {
     let names: Vec<&str> = TARGETS.iter().map(|(name, _)| *name).collect();
-    assert_eq!(names, ["create", "settle", "policy", "token_amount"]);
+    assert_eq!(
+        names,
+        ["create", "settle", "policy", "token_amount", "multi_asset"]
+    );
     for name in names {
         assert!(!seeds(name).is_empty());
     }

@@ -4,6 +4,38 @@
 
 ### Added
 
+- Write local deployment manifests atomically via validated same-directory temporary files,
+  `fsync`, exclusive `.lock` concurrency guards, optimistic snapshot stale-write detection,
+  schema validation, and secret scanning (`scripts/lib/atomic-manifest.mjs`,
+  `scripts/lib/stellar-cli.mjs`).
+  Compatibility: local deployment tooling only; public manifest sanitization is unchanged.
+  Migration: none.
+
+- Add journaled resumable mode (`--resume`, `--journal`) to `scripts/testnet/deploy-testnet.mjs`
+  (`scripts/lib/deploy-journal.mjs`) that verifies recorded network, source commit, deployer,
+  artifact and interface SHA-256 hashes, testnet transaction receipts, and on-chain contract
+  WASM hashes before skipping completed steps.
+  Compatibility: additive deployment script flags; existing testnet workflow is unchanged.
+  Migration: none.
+
+- Add a versioned storage serialization round-trip corpus
+  (`artifacts/interface/storage-corpus-v3.json`, `artifacts/interface/storage-corpus.lock.json`)
+  covering every instance and persistent `DataKey` and value shape, verified in Rust
+  (`contracts/upto-session/tests/storage_corpus.rs`) and Node.js
+  (`scripts/check-storage-corpus.mjs`) with lock and migration evidence checks.
+  Compatibility: test and verification artifacts only; storage layout v3 is unchanged.
+  Migration: intentional future layout changes require bumping `STORAGE_LAYOUT_VERSION`,
+  generating a new versioned corpus, and committing migration evidence under
+  `artifacts/interface/migrations/`.
+
+- Add the `multi_asset` bounded stateful fuzz target (`fuzz/src/multi_asset.rs`,
+  `fuzz/libfuzzer/fuzz_targets/multi_asset.rs`, `fuzz/seeds/multi_asset/`) interleaving
+  session creation, settlement, cancellation, expiry recovery, per-asset cap transitions,
+  and pause/resume transitions across three configured assets while checking per-asset
+  isolation and total liabilities.
+  Compatibility: test-only fuzz harness; no contract interface or storage changes.
+  Migration: none.
+
 - Add typed transaction evidence helpers to the TypeScript binding
   (`createSessionWithEvidence`, `settleWithEvidence`, `cancelWithEvidence`,
   `extendTtlWithEvidence`) that sign through an injected signer, confirm through RPC and

@@ -44,3 +44,10 @@ path = "fuzz_targets/token_amount.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "multi_asset"
+path = "fuzz_targets/multi_asset.rs"
+test = false
+doc = false
+bench = false

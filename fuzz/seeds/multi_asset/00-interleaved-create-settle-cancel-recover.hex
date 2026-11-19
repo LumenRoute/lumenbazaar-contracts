@@ -1,0 +1,9 @@
+# multi_asset: interleaved create, settle, cancel, advance, and recover across all 3 assets.
+# Synthetic. Layout: fuzz/README.md (8 bytes per step).
+00 00 00 00 00 64 00 00  # create asset 0, buyer 0, seller 0, amt 101, dur 50
+00 01 01 01 00 c8 00 01  # create asset 1, buyer 1, seller 1, amt 201, dur 150
+00 02 00 01 01 2c 00 03  # create asset 2, buyer 0, seller 1, amt 301, dur 10
+01 00 00 32 00 00 00 00  # settle session 0 (asset 0) for 51
+02 01 00 00 00 00 00 00  # cancel session 1 (asset 1)
+04 01 00 00 00 00 00 00  # advance ledger by 10 (session 2 now expired)
+03 02 00 00 00 00 00 00  # recover expired session 2 (asset 2)

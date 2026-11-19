@@ -117,6 +117,7 @@ pub fn policy(data: &[u8]) {
 
     let mut policy = SpendingPolicy {
         agent: agent.clone(),
+        revision: 0,
         max_amount_per_payment: per_payment,
         max_amount_per_day: per_day,
         max_authorizations_per_day: max_authorizations,
@@ -178,7 +179,7 @@ pub fn policy(data: &[u8]) {
 
     let before = snapshot(&env, &wallet);
     let expected = expected_policy(&policy, START_LEDGER);
-    let result = defined(client.try_set_policy(&policy));
+    let result = defined(client.try_set_policy(&policy, &0));
     assert_eq!(result, expected, "set_policy result");
     if result.is_err() {
         assert_eq!(
@@ -212,7 +213,7 @@ pub fn policy(data: &[u8]) {
             4 => per_payment,
             _ => i128::from(u16::from_be_bytes([input.u8(at + 5), input.u8(at + 6)])),
         };
-        let authorize = input.u8(at + 7) % 2 == 0;
+        let authorize = input.u8(at + 7).is_multiple_of(2);
 
         let before = snapshot(&env, &wallet);
         let checked =

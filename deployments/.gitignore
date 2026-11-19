@@ -1,4 +1,7 @@
 local.json
 testnet.json
 testnet-evidence.json
+testnet.deploy-journal.json
+*.deploy-journal.json
+*.lock
 receipts/

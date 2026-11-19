@@ -53,6 +53,7 @@ fn make_policy(
 ) -> SpendingPolicy {
     SpendingPolicy {
         agent: agent.clone(),
+        revision: 0,
         max_amount_per_payment: max_per_payment,
         max_amount_per_day: max_per_day,
         max_authorizations_per_day: 100,
@@ -79,11 +80,11 @@ fn set_policy_with_owner_auth(
             invoke: &MockAuthInvoke {
                 contract: contract_id,
                 fn_name: "set_policy",
-                args: (policy.clone(),).into_val(env),
+                args: (policy.clone(), policy.revision).into_val(env),
                 sub_invokes: &[],
             },
         }])
-        .set_policy(&policy);
+        .set_policy(&policy, &policy.revision);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -194,7 +195,7 @@ fn mutation_owner_auth_removal_in_set_policy_is_caught() {
     let policy = make_policy(&env, &agent, &seller, &asset, &resource_hash, 50, 100, 100);
 
     // No mock_auths — the contract must enforce owner.require_auth().
-    let result = client.try_set_policy(&policy);
+    let result = client.try_set_policy(&policy, &policy.revision);
 
     assert!(
         result.is_err(),
@@ -227,11 +228,11 @@ fn mutation_owner_auth_wrong_party_in_set_policy_is_caught() {
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "set_policy",
-                args: (policy.clone(),).into_val(&env),
+                args: (policy.clone(), policy.revision).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .try_set_policy(&policy);
+        .try_set_policy(&policy, &policy.revision);
 
     assert!(
         result.is_err(),
@@ -271,7 +272,16 @@ fn mutation_agent_auth_removal_in_authorize_payment_is_caught() {
         50,
         100,
         100,
-    ));
+    ), &make_policy(
+        &env,
+        &agent,
+        &seller,
+        &asset,
+        &resource_hash,
+        50,
+        100,
+        100,
+    ).revision);
 
     // Drop mock_all_auths and test with no auth for authorize_payment.
     let env2 = Env::default();
@@ -305,11 +315,11 @@ fn mutation_agent_auth_removal_in_authorize_payment_is_caught() {
             invoke: &MockAuthInvoke {
                 contract: &contract_id2,
                 fn_name: "set_policy",
-                args: (policy2.clone(),).into_val(&env2),
+                args: (policy2.clone(), policy2.revision).into_val(&env2),
                 sub_invokes: &[],
             },
         }])
-        .set_policy(&policy2);
+        .set_policy(&policy2, &policy2.revision);
 
     // Call authorize_payment with NO mock_auths — must fail.
     let result =
@@ -361,11 +371,11 @@ fn mutation_agent_auth_wrong_party_in_authorize_payment_is_caught() {
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "set_policy",
-                args: (policy.clone(),).into_val(&env),
+                args: (policy.clone(), policy.revision).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .set_policy(&policy);
+        .set_policy(&policy, &policy.revision);
 
     // Attacker provides their own auth for agent's authorize_payment — must fail.
     let result = client
@@ -430,11 +440,11 @@ fn mutation_payment_cap_inversion_is_caught() {
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "set_policy",
-                args: (policy.clone(),).into_val(&env),
+                args: (policy.clone(), policy.revision).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .set_policy(&policy);
+        .set_policy(&policy, &policy.revision);
 
     // amount == max_amount_per_payment + 1 must be rejected.
     let result = client.try_check_payment(&agent, &seller, &asset, &76, &resource_hash);
@@ -491,11 +501,11 @@ fn mutation_daily_cap_inversion_is_caught() {
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "set_policy",
-                args: (policy.clone(),).into_val(&env),
+                args: (policy.clone(), policy.revision).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .set_policy(&policy);
+        .set_policy(&policy, &policy.revision);
 
     // First payment: 60 → total 60, within daily cap.
     authorize_payment_with_agent_auth(
@@ -568,11 +578,11 @@ fn mutation_daily_cap_exact_boundary_succeeds() {
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "set_policy",
-                args: (policy.clone(),).into_val(&env),
+                args: (policy.clone(), policy.revision).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .set_policy(&policy);
+        .set_policy(&policy, &policy.revision);
 
     // Exactly at daily cap — must succeed.
     authorize_payment_with_agent_auth(
@@ -625,11 +635,11 @@ fn mutation_policy_expiry_check_inversion_is_caught() {
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "set_policy",
-                args: (policy.clone(),).into_val(&env),
+                args: (policy.clone(), policy.revision).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .set_policy(&policy);
+        .set_policy(&policy, &policy.revision);
 
     // At ledger 11 (one past valid_until_ledger) — must be rejected.
     env.ledger().set_sequence_number(11);
@@ -674,11 +684,11 @@ fn mutation_policy_expiry_check_at_boundary_succeeds() {
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "set_policy",
-                args: (policy.clone(),).into_val(&env),
+                args: (policy.clone(), policy.revision).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .set_policy(&policy);
+        .set_policy(&policy, &policy.revision);
 
     // At valid_until_ledger itself — must still succeed (contract uses strict >).
     env.ledger().set_sequence_number(10);
@@ -726,11 +736,11 @@ fn mutation_authorize_payment_must_record_daily_spend() {
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "set_policy",
-                args: (policy.clone(),).into_val(&env),
+                args: (policy.clone(), policy.revision).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .set_policy(&policy);
+        .set_policy(&policy, &policy.revision);
 
     authorize_payment_with_agent_auth(
         &env, &client, &contract_id, &agent, &seller, &asset, 60, &resource_hash,
@@ -784,7 +794,7 @@ fn mutation_end_to_end_policy_wallet_guards_are_all_present() {
     // 2. set_policy requires owner auth.
     let policy = make_policy(&env, &agent, &seller, &asset, &resource_hash, 50, 100, 100);
     assert!(
-        client.try_set_policy(&policy).is_err(),
+        client.try_set_policy(&policy, &policy.revision).is_err(),
         "owner auth not enforced for set_policy"
     );
     set_policy_with_owner_auth(&env, &client, &contract_id, &owner, policy.clone());
@@ -902,11 +912,11 @@ fn mutation_policy_activation_check_before_boundary_is_caught() {
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "set_policy",
-                args: (policy.clone(),).into_val(&env),
+                args: (policy.clone(), policy.revision).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .set_policy(&policy);
+        .set_policy(&policy, &policy.revision);
 
     // At ledger 49 (< valid_from_ledger 50) — must be rejected.
     env.ledger().set_sequence_number(49);
@@ -952,11 +962,11 @@ fn mutation_policy_activation_check_at_boundary_succeeds() {
             invoke: &MockAuthInvoke {
                 contract: &contract_id,
                 fn_name: "set_policy",
-                args: (policy.clone(),).into_val(&env),
+                args: (policy.clone(), policy.revision).into_val(&env),
                 sub_invokes: &[],
             },
         }])
-        .set_policy(&policy);
+        .set_policy(&policy, &policy.revision);
 
     // At valid_from_ledger itself — must succeed (inclusive boundary).
     env.ledger().set_sequence_number(50);

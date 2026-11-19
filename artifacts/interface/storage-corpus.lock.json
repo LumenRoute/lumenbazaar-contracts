@@ -1,0 +1,12 @@
+{
+  "schema": "lumenbazaar/storage-corpus-lock",
+  "currentLayoutVersion": 3,
+  "versions": {
+    "3": {
+      "file": "storage-corpus-v3.json",
+      "sha256": "979749758871d5942fdac257b7cdbc2b8cb63cc45e4eb04afaa3251c904d7fe5",
+      "migrationEvidence": "migrations/v2-to-v3.json",
+      "status": "active"
+    }
+  }
+}

@@ -9,6 +9,7 @@ helpers. All inputs are synthetic and no target ever contacts a network.
 | `settle` | `settle` on open, settled, cancelled, recovered, and lapsed sessions, unknown and off-by-one session IDs, amounts around the cap, ledgers around expiry, usage hashes, and wrong-length session IDs and usage hashes. |
 | `policy` | `set_policy` with arbitrary caps, authorization limits, windows, allowlists, and limits, followed by up to eight `check_payment` / `authorize_payment` steps across a day boundary. |
 | `token_amount` | `validate_asset_cap`, `validate_asset_policy`, `validate_settlement_amount`, `validate_cap_increase_proposal` (including ledger overflow), and checked liability arithmetic. |
+| `multi_asset` | Bounded stateful interleaving of `create_session`, `settle`, `cancel`, `recover_expired`, ledger advances, per-asset cap transitions (`set_asset_max_session_amount`, `propose_asset_cap_increase`, `accept_asset_cap_increase`), and `pause_creation`/`resume_creation` across three configured assets; verifies strict per-asset isolation and total liabilities after every step. |
 
 Every target checks that:
 
@@ -49,6 +50,7 @@ cargo +nightly fuzz run --fuzz-dir fuzz/libfuzzer create -- -max_total_time=600 
 cargo +nightly fuzz run --fuzz-dir fuzz/libfuzzer settle -- -max_total_time=600 -max_len=256
 cargo +nightly fuzz run --fuzz-dir fuzz/libfuzzer policy -- -max_total_time=600 -max_len=256
 cargo +nightly fuzz run --fuzz-dir fuzz/libfuzzer token_amount -- -max_total_time=600 -max_len=256
+cargo +nightly fuzz run --fuzz-dir fuzz/libfuzzer multi_asset -- -max_total_time=600 -max_len=256
 ```
 
 libFuzzer does not read the hex seeds directly. Convert one with
@@ -73,6 +75,7 @@ selectors (`% 10`): 0 default, 1 `0`, 2 `1`, 3 `-1`, 4 `i128::MIN`, 5 `i128::MAX
 | `settle` | 0 cap selector, 1–16 raw; 17 session state; 18 session ID selector, 19–50 raw; 51 ledger selector, 52–55 raw; 56 amount selector, 57–72 raw; 73 usage hash selector, 74–105 raw; 106 malformed (1 wrong-length session ID, 2 wrong-length usage hash). |
 | `policy` | 0 payment cap, 17 daily cap (amount selectors); 34 authorization limit, 35–38 raw; 39 `valid_from`, 40–43 raw; 44 `valid_until`, 45–48 raw; 49 seller, 50 asset, 51 resource allowlist masks; 52 seller limit, 53 resource limit; from 54, eight-byte steps: ledger move, seller, asset, resource, amount selector, two raw amount bytes, check-only flag. |
 | `token_amount` | 0 helper; 1 `a` and 18 `b` (amount selectors); 35–38 `x`; 39–42 `y`; 43 ledger selector, 44–47 raw. |
+| `multi_asset` | Sequence of up to 16 eight-byte steps. Each step: byte 0 opcode (`% 8`: 0 `create_session`, 1 `settle`, 2 `cancel`, 3 `recover_expired`, 4 advance ledger, 5 `set_asset_max_session_amount` decrease, 6 `propose_asset_cap_increase`/`accept_asset_cap_increase`, 7 `pause_creation`/`resume_creation`); bytes 1–7 select asset/session/buyer/seller indices, amounts, and durations. |
 
 The source of truth is the target code in `fuzz/src`.
 

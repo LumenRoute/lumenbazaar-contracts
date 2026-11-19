@@ -1,0 +1,13 @@
+# multi_asset: double finalization and over-cap settlement rejections across assets.
+# Synthetic. Layout: fuzz/README.md (8 bytes per step).
+00 00 00 00 00 40 00 01  # create asset 0
+00 01 01 01 00 80 00 01  # create asset 1
+01 00 00 00 03 00 00 00  # settle asset 0 over cap (rejected)
+01 00 00 00 04 00 00 00  # settle asset 0 with zero (rejected)
+01 00 00 00 02 00 00 00  # settle asset 0 at full cap (succeeds)
+01 00 00 00 01 00 00 00  # double settle asset 0 (rejected)
+02 00 00 00 00 00 00 00  # cancel already settled asset 0 (rejected)
+02 01 00 00 00 00 00 00  # cancel asset 1 (succeeds)
+02 01 00 00 00 00 00 00  # double cancel asset 1 (rejected)
+04 04 00 00 00 00 00 00  # advance ledger by 250
+03 01 00 00 00 00 00 00  # recover already cancelled asset 1 (rejected)

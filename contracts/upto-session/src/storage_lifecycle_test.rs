@@ -73,8 +73,7 @@ impl Lifecycle {
             &self.asset,
             &CAP,
             &expires_at_ledger,
-            &BytesN::from_array(&self.env, &[7; 32]),
-        )
+            &BytesN::from_array(&self.env, &[7; 32]), &crate::test_idempotency_key(&self.env))
     }
 
     fn usage_hash(&self) -> BytesN<32> {
@@ -462,8 +461,7 @@ fn sr9_missing_instance_config_blocks_creation_and_admin_but_not_exits() {
             &h.asset,
             &CAP,
             &EXPIRY,
-            &BytesN::from_array(&h.env, &[7; 32]),
-        ),
+            &BytesN::from_array(&h.env, &[7; 32]), &crate::test_idempotency_key(&h.env)),
         Err(Ok(ContractError::NotInitialized))
     );
     assert_eq!(

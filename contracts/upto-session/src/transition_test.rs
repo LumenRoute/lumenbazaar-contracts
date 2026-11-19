@@ -226,8 +226,7 @@ fn run_sequence(actions: &[Action]) -> Outcome {
         &asset,
         &CAP,
         &EXPIRES_AT,
-        &BytesN::from_array(&env, &[41; 32]),
-    );
+        &BytesN::from_array(&env, &[41; 32]), &crate::test_idempotency_key(&env));
 
     let mut model = Model {
         status: ModelStatus::Open,

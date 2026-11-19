@@ -1,0 +1,15 @@
+# multi_asset: per-asset cap decrease and delayed cap increase proposal + acceptance
+# interleaved with open sessions across multiple assets.
+# Synthetic. Layout: fuzz/README.md (8 bytes per step).
+00 00 00 00 00 00 02 02  # create asset 0 at full initial cap (1000), dur 300
+00 01 01 00 00 00 02 02  # create asset 1 at full initial cap (2500), dur 300
+05 00 00 00 00 00 00 00  # decrease asset 0 cap to half (500)
+00 00 00 00 00 00 03 00  # attempt create asset 0 above new cap (rejected)
+05 00 03 00 00 00 00 00  # attempt direct cap increase on asset 0 (rejected)
+06 00 01 00 00 00 00 00  # propose cap increase on asset 0 (+1000, active in 100 ledgers)
+06 00 00 00 00 00 00 00  # attempt early accept before delay (rejected)
+04 03 00 00 00 00 00 00  # advance ledger by 100 (MIN_CAP_INCREASE_DELAY_LEDGERS)
+06 00 00 00 00 00 00 00  # accept cap increase on asset 0 (now 1500)
+00 00 01 01 00 00 02 01  # create asset 0 at new raised cap (1500)
+01 00 00 00 02 00 00 00  # settle original asset 0 session at full cap
+01 01 00 00 01 00 00 00  # settle asset 1 session for 1
