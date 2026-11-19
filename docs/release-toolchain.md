@@ -51,6 +51,32 @@ attempt cap (121); each RPC request receives the remaining time budget. Success
 returns network ledger/time and result metadata. Receipt files keep schema 1.
 Tests inject RPC fixtures, clock and sleep without making network transactions.
 
+## Bounded RPC retries and timeouts
+
+Deployment and verification scripts share the bounded retry runner in
+`scripts/lib/stellar-cli.mjs` (`withBoundedRetry`, `classifyRpcError`, and
+`submitTransactionWithRetry`):
+
+- **Error classification**: Retryable transport errors (`ETIMEDOUT`, `ECONNRESET`,
+  `ECONNREFUSED`, `EAI_AGAIN`, `ENOTFOUND`, socket hang-ups), timeouts, HTTP
+  `408`/`425`/`429`/`5xx`, and transient RPC responses (`TRY_AGAIN_LATER`,
+  overloaded/rate-limited) are classified separately from terminal errors.
+  Deterministic contract/host errors (`Error(Contract, #...)`, `Error(Auth, ...)`,
+  `tx_failed`, simulation failures, invalid XDR, HTTP `400`/`401`/`403`/`404`,
+  and passphrase or transaction-identity mismatches) fail immediately without retry.
+- **Strict bounds**: Retries use exponential backoff capped by `maxAttempts` (default
+  `4`), per-attempt `attemptTimeoutMs` (default `15000`), total `totalTimeoutMs`
+  (default `45000`), `initialDelayMs` (`500`), and `maxDelayMs` (`8000`). Each
+  attempt's timeout is clamped to the remaining total deadline, and retries stop
+  immediately if no budget remains. Overrides can be set via
+  `LUMENBAZAAR_RPC_MAX_ATTEMPTS`, `LUMENBAZAAR_RPC_ATTEMPT_TIMEOUT_MS`,
+  `LUMENBAZAAR_RPC_TOTAL_TIMEOUT_MS`, `LUMENBAZAAR_RPC_INITIAL_DELAY_MS`, and
+  `LUMENBAZAAR_RPC_MAX_DELAY_MS`.
+- **Submission identity verification**: Before sending or resending a signed
+  transaction, `submitTransactionWithRetry` verifies the immutable signed envelope
+  digest and 64-hex transaction hash, and checks RPC `getTransaction` on retries so
+  an already-pending or finalized transaction is never blindly resubmitted.
+
 Contract release and audit evidence must use the following exact toolchain:
 
 | Component | Version | Enforcement |

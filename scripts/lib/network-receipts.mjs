@@ -3,7 +3,13 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { testnetNetwork } from "./deployment-evidence.mjs";
-import { repoRoot } from "./stellar-cli.mjs";
+import {
+  repoRoot,
+  resolveExpectedNetworkIdentity,
+  resolveRpcRetryPolicy,
+  verifyNetworkPassphrase,
+  withBoundedRetry,
+} from "./stellar-cli.mjs";
 import { pollTransaction, TransactionFinalityError } from "./transaction-finality.mjs";
 
 export const receiptsDirectory = join(repoRoot, "deployments", "receipts", "testnet");
@@ -18,23 +24,54 @@ export function requireTestnet() {
   if (network !== "testnet") {
     throw new Error(`Unsupported network ${JSON.stringify(network)}; receipts are only recorded for testnet.`);
   }
+  resolveExpectedNetworkIdentity("testnet", { expectedPassphrase: testnetNetwork.passphrase });
 }
 
-export async function rpcCall(method, params = undefined, { timeoutMs = 30_000 } = {}) {
-  const response = await fetch(testnetNetwork.rpcUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, ...(params ? { params } : {}) }),
-    signal: AbortSignal.timeout(Math.max(1, Math.ceil(Math.min(timeoutMs, 30_000)))),
+export async function verifyTestnetNetwork(options = {}) {
+  requireTestnet();
+  return verifyNetworkPassphrase({
+    network: "testnet",
+    expectedPassphrase: testnetNetwork.passphrase,
+    rpcUrl: testnetNetwork.rpcUrl,
+    ...options,
   });
-  if (!response.ok) {
-    throw new Error(`${method} returned HTTP ${response.status}.`);
-  }
-  const payload = await response.json();
-  if (payload.error || !payload.result) {
-    throw new Error(`${method} returned no result: ${JSON.stringify(payload.error)}`);
-  }
-  return payload.result;
+}
+
+export async function rpcCall(
+  method,
+  params = undefined,
+  { timeoutMs = 30_000, retryPolicy, fetchImpl = fetch } = {},
+) {
+  const policy = resolveRpcRetryPolicy({
+    ...retryPolicy,
+    attemptTimeoutMs: Math.max(1, Math.ceil(Math.min(timeoutMs, retryPolicy?.attemptTimeoutMs ?? 15_000))),
+    totalTimeoutMs: Math.max(1, Math.ceil(Math.min(timeoutMs, retryPolicy?.totalTimeoutMs ?? 30_000))),
+  });
+  return withBoundedRetry(
+    async ({ timeoutMs: attemptBudgetMs }) => {
+      const response = await fetchImpl(testnetNetwork.rpcUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, ...(params ? { params } : {}) }),
+        signal: AbortSignal.timeout(Math.max(1, Math.ceil(attemptBudgetMs))),
+      });
+      if (!response.ok) {
+        const err = new Error(`${method} returned HTTP ${response.status}.`);
+        err.httpStatus = response.status;
+        throw err;
+      }
+      const payload = await response.json();
+      if (payload.error || !payload.result) {
+        const err = new Error(`${method} returned no result: ${JSON.stringify(payload.error)}`);
+        if (typeof payload.error?.code === "number") {
+          err.rpcCode = payload.error.code;
+        }
+        throw err;
+      }
+      return payload.result;
+    },
+    { ...policy, operationName: `rpc:${method}` },
+  );
 }
 
 export async function latestLedger() {

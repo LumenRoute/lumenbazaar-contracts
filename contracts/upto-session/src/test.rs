@@ -87,6 +87,15 @@ fn asset_policy(asset: &Address, max_session_amount: i128) -> AssetPolicy {
     }
 }
 
+fn unique_key(env: &Env) -> BytesN<32> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(1);
+    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let mut bytes = [0u8; 32];
+    bytes[..8].copy_from_slice(&n.to_be_bytes());
+    BytesN::from_array(env, &bytes)
+}
+
 fn create_adversarial_token(env: &Env, buyer: &Address, amount: i128) -> Address {
     let admin = Address::generate(env);
     let token_id = env.register(AdversarialTokenContract, ());
@@ -116,6 +125,7 @@ fn assert_adversarial_creation_rolls_back(behavior: AdversarialBehavior) {
             &500,
             &50,
             &BytesN::from_array(&env, &[71; 32]),
+            &unique_key(&env)
         )
         .is_err());
     assert_eq!(token.raw_balance(&buyer), 500);
@@ -268,6 +278,7 @@ fn native_rpc_differential_create_session() {
         &100,
         &50,
         &BytesN::from_array(&env, &[76; 32]),
+        &unique_key(&env),
     );
     print_native_rpc_fixture(
         "create_session",
@@ -297,6 +308,7 @@ fn native_rpc_differential_read_settled() {
         &100,
         &50,
         &BytesN::from_array(&env, &[77; 32]),
+        &unique_key(&env),
     );
     client.settle(&session_id, &60, &BytesN::from_array(&env, &[78; 32]));
     let session = client.get_session(&session_id);
@@ -328,6 +340,7 @@ fn native_rpc_differential_repeated_settle() {
         &100,
         &50,
         &BytesN::from_array(&env, &[79; 32]),
+        &unique_key(&env),
     );
     let usage_hash = BytesN::from_array(&env, &[80; 32]);
     client.settle(&session_id, &60, &usage_hash);
@@ -362,6 +375,7 @@ fn native_rpc_differential_repeated_cancel() {
         &100,
         &50,
         &BytesN::from_array(&env, &[81; 32]),
+        &unique_key(&env),
     );
     client.cancel(&session_id);
     assert_eq!(
@@ -395,6 +409,7 @@ fn native_rpc_differential_repeated_recovery() {
         &100,
         &50,
         &BytesN::from_array(&env, &[82; 32]),
+        &unique_key(&env),
     );
     env.ledger().set_sequence_number(50);
     client.recover_expired(&session_id);
@@ -426,7 +441,15 @@ fn nested_create_during_funding_is_rejected_without_duplicate_state() {
     let resource_hash = BytesN::from_array(&env, &[70; 32]);
     token.configure_create(&contract_id, &buyer, &seller, &100, &50, &resource_hash);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &100, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     let event_count = escrow_event_count(&env, &contract_id);
     let auth_count = env.auths().len();
 
@@ -461,6 +484,7 @@ fn nested_settle_during_payout_cannot_finalize_twice() {
         &100,
         &50,
         &BytesN::from_array(&env, &[71; 32]),
+        &unique_key(&env),
     );
     let usage_hash = BytesN::from_array(&env, &[72; 32]);
     token.configure_terminal(
@@ -508,6 +532,7 @@ fn nested_cancel_during_refund_cannot_finalize_twice() {
         &100,
         &50,
         &BytesN::from_array(&env, &[73; 32]),
+        &unique_key(&env),
     );
     token.configure_terminal(
         &contract_id,
@@ -555,6 +580,7 @@ fn nested_recovery_during_refund_cannot_finalize_twice() {
         &100,
         &10,
         &BytesN::from_array(&env, &[75; 32]),
+        &unique_key(&env),
     );
     token.configure_terminal(
         &contract_id,
@@ -611,10 +637,19 @@ fn public_interface_is_callable() {
                 expires_at_ledger: 10,
                 resource_hash: &resource_hash,
                 sequence: 0,
+                idempotency_key: &resource_hash,
             },
         )
     });
-    let session_id = client.create_session(&buyer, &seller, &asset, &100, &10, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &10,
+        &resource_hash,
+        &resource_hash,
+    );
 
     assert_eq!(session_id, expected_id);
     let open_session = client.get_session(&session_id);
@@ -637,7 +672,15 @@ fn public_interface_is_callable() {
     assert!(client.try_extend_ttl(&session_id).is_err());
 
     // Test cancel and extend_ttl on separate open sessions
-    let session_id_2 = client.create_session(&buyer, &seller, &asset, &100, &10, &resource_hash);
+    let session_id_2 = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &10,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.cancel(&session_id_2);
     let cancelled_session = client.get_session(&session_id_2);
     assert_eq!(cancelled_session.status, SessionStatus::Cancelled);
@@ -647,7 +690,15 @@ fn public_interface_is_callable() {
         Err(Ok(ContractError::TtlExtensionFailed))
     );
 
-    let session_id_3 = client.create_session(&buyer, &seller, &asset, &100, &10, &resource_hash);
+    let session_id_3 = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &10,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.extend_ttl(&session_id_3);
 }
 
@@ -663,7 +714,15 @@ fn resource_usage_create_session() {
     let resource_hash = BytesN::from_array(&env, &[31; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     print_resource_usage("create_session", &env);
 }
@@ -680,7 +739,15 @@ fn resource_usage_settle() {
     let resource_hash = BytesN::from_array(&env, &[32; 32]);
     let usage_hash = BytesN::from_array(&env, &[33; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     client.settle(&session_id, &125, &usage_hash);
 
@@ -698,7 +765,15 @@ fn resource_usage_cancel() {
     let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[34; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     client.cancel(&session_id);
 
@@ -716,7 +791,15 @@ fn resource_usage_extend_ttl() {
     let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[35; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     client.extend_ttl(&session_id);
 
@@ -734,7 +817,15 @@ fn resource_usage_recover_expired() {
     let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[57; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     env.ledger().set_sequence_number(50);
 
     client.recover_expired(&session_id);
@@ -808,6 +899,7 @@ fn configuration_query_returns_bounded_versioned_public_state() {
             operational_state: OperationalState::Active,
             instance_ttl_threshold: storage::DEFAULT_TTL_THRESHOLD,
             instance_ttl_extension: storage::TTL_EXTENSION_AMOUNT,
+            max_session_duration_ledgers: validation::MAX_SESSION_DURATION_LEDGERS,
         }
     );
 }
@@ -1038,7 +1130,15 @@ fn per_asset_caps_enforce_boundaries_before_buyer_authorization() {
 
     let resource_hash = BytesN::from_array(&env, &[63; 32]);
     assert_eq!(
-        client.try_create_session(&buyer, &seller, &first_asset, &101, &50, &resource_hash),
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &first_asset,
+            &101,
+            &50,
+            &resource_hash,
+            &unique_key(&env)
+        ),
         Err(Ok(ContractError::AmountExceedsCap))
     );
     assert_eq!(token::Client::new(&env, &first_asset).balance(&buyer), 500);
@@ -1056,6 +1156,7 @@ fn per_asset_caps_enforce_boundaries_before_buyer_authorization() {
                     100_i128,
                     50_u32,
                     resource_hash.clone(),
+                    resource_hash.clone(),
                 )
                     .into_val(&env),
                 sub_invokes: &[MockAuthInvoke {
@@ -1066,7 +1167,15 @@ fn per_asset_caps_enforce_boundaries_before_buyer_authorization() {
                 }],
             },
         }])
-        .create_session(&buyer, &seller, &first_asset, &100, &50, &resource_hash);
+        .create_session(
+            &buyer,
+            &seller,
+            &first_asset,
+            &100,
+            &50,
+            &resource_hash,
+            &resource_hash,
+        );
 }
 
 #[test]
@@ -1081,7 +1190,15 @@ fn admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions() {
     let asset = create_test_asset(&env, &buyer, 250);
     client.initialize(&admin, &soroban_sdk::vec![&env, asset_policy(&asset, 100)]);
     let resource_hash = BytesN::from_array(&env, &[64; 32]);
-    let session_id = client.create_session(&buyer, &seller, &asset, &100, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     client.set_asset_max_session_amount(&asset, &50);
 
@@ -1104,7 +1221,15 @@ fn admin_cap_updates_emit_events_and_do_not_rewrite_existing_sessions() {
     assert_eq!(client.get_asset_max_session_amount(&asset), 50);
     assert_eq!(client.get_session(&session_id).max_amount, 100);
     assert_eq!(
-        client.try_create_session(&buyer, &seller, &asset, &51, &50, &resource_hash),
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &asset,
+            &51,
+            &50,
+            &resource_hash,
+            &unique_key(&env)
+        ),
         Err(Ok(ContractError::AmountExceedsCap))
     );
 
@@ -1408,7 +1533,8 @@ fn create_rejects_uninitialized_unsupported_and_excessive_duration() {
             &supported_asset,
             &500,
             &50,
-            &resource_hash
+            &resource_hash,
+            &unique_key(&env)
         ),
         Err(Ok(ContractError::NotInitialized))
     );
@@ -1423,7 +1549,8 @@ fn create_rejects_uninitialized_unsupported_and_excessive_duration() {
             &unsupported_asset,
             &500,
             &50,
-            &resource_hash
+            &resource_hash,
+            &unique_key(&env)
         ),
         Err(Ok(ContractError::UnsupportedAsset))
     );
@@ -1434,7 +1561,8 @@ fn create_rejects_uninitialized_unsupported_and_excessive_duration() {
             &supported_asset,
             &500,
             &(validation::MAX_SESSION_DURATION_LEDGERS + 1),
-            &resource_hash
+            &resource_hash,
+            &unique_key(&env)
         ),
         Err(Ok(ContractError::SessionDurationTooLong))
     );
@@ -1499,8 +1627,24 @@ fn public_liability_query_handles_initialization_support_and_multiple_assets() {
 
     let first_hash = BytesN::from_array(&env, &[65; 32]);
     let second_hash = BytesN::from_array(&env, &[66; 32]);
-    client.create_session(&buyer, &seller, &first_asset, &100, &50, &first_hash);
-    client.create_session(&buyer, &seller, &second_asset, &250, &50, &second_hash);
+    client.create_session(
+        &buyer,
+        &seller,
+        &first_asset,
+        &100,
+        &50,
+        &first_hash,
+        &unique_key(&env),
+    );
+    client.create_session(
+        &buyer,
+        &seller,
+        &second_asset,
+        &250,
+        &50,
+        &second_hash,
+        &unique_key(&env),
+    );
 
     assert_eq!(client.get_escrow_liability(&first_asset), 100);
     assert_eq!(client.get_escrow_liability(&second_asset), 250);
@@ -1526,6 +1670,7 @@ fn public_liability_reconciles_concurrent_sessions_and_all_terminal_paths() {
         &100,
         &50,
         &BytesN::from_array(&env, &[67; 32]),
+        &unique_key(&env),
     );
     let cancelled_id = client.create_session(
         &buyer,
@@ -1534,6 +1679,7 @@ fn public_liability_reconciles_concurrent_sessions_and_all_terminal_paths() {
         &200,
         &50,
         &BytesN::from_array(&env, &[68; 32]),
+        &unique_key(&env),
     );
     let expired_id = client.create_session(
         &buyer,
@@ -1542,6 +1688,7 @@ fn public_liability_reconciles_concurrent_sessions_and_all_terminal_paths() {
         &300,
         &50,
         &BytesN::from_array(&env, &[69; 32]),
+        &unique_key(&env),
     );
     assert_eq!(client.get_escrow_liability(&asset), 600);
     assert_eq!(token.balance(&contract_id), 600);
@@ -1574,8 +1721,15 @@ fn maximum_value_session_conserves_escrow() {
     let token_client = token::Client::new(&env, &asset);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id =
-        client.create_session(&buyer, &seller, &asset, &i128::MAX, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &i128::MAX,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.settle(&session_id, &1, &usage_hash);
 
     assert_eq!(token_client.balance(&buyer), i128::MAX - 1);
@@ -1599,7 +1753,15 @@ fn invalid_create_inputs_do_not_consume_sequence() {
     let resource_hash = BytesN::from_array(&env, &[4; 32]);
 
     assert_eq!(
-        client.try_create_session(&buyer, &seller, &asset, &0, &10, &resource_hash),
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &asset,
+            &0,
+            &10,
+            &resource_hash,
+            &unique_key(&env)
+        ),
         Err(Ok(ContractError::InvalidAmount))
     );
 
@@ -1621,7 +1783,15 @@ fn expired_create_input_fails_before_storage_write() {
     let resource_hash = BytesN::from_array(&env, &[4; 32]);
 
     assert_eq!(
-        client.try_create_session(&buyer, &seller, &asset, &100, &20, &resource_hash),
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &asset,
+            &100,
+            &20,
+            &resource_hash,
+            &unique_key(&env)
+        ),
         Err(Ok(ContractError::ExpiredSession))
     );
 
@@ -1642,7 +1812,15 @@ fn create_session_stores_open_session() {
     let resource_hash = BytesN::from_array(&env, &[5; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &25, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &25,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     env.as_contract(&contract_id, || {
         let session = storage::read_session(&env, &session_id).unwrap();
@@ -1674,7 +1852,15 @@ fn create_session_emits_stable_event() {
     let resource_hash = BytesN::from_array(&env, &[5; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &25, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &25,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     assert_eq!(
         env.events().all().filter_by_contract(&contract_id),
@@ -1718,7 +1904,15 @@ fn create_session_requires_buyer_auth() {
         }])
         .initialize(&admin, &asset_policies);
 
-    let result = client.try_create_session(&buyer, &seller, &asset, &500, &25, &resource_hash);
+    let result = client.try_create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &25,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     assert!(result.is_err());
     env.as_contract(&contract_id, || {
@@ -1738,7 +1932,15 @@ fn get_session_returns_full_state() {
     let resource_hash = BytesN::from_array(&env, &[6; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &900, &30, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &900,
+        &30,
+        &resource_hash,
+        &unique_key(&env),
+    );
     let session = client.get_session(&session_id);
 
     assert_eq!(session.id, session_id);
@@ -1789,6 +1991,7 @@ fn session_status_query_decodes_open_and_all_terminal_states_compatibly() {
         &100,
         &50,
         &BytesN::from_array(&env, &[101; 32]),
+        &unique_key(&env),
     );
     let settled_id = client.create_session(
         &buyer,
@@ -1797,6 +2000,7 @@ fn session_status_query_decodes_open_and_all_terminal_states_compatibly() {
         &100,
         &50,
         &BytesN::from_array(&env, &[102; 32]),
+        &unique_key(&env),
     );
     let cancelled_id = client.create_session(
         &buyer,
@@ -1805,6 +2009,7 @@ fn session_status_query_decodes_open_and_all_terminal_states_compatibly() {
         &100,
         &50,
         &BytesN::from_array(&env, &[103; 32]),
+        &unique_key(&env),
     );
     let expired_id = client.create_session(
         &buyer,
@@ -1813,6 +2018,7 @@ fn session_status_query_decodes_open_and_all_terminal_states_compatibly() {
         &100,
         &30,
         &BytesN::from_array(&env, &[104; 32]),
+        &unique_key(&env),
     );
 
     // Verify open state
@@ -1883,6 +2089,7 @@ fn get_session_batch_returns_ordered_found_and_missing_results_with_duplicate_id
         &100,
         &30,
         &BytesN::from_array(&env, &[81; 32]),
+        &unique_key(&env),
     );
     let cancelled_id = client.create_session(
         &buyer,
@@ -1891,6 +2098,7 @@ fn get_session_batch_returns_ordered_found_and_missing_results_with_duplicate_id
         &100,
         &30,
         &BytesN::from_array(&env, &[82; 32]),
+        &unique_key(&env),
     );
     let settled_id = client.create_session(
         &buyer,
@@ -1899,6 +2107,7 @@ fn get_session_batch_returns_ordered_found_and_missing_results_with_duplicate_id
         &100,
         &30,
         &BytesN::from_array(&env, &[83; 32]),
+        &unique_key(&env),
     );
     let expired_id = client.create_session(
         &buyer,
@@ -1907,6 +2116,7 @@ fn get_session_batch_returns_ordered_found_and_missing_results_with_duplicate_id
         &100,
         &10,
         &BytesN::from_array(&env, &[84; 32]),
+        &unique_key(&env),
     );
 
     client.cancel(&cancelled_id);
@@ -1999,6 +2209,7 @@ fn get_session_batch_enforces_nonzero_and_max_batch_size_bounds() {
             &100,
             &30,
             &BytesN::from_array(&env, &[(90 + idx) as u8; 32]),
+            &unique_key(&env),
         );
         max_batch.push_back(id);
     }
@@ -2047,6 +2258,7 @@ fn get_session_batch_resource_usage_is_read_only_and_bounded() {
             &100,
             &50,
             &BytesN::from_array(&env, &[(110 + idx) as u8; 32]),
+            &unique_key(&env),
         );
         batch_ids.push_back(session_id);
     }
@@ -2255,7 +2467,15 @@ fn settle_stores_actual_amount_and_status() {
     let token_client = token::Client::new(&env, &asset);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.settle(&session_id, &125, &usage_hash);
     let session = client.get_session(&session_id);
 
@@ -2282,7 +2502,15 @@ fn settle_accepts_exact_cap_without_refund() {
     let token_client = token::Client::new(&env, &asset);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.settle(&session_id, &500, &usage_hash);
 
     let session = client.get_session(&session_id);
@@ -2313,8 +2541,24 @@ fn settlement_isolates_concurrent_sessions_sharing_an_asset() {
     let token_client = token::Client::new(&env, &asset);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let first = client.create_session(&buyer, &seller, &asset, &400, &50, &resource_one);
-    let second = client.create_session(&buyer, &seller, &asset, &600, &50, &resource_two);
+    let first = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &400,
+        &50,
+        &resource_one,
+        &unique_key(&env),
+    );
+    let second = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &600,
+        &50,
+        &resource_two,
+        &unique_key(&env),
+    );
     client.settle(&first, &150, &usage_one);
 
     assert_eq!(client.get_session(&first).settled_amount, 150);
@@ -2427,7 +2671,15 @@ fn asset_deprecation_requires_admin_and_blocks_new_sessions() {
     let seller = Address::generate(&env);
     let resource_hash = BytesN::from_array(&env, &[71; 32]);
     assert_eq!(
-        client.try_create_session(&buyer, &seller, &asset, &100, &50, &resource_hash),
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &asset,
+            &100,
+            &50,
+            &resource_hash,
+            &unique_key(&env)
+        ),
         Err(Ok(ContractError::UnsupportedAsset))
     );
 }
@@ -2451,6 +2703,7 @@ fn deprecated_asset_terminal_paths_clear_liability_before_removal() {
         &300,
         &50,
         &BytesN::from_array(&env, &[72; 32]),
+        &unique_key(&env),
     );
     let cancel_id = client.create_session(
         &buyer,
@@ -2459,6 +2712,7 @@ fn deprecated_asset_terminal_paths_clear_liability_before_removal() {
         &300,
         &50,
         &BytesN::from_array(&env, &[73; 32]),
+        &unique_key(&env),
     );
     let recover_id = client.create_session(
         &buyer,
@@ -2467,6 +2721,7 @@ fn deprecated_asset_terminal_paths_clear_liability_before_removal() {
         &300,
         &50,
         &BytesN::from_array(&env, &[74; 32]),
+        &unique_key(&env),
     );
 
     let deprecate_reason = BytesN::from_array(&env, &[77; 32]);
@@ -2544,7 +2799,15 @@ fn undercollateralized_settlement_fails_without_state_transition() {
     let token_client = token::Client::new(&env, &asset);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     env.as_contract(&contract_id, || {
         token_client.transfer(&contract_id, &sink, &1);
     });
@@ -2578,7 +2841,15 @@ fn settle_accepts_local_test_token_contract() {
     let token_client = token::Client::new(&env, &asset);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.settle(&session_id, &125, &usage_hash);
 
     assert_eq!(token_client.balance(&buyer), 375);
@@ -2614,6 +2885,7 @@ fn adversarial_terminal_failures_leave_the_session_open_and_funded() {
         &500,
         &50,
         &BytesN::from_array(&env, &[72; 32]),
+        &unique_key(&env),
     );
     let usage_hash = BytesN::from_array(&env, &[73; 32]);
 
@@ -2664,6 +2936,7 @@ fn nested_token_callback_cannot_reenter_a_terminal_transition() {
         &500,
         &50,
         &BytesN::from_array(&env, &[74; 32]),
+        &unique_key(&env),
     );
     let usage_hash = BytesN::from_array(&env, &[75; 32]);
     token.configure_nested_attempt(&contract_id, &session_id, &100, &usage_hash);
@@ -2696,9 +2969,33 @@ fn settle_rejects_invalid_amounts_and_expiry() {
     let usage_hash = BytesN::from_array(&env, &[13; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let zero_amount_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
-    let over_cap_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
-    let expired_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let zero_amount_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
+    let over_cap_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
+    let expired_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     assert_eq!(
         client.try_settle(&zero_amount_id, &0, &usage_hash),
@@ -2732,7 +3029,15 @@ fn expired_open_session_remains_observable_and_permissionlessly_recoverable() {
     let usage_hash = BytesN::from_array(&env, &[33; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     env.ledger().set_sequence_number(50);
 
@@ -2772,9 +3077,33 @@ fn expiry_boundary_selects_exactly_one_terminal_path() {
     let usage_hash = BytesN::from_array(&env, &[54; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let settles_before = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
-    let cancels_before = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
-    let recovers_at = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let settles_before = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
+    let cancels_before = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
+    let recovers_at = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     assert_eq!(
         client.try_recover_expired(&recovers_at),
@@ -2822,7 +3151,15 @@ fn expiry_recovery_is_permissionless_fixed_recipient_and_single_use() {
     let resource_hash = BytesN::from_array(&env, &[55; 32]);
     let token_client = token::Client::new(&env, &asset);
     initialize_for_asset(&env, &client, &buyer, &asset);
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     env.ledger().set_sequence_number(51);
     client.recover_expired(&session_id);
@@ -2864,6 +3201,7 @@ fn batch_recovery_is_bounded_and_reports_partial_results_in_order() {
         &100,
         &10,
         &BytesN::from_array(&env, &[70; 32]),
+        &unique_key(&env),
     );
     let cancelled = client.create_session(
         &buyer,
@@ -2872,6 +3210,7 @@ fn batch_recovery_is_bounded_and_reports_partial_results_in_order() {
         &100,
         &20,
         &BytesN::from_array(&env, &[71; 32]),
+        &unique_key(&env),
     );
     let settled = client.create_session(
         &buyer,
@@ -2880,6 +3219,7 @@ fn batch_recovery_is_bounded_and_reports_partial_results_in_order() {
         &100,
         &20,
         &BytesN::from_array(&env, &[72; 32]),
+        &unique_key(&env),
     );
     let not_expired = client.create_session(
         &buyer,
@@ -2888,6 +3228,7 @@ fn batch_recovery_is_bounded_and_reports_partial_results_in_order() {
         &100,
         &20,
         &BytesN::from_array(&env, &[73; 32]),
+        &unique_key(&env),
     );
     client.cancel(&cancelled);
     client.settle(&settled, &100, &BytesN::from_array(&env, &[74; 32]));
@@ -2988,6 +3329,7 @@ fn batch_recovery_refunds_each_stored_buyer_only() {
         &100,
         &10,
         &BytesN::from_array(&env, &[76; 32]),
+        &unique_key(&env),
     );
     let second = client.create_session(
         &second_buyer,
@@ -2996,6 +3338,7 @@ fn batch_recovery_refunds_each_stored_buyer_only() {
         &100,
         &10,
         &BytesN::from_array(&env, &[77; 32]),
+        &unique_key(&env),
     );
     env.ledger().set_sequence_number(10);
 
@@ -3024,8 +3367,24 @@ fn expiry_recovery_rejects_missing_settled_and_cancelled_sessions() {
     let resource_hash = BytesN::from_array(&env, &[58; 32]);
     let usage_hash = BytesN::from_array(&env, &[59; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
-    let settled = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
-    let cancelled = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let settled = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
+    let cancelled = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.settle(&settled, &250, &usage_hash);
     client.cancel(&cancelled);
     env.ledger().set_sequence_number(50);
@@ -3055,7 +3414,15 @@ fn expiry_recovery_emits_versioned_receipt() {
     let asset = create_test_asset(&env, &buyer, 500);
     let resource_hash = BytesN::from_array(&env, &[56; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     env.ledger().set_sequence_number(50);
     client.recover_expired(&session_id);
@@ -3089,7 +3456,15 @@ fn insufficient_funding_prevents_session_creation() {
     initialize_for_asset(&env, &client, &buyer, &asset);
 
     assert!(client
-        .try_create_session(&buyer, &seller, &asset, &500, &50, &resource_hash)
+        .try_create_session(
+            &buyer,
+            &seller,
+            &asset,
+            &500,
+            &50,
+            &resource_hash,
+            &unique_key(&env)
+        )
         .is_err());
     let _ = usage_hash;
     env.as_contract(&contract_id, || {
@@ -3112,7 +3487,15 @@ fn settle_rejects_empty_usage_hash_before_transfer() {
     let usage_hash = BytesN::from_array(&env, &[0; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     assert_eq!(
         client.try_settle(&session_id, &125, &usage_hash),
@@ -3142,7 +3525,15 @@ fn settle_prevents_double_settlement() {
     let usage_hash = BytesN::from_array(&env, &[15; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     // First settlement succeeds
     client.settle(&session_id, &100, &usage_hash);
@@ -3184,7 +3575,15 @@ fn settle_emits_stable_event() {
     let usage_hash = BytesN::from_array(&env, &[17; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     client.settle(&session_id, &125, &usage_hash);
 
@@ -3215,7 +3614,15 @@ fn cancel_allows_buyer_cancellation_before_settlement() {
     let resource_hash = BytesN::from_array(&env, &[18; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     let session_before = client.get_session(&session_id);
     assert_eq!(session_before.status, SessionStatus::Open);
 
@@ -3370,7 +3777,15 @@ fn cancel_emits_stable_event() {
     let resource_hash = BytesN::from_array(&env, &[24; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     // Verify session is open before cancel
     let session_before = client.get_session(&session_id);
@@ -3408,7 +3823,15 @@ fn reject_allows_seller_rejection_and_refunds_buyer_only() {
     let resource_hash = BytesN::from_array(&env, &[81; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     let session_before = client.get_session(&session_id);
     assert_eq!(session_before.status, SessionStatus::Open);
@@ -3465,6 +3888,10 @@ fn reject_requires_seller_auth() {
                 resource_hash,
                 usage_hash: None,
                 status: SessionStatus::Open,
+                creation_ledger: 10,
+                finalized_ledger: None,
+                resource_scheme_version: 1,
+                usage_scheme_version: None,
             },
         );
     });
@@ -3491,7 +3918,15 @@ fn reject_rejects_terminal_and_expired_states() {
         Err(Ok(ContractError::SessionNotFound))
     );
 
-    let rejected_id = client.create_session(&buyer, &seller, &asset, &200, &50, &resource_hash);
+    let rejected_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.reject(&rejected_id);
     assert_eq!(
         client.try_reject(&rejected_id),
@@ -3511,21 +3946,45 @@ fn reject_rejects_terminal_and_expired_states() {
         Err(Ok(ContractError::SessionRejected))
     );
 
-    let settled_id = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    let settled_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &60,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.settle(&settled_id, &100, &usage_hash);
     assert_eq!(
         client.try_reject(&settled_id),
         Err(Ok(ContractError::SessionAlreadySettled))
     );
 
-    let cancelled_id = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    let cancelled_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &60,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.cancel(&cancelled_id);
     assert_eq!(
         client.try_reject(&cancelled_id),
         Err(Ok(ContractError::SessionCancelled))
     );
 
-    let expired_id = client.create_session(&buyer, &seller, &asset, &200, &70, &resource_hash);
+    let expired_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &70,
+        &resource_hash,
+        &unique_key(&env),
+    );
     env.ledger().set_sequence_number(70);
     assert_eq!(
         client.try_reject(&expired_id),
@@ -3546,7 +4005,15 @@ fn preview_settle_calculates_exact_payout_and_refund_without_state_changes_or_au
     let usage_hash = BytesN::from_array(&env, &[88; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     // 1. Valid partial settlement preview
     let preview = client.preview_settle(&session_id, &200);
@@ -3622,7 +4089,15 @@ fn preview_settle_reports_deterministic_rejection_reasons() {
     );
 
     // 2. Invalid zero and negative amounts
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     let zero_preview = client.preview_settle(&session_id, &0);
     assert_eq!(
         zero_preview.rejection_reason,
@@ -3646,7 +4121,15 @@ fn preview_settle_reports_deterministic_rejection_reasons() {
     assert!(!exceed_preview.eligible);
 
     // 4. Expired state
-    let expired_id = client.create_session(&buyer, &seller, &asset, &200, &30, &resource_hash);
+    let expired_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &30,
+        &resource_hash,
+        &unique_key(&env),
+    );
     env.ledger().set_sequence_number(30);
     let expired_preview = client.preview_settle(&expired_id, &100);
     assert_eq!(
@@ -3663,28 +4146,60 @@ fn preview_settle_reports_deterministic_rejection_reasons() {
 
     // 5. Terminal states: Settled, Cancelled, Expired, Rejected
     env.ledger().set_sequence_number(1);
-    let s_id = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    let s_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &60,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.settle(&s_id, &100, &usage_hash);
     assert_eq!(
         client.preview_settle(&s_id, &100).rejection_reason,
         SettlementRejectionReason::AlreadySettled
     );
 
-    let c_id = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    let c_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &60,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.cancel(&c_id);
     assert_eq!(
         client.preview_settle(&c_id, &100).rejection_reason,
         SettlementRejectionReason::AlreadyCancelled
     );
 
-    let r_id = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    let r_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &60,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.reject(&r_id);
     assert_eq!(
         client.preview_settle(&r_id, &100).rejection_reason,
         SettlementRejectionReason::AlreadyRejected
     );
 
-    let exp_id = client.create_session(&buyer, &seller, &asset, &200, &40, &resource_hash);
+    let exp_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &40,
+        &resource_hash,
+        &unique_key(&env),
+    );
     env.ledger().set_sequence_number(40);
     client.recover_expired(&exp_id);
     assert_eq!(
@@ -3719,6 +4234,10 @@ fn preview_settle_detects_undercollateralized_escrow() {
                 resource_hash,
                 usage_hash: None,
                 status: SessionStatus::Open,
+                creation_ledger: 10,
+                finalized_ledger: None,
+                resource_scheme_version: 1,
+                usage_scheme_version: None,
             },
         );
     });
@@ -3743,7 +4262,15 @@ fn extend_ttl_succeeds_for_open_sessions() {
     let resource_hash = BytesN::from_array(&env, &[25; 32]);
     initialize_for_asset(&env, &client, &buyer, &asset);
 
-    let session_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     assert!(client.try_extend_ttl(&session_id).is_ok());
 }
@@ -3862,7 +4389,15 @@ fn recoverability_query_matches_recover_expired_boundary_and_terminal_states() {
     assert_eq!(missing.recipient, None);
     assert_eq!(missing.refundable_amount, 0);
 
-    let open_id = client.create_session(&buyer, &seller, &asset, &200, &50, &resource_hash);
+    let open_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     env.ledger().set_sequence_number(49);
     let before = client.get_recoverability(&open_id);
     assert_eq!(before.status, RecoverabilityStatus::NotExpired);
@@ -3890,19 +4425,43 @@ fn recoverability_query_matches_recover_expired_boundary_and_terminal_states() {
     );
 
     env.ledger().set_sequence_number(1);
-    let settled = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    let settled = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &60,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.settle(&settled, &100, &usage_hash);
     assert_eq!(
         client.get_recoverability(&settled).status,
         RecoverabilityStatus::AlreadySettled
     );
-    let cancelled = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    let cancelled = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &60,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.cancel(&cancelled);
     assert_eq!(
         client.get_recoverability(&cancelled).status,
         RecoverabilityStatus::AlreadyCancelled
     );
-    let rejected = client.create_session(&buyer, &seller, &asset, &200, &60, &resource_hash);
+    let rejected = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &60,
+        &resource_hash,
+        &unique_key(&env),
+    );
     client.reject(&rejected);
     let rej = client.get_recoverability(&rejected);
     assert_eq!(rej.status, RecoverabilityStatus::AlreadyRejected);
@@ -3910,7 +4469,6 @@ fn recoverability_query_matches_recover_expired_boundary_and_terminal_states() {
 }
 
 #[test]
-fn solvency_query_reports_ordered_mixed_health_with_defined_edge_cases() {
 fn per_asset_minimum_enforces_boundaries_and_policy_invariants() {
     let env = Env::default();
     env.mock_all_auths_allowing_non_root_auth();
@@ -3961,20 +4519,60 @@ fn per_asset_minimum_enforces_boundaries_and_policy_invariants() {
 
     let hash = |n: u8| BytesN::from_array(&env, &[n; 32]);
     assert_eq!(
-        client.try_create_session(&buyer, &seller, &asset, &9, &50, &hash(90)),
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &asset,
+            &9,
+            &50,
+            &hash(90),
+            &unique_key(&env)
+        ),
         Err(Ok(ContractError::InvalidAmount))
     );
     assert_eq!(
-        client.try_create_session(&buyer, &seller, &asset, &101, &50, &hash(91)),
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &asset,
+            &101,
+            &50,
+            &hash(91),
+            &unique_key(&env)
+        ),
         Err(Ok(ContractError::AmountExceedsCap))
     );
     // Same amount is valid for one asset and below the other asset's minimum.
     assert_eq!(
-        client.try_create_session(&buyer, &seller, &other, &10, &50, &hash(92)),
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &other,
+            &10,
+            &50,
+            &hash(92),
+            &unique_key(&env)
+        ),
         Err(Ok(ContractError::InvalidAmount))
     );
-    let at_min = client.create_session(&buyer, &seller, &asset, &10, &50, &hash(93));
-    let at_max = client.create_session(&buyer, &seller, &asset, &100, &50, &hash(94));
+    let at_min = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &10,
+        &50,
+        &hash(93),
+        &unique_key(&env),
+    );
+    let at_max = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &50,
+        &hash(94),
+        &unique_key(&env),
+    );
 
     // The cap cannot be moved below the minimum; a valid update leaves sessions intact.
     assert_eq!(
@@ -4010,16 +4608,40 @@ fn seller_exposure_ceiling_enforces_limits_and_releases_exposure() {
     let usage_hash = BytesN::from_array(&env, &[2; 32]);
 
     // Create 1st session with max_amount 1,000 -> seller exposure = 1,000
-    let session_1 = client.create_session(&buyer, &seller, &asset, &1_000, &100, &resource_hash);
+    let session_1 = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &1_000,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(client.get_seller_exposure(&seller, &asset), 1_000);
 
     // Attempting 2nd session with 600 would exceed ceiling 1,500 (1000 + 600 > 1500) -> fails before transfer
-    let err = client.try_create_session(&buyer, &seller, &asset, &600, &100, &resource_hash);
+    let err = client.try_create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &600,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(err, Err(Ok(ContractError::SellerExposureCeilingExceeded)));
     assert_eq!(client.get_seller_exposure(&seller, &asset), 1_000);
 
     // Session with 500 reaches exact ceiling (1000 + 500 = 1500)
-    let session_2 = client.create_session(&buyer, &seller, &asset, &500, &100, &resource_hash);
+    let session_2 = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(client.get_seller_exposure(&seller, &asset), 1_500);
 
     // Settle session 1: releases 1,000 exposure exactly once
@@ -4031,7 +4653,15 @@ fn seller_exposure_ceiling_enforces_limits_and_releases_exposure() {
     assert_eq!(client.get_seller_exposure(&seller, &asset), 0);
 
     // Recovery path: test expired session releases exposure
-    let session_3 = client.create_session(&buyer, &seller, &asset, &700, &50, &resource_hash);
+    let session_3 = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &700,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(client.get_seller_exposure(&seller, &asset), 700);
     env.ledger().set_sequence_number(55);
     client.recover_expired(&session_3);
@@ -4064,21 +4694,53 @@ fn buyer_open_session_limits_enforces_boundaries_and_maintains_isolation() {
     let usage_hash = BytesN::from_array(&env, &[2; 32]);
 
     // Buyer 1 creates 1st session -> count = 1
-    let b1_s1 = client.create_session(&buyer_1, &seller, &asset, &100, &100, &resource_hash);
+    let b1_s1 = client.create_session(
+        &buyer_1,
+        &seller,
+        &asset,
+        &100,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(client.get_buyer_open_sessions(&buyer_1), 1);
     assert_eq!(client.get_buyer_open_sessions(&buyer_2), 0);
 
     // Buyer 1 creates 2nd session -> count = 2 (exact limit succeeds)
-    let b1_s2 = client.create_session(&buyer_1, &seller, &asset, &100, &100, &resource_hash);
+    let b1_s2 = client.create_session(
+        &buyer_1,
+        &seller,
+        &asset,
+        &100,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(client.get_buyer_open_sessions(&buyer_1), 2);
 
     // Limit plus one fails for Buyer 1
-    let err = client.try_create_session(&buyer_1, &seller, &asset, &100, &100, &resource_hash);
+    let err = client.try_create_session(
+        &buyer_1,
+        &seller,
+        &asset,
+        &100,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(err, Err(Ok(ContractError::BuyerOpenSessionsExceeded)));
     assert_eq!(client.get_buyer_open_sessions(&buyer_1), 2);
 
     // Buyer 2 remains independent and can create sessions up to their limit
-    let b2_s1 = client.create_session(&buyer_2, &seller, &asset, &100, &100, &resource_hash);
+    let b2_s1 = client.create_session(
+        &buyer_2,
+        &seller,
+        &asset,
+        &100,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(client.get_buyer_open_sessions(&buyer_2), 1);
     assert_eq!(client.get_buyer_open_sessions(&buyer_1), 2);
 
@@ -4087,7 +4749,15 @@ fn buyer_open_session_limits_enforces_boundaries_and_maintains_isolation() {
     assert_eq!(client.get_buyer_open_sessions(&buyer_1), 1);
 
     // Now Buyer 1 can create another session
-    let b1_s3 = client.create_session(&buyer_1, &seller, &asset, &100, &100, &resource_hash);
+    let b1_s3 = client.create_session(
+        &buyer_1,
+        &seller,
+        &asset,
+        &100,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(client.get_buyer_open_sessions(&buyer_1), 2);
 
     // Cancellation releases slot for Buyer 1
@@ -4130,21 +4800,53 @@ fn seller_open_session_limits_enforces_boundaries_and_maintains_isolation() {
     let usage_hash = BytesN::from_array(&env, &[2; 32]);
 
     // Seller 1 receives 1st session -> count = 1
-    let s1_sess1 = client.create_session(&buyer, &seller_1, &asset, &100, &100, &resource_hash);
+    let s1_sess1 = client.create_session(
+        &buyer,
+        &seller_1,
+        &asset,
+        &100,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(client.get_seller_open_sessions(&seller_1), 1);
     assert_eq!(client.get_seller_open_sessions(&seller_2), 0);
 
     // Seller 1 receives 2nd session -> count = 2 (exact limit succeeds)
-    let s1_sess2 = client.create_session(&buyer, &seller_1, &asset, &100, &100, &resource_hash);
+    let s1_sess2 = client.create_session(
+        &buyer,
+        &seller_1,
+        &asset,
+        &100,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(client.get_seller_open_sessions(&seller_1), 2);
 
     // Limit plus one fails for Seller 1
-    let err = client.try_create_session(&buyer, &seller_1, &asset, &100, &100, &resource_hash);
+    let err = client.try_create_session(
+        &buyer,
+        &seller_1,
+        &asset,
+        &100,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(err, Err(Ok(ContractError::SellerOpenSessionsExceeded)));
     assert_eq!(client.get_seller_open_sessions(&seller_1), 2);
 
     // Seller 2 remains independent and can receive sessions up to their limit
-    let s2_sess1 = client.create_session(&buyer, &seller_2, &asset, &100, &100, &resource_hash);
+    let s2_sess1 = client.create_session(
+        &buyer,
+        &seller_2,
+        &asset,
+        &100,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(client.get_seller_open_sessions(&seller_2), 1);
     assert_eq!(client.get_seller_open_sessions(&seller_1), 2);
 
@@ -4153,7 +4855,15 @@ fn seller_open_session_limits_enforces_boundaries_and_maintains_isolation() {
     assert_eq!(client.get_seller_open_sessions(&seller_1), 1);
 
     // Now Seller 1 can receive another session
-    let s1_sess3 = client.create_session(&buyer, &seller_1, &asset, &100, &100, &resource_hash);
+    let s1_sess3 = client.create_session(
+        &buyer,
+        &seller_1,
+        &asset,
+        &100,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(client.get_seller_open_sessions(&seller_1), 2);
 
     // Cancellation releases slot for Seller 1
@@ -4191,7 +4901,15 @@ fn reduce_session_cap_lowers_cap_refunds_buyer_and_reduces_liability() {
     let usage_hash = BytesN::from_array(&env, &[2; 32]);
 
     // Create session for 1,000
-    let session_id = client.create_session(&buyer, &seller, &asset, &1_000, &100, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &1_000,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
     assert_eq!(token.balance(&buyer), 9_000);
     assert_eq!(client.get_escrow_liability(&asset), 1_000);
     assert_eq!(client.get_seller_exposure(&seller, &asset), 1_000);
@@ -4238,7 +4956,15 @@ fn reduce_session_cap_lowers_cap_refunds_buyer_and_reduces_liability() {
     assert_eq!(err_settled, Err(Ok(ContractError::SessionAlreadySettled)));
 
     // Expired session reduction must fail
-    let s2_id = client.create_session(&buyer, &seller, &asset, &500, &50, &resource_hash);
+    let s2_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_key(&env),
+    );
     env.ledger().set_sequence_number(55);
     let err_expired = client.try_reduce_session_cap(&s2_id, &300);
     assert_eq!(err_expired, Err(Ok(ContractError::ExpiredSession)));
@@ -4316,7 +5042,15 @@ fn creation_pause_requires_admin_and_fails_closed_before_transfer() {
     let seller = Address::generate(&env);
     let resource_hash = BytesN::from_array(&env, &[71; 32]);
     assert_eq!(
-        client.try_create_session(&buyer, &seller, &asset, &100, &50, &resource_hash),
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &asset,
+            &100,
+            &50,
+            &resource_hash,
+            &unique_key(&env)
+        ),
         Err(Ok(ContractError::CreationPaused))
     );
     env.as_contract(&contract_id, || {
@@ -4327,7 +5061,7 @@ fn creation_pause_requires_admin_and_fails_closed_before_transfer() {
 }
 
 #[test]
-fn creation_pause_rejects_repeated_calls_and_resume_restores_creation() {
+fn solvency_query_reports_ordered_mixed_health_with_defined_edge_cases() {
     let env = Env::default();
     env.mock_all_auths_allowing_non_root_auth();
     let contract_id = env.register(UptoSessionContract, ());
@@ -4356,16 +5090,40 @@ fn creation_pause_rejects_repeated_calls_and_resume_restores_creation() {
         ],
     );
     let hash = BytesN::from_array(&env, &[97; 32]);
-    client.create_session(&buyer, &seller, &healthy, &100, &50, &hash);
-    client.create_session(&buyer, &seller, &surplus, &100, &50, &hash);
-    client.create_session(&buyer, &seller, &underfunded, &100, &50, &hash);
+    client.create_session(
+        &buyer,
+        &seller,
+        &healthy,
+        &100,
+        &50,
+        &hash,
+        &unique_key(&env),
+    );
+    client.create_session(
+        &buyer,
+        &seller,
+        &surplus,
+        &100,
+        &50,
+        &hash,
+        &unique_key(&env),
+    );
+    client.create_session(
+        &buyer,
+        &seller,
+        &underfunded,
+        &100,
+        &50,
+        &hash,
+        &unique_key(&env),
+    );
     // Surplus: unsolicited transfer into escrow custody.
     token::StellarAssetClient::new(&env, &surplus).mint(&contract_id, &40);
     // Underfunded: raise recorded liability above custody.
     env.as_contract(&contract_id, || {
         storage::increase_liability(&env, &underfunded, 25).unwrap();
     });
-    client.deprecate_asset(&deprecated);
+    client.deprecate_asset(&deprecated, &hash);
 
     let query = soroban_sdk::vec![
         &env,
@@ -4416,6 +5174,17 @@ fn creation_pause_rejects_repeated_calls_and_resume_restores_creation() {
         client.get_solvency(&at_limit).len(),
         MAX_SOLVENCY_QUERY_ASSETS
     );
+}
+
+#[test]
+fn creation_pause_rejects_repeated_calls_and_resume_restores_creation() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
     let asset = create_test_asset(&env, &buyer, 1_000);
     let resource_hash = BytesN::from_array(&env, &[72; 32]);
     initialize_for_asset(&env, &client, &admin, &asset);
@@ -4446,7 +5215,15 @@ fn creation_pause_rejects_repeated_calls_and_resume_restores_creation() {
         Err(Ok(ContractError::OperationalStateUnchanged))
     );
     assert_eq!(
-        client.try_create_session(&buyer, &seller, &asset, &100, &50, &resource_hash),
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &asset,
+            &100,
+            &50,
+            &resource_hash,
+            &resource_hash
+        ),
         Err(Ok(ContractError::CreationPaused))
     );
 
@@ -4469,7 +5246,15 @@ fn creation_pause_rejects_repeated_calls_and_resume_restores_creation() {
     );
 
     // Creation is available again after an authorized resume.
-    let session_id = client.create_session(&buyer, &seller, &asset, &100, &50, &resource_hash);
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &50,
+        &resource_hash,
+        &resource_hash,
+    );
     assert_eq!(client.get_session(&session_id).status, SessionStatus::Open);
 }
 
@@ -4487,10 +5272,42 @@ fn paused_creation_preserves_all_exit_paths() {
     let usage_hash = BytesN::from_array(&env, &[74; 32]);
     initialize_for_asset(&env, &client, &admin, &asset);
 
-    let to_settle = client.create_session(&buyer, &seller, &asset, &500, &100, &resource_hash);
-    let to_cancel = client.create_session(&buyer, &seller, &asset, &500, &100, &resource_hash);
-    let to_extend = client.create_session(&buyer, &seller, &asset, &500, &100, &resource_hash);
-    let to_recover = client.create_session(&buyer, &seller, &asset, &500, &100, &resource_hash);
+    let to_settle = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
+    let to_cancel = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
+    let to_extend = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
+    let to_recover = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &100,
+        &resource_hash,
+        &unique_key(&env),
+    );
 
     client.pause_creation();
     assert_eq!(
@@ -4792,4 +5609,501 @@ fn lifecycle_events_expose_indexable_topics_and_versions() {
         events::publish_creation_resumed(&env, &admin)
     });
     assert_indexable_event(&env, &contract_id, "creation_resumed", false, 3);
+}
+
+// ── Issue #173: Initialization replay rejection regression tests ─────────────
+
+mod init_replay_regression {
+    use super::*;
+    use soroban_sdk::{
+        contract, contractimpl,
+        testutils::{AuthorizedFunction, AuthorizedInvocation},
+        Error as SdkError, String as SorobanString, Symbol,
+    };
+
+    #[contract]
+    struct ReentrantInitProbeToken;
+
+    #[contractimpl]
+    impl ReentrantInitProbeToken {
+        pub fn configure(
+            env: Env,
+            escrow: Address,
+            attacker: Address,
+            reentry_policies: Vec<AssetPolicy>,
+        ) {
+            env.storage()
+                .instance()
+                .set(&Symbol::new(&env, "escrow"), &escrow);
+            env.storage()
+                .instance()
+                .set(&Symbol::new(&env, "attacker"), &attacker);
+            env.storage()
+                .instance()
+                .set(&Symbol::new(&env, "policies"), &reentry_policies);
+            env.storage()
+                .instance()
+                .set(&Symbol::new(&env, "attempted"), &false);
+            env.storage()
+                .instance()
+                .set(&Symbol::new(&env, "err_code"), &0_u32);
+        }
+
+        pub fn balance(env: Env, _id: Address) -> i128 {
+            let attempted: bool = env
+                .storage()
+                .instance()
+                .get(&Symbol::new(&env, "attempted"))
+                .unwrap_or(true);
+            if !attempted {
+                env.storage()
+                    .instance()
+                    .set(&Symbol::new(&env, "attempted"), &true);
+                let escrow: Address = env
+                    .storage()
+                    .instance()
+                    .get(&Symbol::new(&env, "escrow"))
+                    .unwrap();
+                let attacker: Address = env
+                    .storage()
+                    .instance()
+                    .get(&Symbol::new(&env, "attacker"))
+                    .unwrap();
+                let policies: Vec<AssetPolicy> = env
+                    .storage()
+                    .instance()
+                    .get(&Symbol::new(&env, "policies"))
+                    .unwrap();
+                let res = env.try_invoke_contract::<(), SdkError>(
+                    &escrow,
+                    &Symbol::new(&env, "initialize"),
+                    (attacker, policies).into_val(&env),
+                );
+                let code = match res {
+                    Err(Ok(err)) if err == SdkError::from_contract_error(1) => 1_u32,
+                    // Soroban host blocks direct reentrancy into an active contract frame
+                    // with Error(Context, InvalidAction) before the reentered body executes.
+                    Err(Ok(err))
+                        if err
+                            == SdkError::from_type_and_code(
+                                soroban_sdk::xdr::ScErrorType::Context,
+                                soroban_sdk::xdr::ScErrorCode::InvalidAction,
+                            ) =>
+                    {
+                        2_u32
+                    }
+                    Err(Err(_)) => 2_u32,
+                    Ok(Ok(())) => 0_u32,
+                    _ => 999_u32,
+                };
+                env.storage()
+                    .instance()
+                    .set(&Symbol::new(&env, "err_code"), &code);
+            }
+            0
+        }
+
+        pub fn decimals() -> u32 {
+            7
+        }
+
+        pub fn name(env: Env) -> SorobanString {
+            SorobanString::from_str(&env, "Reentrant Probe Token")
+        }
+
+        pub fn symbol(env: Env) -> SorobanString {
+            SorobanString::from_str(&env, "RPT")
+        }
+
+        pub fn reentry_attempted(env: Env) -> bool {
+            env.storage()
+                .instance()
+                .get(&Symbol::new(&env, "attempted"))
+                .unwrap_or(false)
+        }
+
+        pub fn reentry_error_code(env: Env) -> u32 {
+            env.storage()
+                .instance()
+                .get(&Symbol::new(&env, "err_code"))
+                .unwrap_or(0)
+        }
+    }
+
+    #[contract]
+    struct NestedInitCaller;
+
+    #[contractimpl]
+    impl NestedInitCaller {
+        pub fn replay_initialize(
+            env: Env,
+            escrow: Address,
+            admin: Address,
+            policies: Vec<AssetPolicy>,
+        ) -> u32 {
+            let res = env.try_invoke_contract::<(), SdkError>(
+                &escrow,
+                &Symbol::new(&env, "initialize"),
+                (admin, policies).into_val(&env),
+            );
+            match res {
+                Err(Ok(err)) if err == SdkError::from_contract_error(1) => {
+                    ContractError::AlreadyInitialized as u32
+                }
+                Ok(Ok(())) => 0,
+                _ => 999,
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    struct ConfigSnapshot {
+        admin: Address,
+        config: ContractConfiguration,
+        asset_policy: AssetPolicyResponse,
+        max_cap: i128,
+        min_cap: i128,
+        asset_ceiling: i128,
+        buyer_ceiling: i128,
+        sequence: u64,
+    }
+
+    fn capture_state(
+        env: &Env,
+        contract_id: &Address,
+        client: &UptoSessionContractClient<'_>,
+        asset: &Address,
+    ) -> ConfigSnapshot {
+        ConfigSnapshot {
+            admin: client.get_admin(),
+            config: client.get_configuration(),
+            asset_policy: client.get_asset_policy(asset),
+            max_cap: client.get_asset_max_session_amount(asset),
+            min_cap: client.get_asset_min_session_amount(asset),
+            asset_ceiling: client.get_asset_exposure_ceiling(asset),
+            buyer_ceiling: client.get_buyer_exposure_ceiling(asset),
+            sequence: env.as_contract(contract_id, || storage::read_next_session_sequence(env)),
+        }
+    }
+
+    fn custom_policy(
+        asset: &Address,
+        min_amount: i128,
+        max_amount: i128,
+        asset_ceiling: i128,
+        buyer_ceiling: i128,
+    ) -> AssetPolicy {
+        AssetPolicy {
+            asset: asset.clone(),
+            max_session_amount: max_amount,
+            min_session_amount: min_amount,
+            max_asset_exposure: asset_ceiling,
+            max_buyer_exposure: buyer_ceiling,
+        }
+    }
+
+    #[test]
+    fn direct_initialization_replay_rejects_all_variants_and_preserves_state_and_auth_trees() {
+        let env = Env::default();
+        let contract_id = env.register(UptoSessionContract, ());
+        let client = UptoSessionContractClient::new(&env, &contract_id);
+        let admin = Address::generate(&env);
+        let attacker = Address::generate(&env);
+        let primary_asset = create_test_asset(&env, &admin, 1_000);
+        let other_asset = create_test_asset(&env, &attacker, 1_000);
+        let initial_policies =
+            soroban_sdk::vec![&env, custom_policy(&primary_asset, 25, 500, 5_000, 1_000)];
+
+        // Initial call requires exact admin authorization tree.
+        client
+            .mock_auths(&[MockAuth {
+                address: &admin,
+                invoke: &MockAuthInvoke {
+                    contract: &contract_id,
+                    fn_name: "initialize",
+                    args: (admin.clone(), initial_policies.clone()).into_val(&env),
+                    sub_invokes: &[],
+                },
+            }])
+            .initialize(&admin, &initial_policies);
+
+        assert_eq!(
+            env.auths(),
+            std::vec![(
+                admin.clone(),
+                AuthorizedInvocation {
+                    function: AuthorizedFunction::Contract((
+                        contract_id.clone(),
+                        Symbol::new(&env, "initialize"),
+                        (admin.clone(), initial_policies.clone()).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![],
+                }
+            )]
+        );
+
+        let before = capture_state(&env, &contract_id, &client, &primary_asset);
+
+        // 1. Direct replay with identical admin and policies (no auth needed: fails before require_auth).
+        assert_eq!(
+            client.try_initialize(&admin, &initial_policies),
+            Err(Ok(ContractError::AlreadyInitialized))
+        );
+        assert!(env.auths().is_empty());
+        assert_eq!(contract_event_count(&env, &contract_id), 0);
+        assert_eq!(
+            capture_state(&env, &contract_id, &client, &primary_asset),
+            before
+        );
+
+        // 2. Direct replay with different admin and different valid policies.
+        let attacker_policies =
+            soroban_sdk::vec![&env, custom_policy(&other_asset, 1, 9_999, 99_999, 9_999)];
+        assert_eq!(
+            client.try_initialize(&attacker, &attacker_policies),
+            Err(Ok(ContractError::AlreadyInitialized))
+        );
+        assert!(env.auths().is_empty());
+        assert_eq!(contract_event_count(&env, &contract_id), 0);
+        assert_eq!(
+            capture_state(&env, &contract_id, &client, &primary_asset),
+            before
+        );
+        assert_eq!(
+            client.get_asset_policy(&other_asset).lifecycle,
+            AssetLifecycle::NotConfigured
+        );
+
+        // 3. Direct replay with empty or invalid policies still returns AlreadyInitialized
+        //    rather than InvalidSupportedAssets or InvalidAssetCap.
+        assert_eq!(
+            client.try_initialize(&attacker, &soroban_sdk::vec![&env]),
+            Err(Ok(ContractError::AlreadyInitialized))
+        );
+        assert_eq!(
+            client.try_initialize(
+                &attacker,
+                &soroban_sdk::vec![&env, custom_policy(&primary_asset, 0, 0, 0, 0)],
+            ),
+            Err(Ok(ContractError::AlreadyInitialized))
+        );
+        assert!(env.auths().is_empty());
+        assert_eq!(contract_event_count(&env, &contract_id), 0);
+        assert_eq!(
+            capture_state(&env, &contract_id, &client, &primary_asset),
+            before
+        );
+    }
+
+    #[test]
+    fn nested_reentrant_initialization_during_asset_probe_is_rejected() {
+        let env = Env::default();
+        let contract_id = env.register(UptoSessionContract, ());
+        let client = UptoSessionContractClient::new(&env, &contract_id);
+        let admin = Address::generate(&env);
+        let attacker = Address::generate(&env);
+        let probe_token_id = env.register(ReentrantInitProbeToken, ());
+        let probe_token = ReentrantInitProbeTokenClient::new(&env, &probe_token_id);
+
+        let initial_policies =
+            soroban_sdk::vec![&env, custom_policy(&probe_token_id, 10, 200, 2_000, 500)];
+        let attacker_policies =
+            soroban_sdk::vec![&env, custom_policy(&probe_token_id, 1, 9_999, 9_999, 9_999)];
+        probe_token.configure(&contract_id, &attacker, &attacker_policies);
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &admin,
+                invoke: &MockAuthInvoke {
+                    contract: &contract_id,
+                    fn_name: "initialize",
+                    args: (admin.clone(), initial_policies.clone()).into_val(&env),
+                    sub_invokes: &[],
+                },
+            }])
+            .initialize(&admin, &initial_policies);
+
+        // Capture auths immediately after initialize before subsequent read calls overwrite env.auths().
+        let init_auths = env.auths();
+        assert_eq!(
+            init_auths,
+            std::vec![(
+                admin.clone(),
+                AuthorizedInvocation {
+                    function: AuthorizedFunction::Contract((
+                        contract_id.clone(),
+                        Symbol::new(&env, "initialize"),
+                        (admin.clone(), initial_policies.clone()).into_val(&env),
+                    )),
+                    sub_invocations: std::vec![],
+                }
+            )]
+        );
+
+        assert!(probe_token.reentry_attempted());
+        // Rejected either by contract AlreadyInitialized (1) or Soroban host reentrancy guard (2).
+        let reentry_code = probe_token.reentry_error_code();
+        assert!(
+            reentry_code == ContractError::AlreadyInitialized as u32 || reentry_code == 2,
+            "unexpected reentry outcome code: {reentry_code}"
+        );
+        // Original admin and policy state are intact.
+        assert_eq!(client.get_admin(), admin);
+        assert_eq!(client.get_asset_min_session_amount(&probe_token_id), 10);
+        assert_eq!(client.get_asset_max_session_amount(&probe_token_id), 200);
+        assert_eq!(client.get_asset_exposure_ceiling(&probe_token_id), 2_000);
+        assert_eq!(client.get_buyer_exposure_ceiling(&probe_token_id), 500);
+    }
+
+    #[test]
+    fn nested_cross_contract_initialization_replay_after_init_and_mutations_is_rejected() {
+        let env = Env::default();
+        env.mock_all_auths_allowing_non_root_auth();
+        let contract_id = env.register(UptoSessionContract, ());
+        let client = UptoSessionContractClient::new(&env, &contract_id);
+        let caller_id = env.register(NestedInitCaller, ());
+        let caller = NestedInitCallerClient::new(&env, &caller_id);
+
+        let admin = Address::generate(&env);
+        let rotated_admin = Address::generate(&env);
+        let attacker = Address::generate(&env);
+        let asset = create_test_asset(&env, &admin, 500);
+        let initial_policies = soroban_sdk::vec![&env, custom_policy(&asset, 5, 400, 4_000, 800)];
+
+        client.initialize(&admin, &initial_policies);
+        // Rotate admin, pause creation, and lower cap to ensure replay fails after state changes too.
+        client.propose_admin(&rotated_admin, &25);
+        client.accept_admin();
+        client.pause_creation();
+        client.set_asset_max_session_amount(&asset, &300);
+
+        let before = capture_state(&env, &contract_id, &client, &asset);
+
+        // Clear all mock auths: nested replay must fail before requiring any auth.
+        env.set_auths(&[]);
+        assert_eq!(
+            caller.replay_initialize(&contract_id, &attacker, &initial_policies),
+            ContractError::AlreadyInitialized as u32
+        );
+        assert!(env.auths().is_empty());
+        assert_eq!(contract_event_count(&env, &contract_id), 0);
+        assert_eq!(capture_state(&env, &contract_id, &client, &asset), before);
+        assert_eq!(client.get_admin(), rotated_admin);
+        assert_eq!(
+            client.get_configuration().operational_state,
+            OperationalState::Paused
+        );
+        assert_eq!(client.get_asset_max_session_amount(&asset), 300);
+    }
+
+    fn addr_to_strkey(addr: &Address) -> std::string::String {
+        let s = addr.to_string();
+        let mut buf = std::vec![0u8; s.len() as usize];
+        s.copy_into_slice(&mut buf);
+        std::string::String::from_utf8(buf).expect("valid utf8 strkey")
+    }
+
+    fn addr_from_strkey(env: &Env, strkey: &str) -> Address {
+        Address::from_string(&SorobanString::from_str(env, strkey))
+    }
+
+    #[test]
+    fn restored_ledger_snapshot_rejects_direct_and_nested_initialization_replay() {
+        let env = Env::default();
+        let contract_id = env.register(UptoSessionContract, ());
+        let caller_id = env.register(NestedInitCaller, ());
+        let client = UptoSessionContractClient::new(&env, &contract_id);
+        let admin = Address::generate(&env);
+        let asset = create_test_asset(&env, &admin, 500);
+        let initial_policies =
+            soroban_sdk::vec![&env, custom_policy(&asset, 15, 600, 6_000, 1_200)];
+
+        client
+            .mock_auths(&[MockAuth {
+                address: &admin,
+                invoke: &MockAuthInvoke {
+                    contract: &contract_id,
+                    fn_name: "initialize",
+                    args: (admin.clone(), initial_policies.clone()).into_val(&env),
+                    sub_invokes: &[],
+                },
+            }])
+            .initialize(&admin, &initial_policies);
+
+        let contract_str = addr_to_strkey(&contract_id);
+        let caller_str = addr_to_strkey(&caller_id);
+        let asset_str = addr_to_strkey(&asset);
+
+        // Advance ledger and capture full ledger snapshot, then restore into a fresh Env.
+        env.ledger()
+            .set_sequence_number(storage::DEFAULT_TTL_THRESHOLD + 50);
+        let snapshot = env.to_snapshot();
+
+        let restored_env = Env::from_snapshot(snapshot);
+        let restored_contract_id = addr_from_strkey(&restored_env, &contract_str);
+        let restored_caller_id = addr_from_strkey(&restored_env, &caller_str);
+        let restored_asset = addr_from_strkey(&restored_env, &asset_str);
+        let restored_attacker = Address::generate(&restored_env);
+        let restored_policies = soroban_sdk::vec![
+            &restored_env,
+            custom_policy(&restored_asset, 15, 600, 6_000, 1_200)
+        ];
+
+        restored_env.register_at(&restored_contract_id, UptoSessionContract, ());
+        restored_env.register_at(&restored_caller_id, NestedInitCaller, ());
+
+        let restored_client = UptoSessionContractClient::new(&restored_env, &restored_contract_id);
+        let restored_caller = NestedInitCallerClient::new(&restored_env, &restored_caller_id);
+
+        let before = capture_state(
+            &restored_env,
+            &restored_contract_id,
+            &restored_client,
+            &restored_asset,
+        );
+
+        // Direct replay on restored state fails closed with zero auths and zero events.
+        assert_eq!(
+            restored_client.try_initialize(&restored_attacker, &restored_policies),
+            Err(Ok(ContractError::AlreadyInitialized))
+        );
+        assert!(restored_env.auths().is_empty());
+        assert_eq!(
+            contract_event_count(&restored_env, &restored_contract_id),
+            0
+        );
+        assert_eq!(
+            capture_state(
+                &restored_env,
+                &restored_contract_id,
+                &restored_client,
+                &restored_asset,
+            ),
+            before
+        );
+
+        // Nested cross-contract replay on restored state also fails closed.
+        assert_eq!(
+            restored_caller.replay_initialize(
+                &restored_contract_id,
+                &restored_attacker,
+                &restored_policies,
+            ),
+            ContractError::AlreadyInitialized as u32
+        );
+        assert!(restored_env.auths().is_empty());
+        assert_eq!(
+            contract_event_count(&restored_env, &restored_contract_id),
+            0
+        );
+        assert_eq!(
+            capture_state(
+                &restored_env,
+                &restored_contract_id,
+                &restored_client,
+                &restored_asset,
+            ),
+            before
+        );
+    }
 }

@@ -1,51 +1,59 @@
 {
   "contractVersion": "0.3.0",
   "interfaceVersion": 3,
-  "sourceSpecSha256": "026dc59bcfe7c3993a8609b60250049d125371d8b5cca7b7b981aa580c044086",
-  "sourceSpecSha256": "f0e2a98a4ae7d396ad5ed2a87a4f13d28c9658f3ea7cc97b5b07ea47d355f674",
-  "sourceSpecSha256": "fc603a096025df811f1cb31384595dbf334a35353d7ff03e300447eaa8368bf1",
-  "sourceSpecSha256": "d70448072290cda266851becf600afd422353c6f31b3ff85bbaf7ce24dce0aee",
+  "sourceSpecSha256": "bf8580094cb6569779d5249d589e8a42e44e6812810af5168ad5eca425f8fa07",
   "methods": [
     "accept_admin",
     "accept_asset_cap_increase",
+    "activate_asset",
     "cancel",
     "cancel_admin_rotation",
     "cancel_asset_cap_increase",
     "create_session",
     "deprecate_asset",
+    "extend_session_expiry",
     "extend_ttl",
     "get_admin",
     "get_admin_rotation",
     "get_asset_cap_increase",
+    "get_asset_exposure_ceiling",
     "get_asset_max_session_amount",
     "get_asset_min_session_amount",
+    "get_asset_policy",
+    "get_asset_solvency",
+    "get_buyer_exposure",
+    "get_buyer_exposure_ceiling",
     "get_buyer_open_sessions",
     "get_commitment_domain_metadata",
     "get_configuration",
     "get_escrow_liability",
-    "get_recoverability",
     "get_max_buyer_open_sessions",
     "get_max_seller_open_sessions",
+    "get_recoverability",
     "get_seller_exposure",
     "get_seller_exposure_ceiling",
     "get_seller_open_sessions",
     "get_session",
     "get_session_batch",
-    "get_solvency",
     "get_session_status",
+    "get_solvency",
     "initialize",
     "interface_version",
-    "preview_settle",
+    "max_session_duration_ledgers",
     "pause_creation",
+    "preview_settle",
     "propose_admin",
     "propose_asset_cap_increase",
     "recover_expired",
     "recover_expired_batch",
-    "reject",
+    "recover_surplus",
     "reduce_session_cap",
+    "reject",
     "remove_asset",
     "resume_creation",
+    "set_asset_exposure_ceiling",
     "set_asset_max_session_amount",
+    "set_buyer_exposure_ceiling",
     "set_max_buyer_open_sessions",
     "set_max_seller_open_sessions",
     "set_seller_exposure_ceiling",
@@ -182,6 +190,44 @@
       ]
     },
     {
+      "name": "AssetExposureCeilingUpdated",
+      "prefixTopics": [
+        "asset_exposure_ceiling_updated"
+      ],
+      "fields": [
+        {
+          "name": "asset",
+          "location": "topic_list",
+          "type": "address"
+        },
+        {
+          "name": "admin",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "previous_ceiling",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "new_ceiling",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "current_liability",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "AssetRemoved",
       "prefixTopics": [
         "asset_removed"
@@ -236,6 +282,39 @@
         },
         {
           "name": "new_max_session_amount",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "BuyerExposureCeilingUpdated",
+      "prefixTopics": [
+        "buyer_exposure_ceiling_updated"
+      ],
+      "fields": [
+        {
+          "name": "asset",
+          "location": "topic_list",
+          "type": "address"
+        },
+        {
+          "name": "admin",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "previous_ceiling",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "new_ceiling",
           "location": "data",
           "type": "i128"
         },
@@ -583,6 +662,48 @@
       ]
     },
     {
+      "name": "SessionExpiryExtended",
+      "prefixTopics": [
+        "session_expiry_extended"
+      ],
+      "fields": [
+        {
+          "name": "session_id",
+          "location": "topic_list",
+          "type": {
+            "bytes_n": {
+              "n": 32
+            }
+          }
+        },
+        {
+          "name": "buyer",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "seller",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "previous_expires_at_ledger",
+          "location": "data",
+          "type": "u32"
+        },
+        {
+          "name": "new_expires_at_ledger",
+          "location": "data",
+          "type": "u32"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
+        }
+      ]
+    },
+    {
       "name": "SessionRecovered",
       "prefixTopics": [
         "session_recovered"
@@ -719,6 +840,34 @@
           "name": "refunded_amount",
           "location": "data",
           "type": "i128"
+        }
+      ]
+    },
+    {
+      "name": "SurplusRecovered",
+      "prefixTopics": [
+        "surplus_recovered"
+      ],
+      "fields": [
+        {
+          "name": "asset",
+          "location": "topic_list",
+          "type": "address"
+        },
+        {
+          "name": "recipient",
+          "location": "data",
+          "type": "address"
+        },
+        {
+          "name": "amount",
+          "location": "data",
+          "type": "i128"
+        },
+        {
+          "name": "event_version",
+          "location": "data",
+          "type": "u32"
         }
       ]
     }
@@ -865,8 +1014,14 @@
       "value": 35
     },
     {
-      "name": "SessionRejected",
+      "name": "CreationPaused",
       "value": 36
+    },
+    {
+      "name": "OperationalStateUnchanged",
+      "value": 37
+    },
+    {
       "name": "CapIncreasePending",
       "value": 38
     },
@@ -915,12 +1070,48 @@
       "value": 49
     },
     {
-      "name": "CreationPaused",
-      "value": 36
+      "name": "SessionRejected",
+      "value": 50
     },
     {
-      "name": "OperationalStateUnchanged",
-      "value": 37
+      "name": "AssetAlreadyActive",
+      "value": 51
+    },
+    {
+      "name": "AssetDeprecated",
+      "value": 52
+    },
+    {
+      "name": "AssetLimitReached",
+      "value": 53
+    },
+    {
+      "name": "AssetExposureCeilingExceeded",
+      "value": 54
+    },
+    {
+      "name": "InvalidExposureCeiling",
+      "value": 55
+    },
+    {
+      "name": "ExposureCeilingNotConfigured",
+      "value": 56
+    },
+    {
+      "name": "BuyerExposureCeilingExceeded",
+      "value": 57
+    },
+    {
+      "name": "BuyerExposureUnderflow",
+      "value": 58
+    },
+    {
+      "name": "SequenceExhausted",
+      "value": 59
+    },
+    {
+      "name": "IdempotencyConflict",
+      "value": 60
     }
   ]
 }

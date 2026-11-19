@@ -61,6 +61,7 @@ const rootTsPreimage = deriveSessionIdPreimage({
   expiresAtLedger: vector.sessionId.expiresAtLedger,
   resourceHash: vector.sessionId.resourceHashHex,
   sequence: vector.sessionId.sequence,
+  idempotencyKey: vector.sessionId.idempotencyKeyHex,
 });
 if (rootTsPreimage.toString("hex") !== vector.sessionId.preimageXdrHex) {
   throw new Error("TypeScript root preimage does not match JSON artifact");
@@ -75,6 +76,7 @@ const rootTsId = deriveSessionId({
   expiresAtLedger: vector.sessionId.expiresAtLedger,
   resourceHash: vector.sessionId.resourceHashHex,
   sequence: vector.sessionId.sequence,
+  idempotencyKey: vector.sessionId.idempotencyKeyHex,
 });
 if (rootTsId !== vector.sessionId.sha256) {
   throw new Error("TypeScript root session ID does not match JSON artifact");
@@ -115,6 +117,7 @@ for (const fixture of vector.vectors) {
     expiresAtLedger: fixture.expiresAtLedger,
     resourceHash: fixture.resourceHashHex,
     sequence: fixture.sequence,
+    idempotencyKey: fixture.idempotencyKeyHex,
   };
 
   const tsPreimage = deriveSessionIdPreimage(input);
@@ -139,6 +142,7 @@ const baseInput = {
   expiresAtLedger: 5067600,
   resourceHash: "0909090909090909090909090909090909090909090909090909090909090909",
   sequence: "7",
+  idempotencyKey: "0808080808080808080808080808080808080808080808080808080808080808",
   interfaceVersion: 3,
 };
 const baseId = deriveSessionId(baseInput);

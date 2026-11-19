@@ -1,16 +1,26 @@
 import { join } from "node:path";
 import {
+  DEFAULT_RPC_RETRY_POLICY,
   hasFlag,
   invokeContract,
   readManifest,
   repoRoot,
+  resolveExpectedNetworkIdentity,
   sourceAccount,
+  verifyNetworkPassphraseSync,
 } from "../lib/stellar-cli.mjs";
 
 const dryRun = hasFlag("--dry-run");
 const source = sourceAccount();
+const network = process.env.STELLAR_NETWORK || "local";
 const manifest = readManifest(join(repoRoot, "deployments", "local.json"));
 const contracts = manifest.contracts || {};
+
+if (!dryRun) {
+  verifyNetworkPassphraseSync({ network });
+} else {
+  resolveExpectedNetworkIdentity(network);
+}
 
 const admin = process.env.LUMENBAZAAR_ADMIN || source;
 const tokenAdmin = process.env.LUMENBAZAAR_TEST_TOKEN_ADMIN || admin;
@@ -45,15 +55,16 @@ const policyWalletContract =
 invokeContract({
   contractId: testTokenContract,
   source: tokenAdmin,
-  network: "local",
+  network,
   args: ["initialize", "--admin", tokenAdmin],
   dryRun,
+  timeoutMs: DEFAULT_RPC_RETRY_POLICY.attemptTimeoutMs,
 });
 
 invokeContract({
   contractId: uptoSessionContract,
   source: admin,
-  network: "local",
+  network,
   args: [
     "initialize",
     "--admin",
@@ -69,12 +80,13 @@ invokeContract({
     ]),
   ],
   dryRun,
+  timeoutMs: DEFAULT_RPC_RETRY_POLICY.attemptTimeoutMs,
 });
 
 invokeContract({
   contractId: policyWalletContract,
   source: policyOwner,
-  network: "local",
+  network,
   args: [
     "initialize",
     "--owner",
@@ -83,4 +95,5 @@ invokeContract({
     uptoSessionContract,
   ],
   dryRun,
+  timeoutMs: DEFAULT_RPC_RETRY_POLICY.attemptTimeoutMs,
 });

@@ -4,8 +4,15 @@
 // rejected calls that must be recorded on ledger, and WASM uploads the CLI skips as already installed.
 import { execFileSync, spawnSync } from "node:child_process";
 
-import { fetchReceipt, rpcCall, writeReceipt } from "./network-receipts.mjs";
-import { repoRoot, sanitizeCliOutput } from "./stellar-cli.mjs";
+import { fetchReceipt, rpcCall, verifyTestnetNetwork, writeReceipt } from "./network-receipts.mjs";
+import {
+  DEFAULT_RPC_RETRY_POLICY,
+  classifyRpcError,
+  repoRoot,
+  sanitizeCliOutput,
+  submitTransactionWithRetry,
+  verifyNetworkPassphraseSync,
+} from "./stellar-cli.mjs";
 
 export async function simulate(xdr) {
   return rpcCall("simulateTransaction", { transaction: xdr });
@@ -27,26 +34,76 @@ export function assembleTransaction(xdr, simulation, { includeAuth = false, reda
   return stellar(["tx", "encode", "--input", "json"], JSON.stringify(transaction), redact);
 }
 
-export function signTransaction(xdr, identity) {
-  return stellar(["tx", "sign", "--sign-with-key", identity, "--network", "testnet"], xdr, [identity]);
+export function signTransaction(
+  xdr,
+  identity,
+  { network = "testnet", expectedPassphrase, actualPassphrase, resolveNetwork } = {},
+) {
+  if (
+    expectedPassphrase !== undefined ||
+    actualPassphrase !== undefined ||
+    typeof resolveNetwork === "function"
+  ) {
+    verifyNetworkPassphraseSync({
+      network,
+      expectedPassphrase,
+      actualPassphrase,
+      resolveNetwork,
+    });
+  }
+  return stellar(["tx", "sign", "--sign-with-key", identity, "--network", network], xdr, [identity]);
 }
 
 // Sends a signed envelope and returns its network receipt. The signed envelope is never written to
 // disk or logs; only the receipt's public fields are kept.
-export async function submitSigned(signed, { redact = [] } = {}) {
-  const transactionHash = stellar(["tx", "hash", "--network", "testnet"], signed, redact);
-  const sent = spawnSync("stellar", ["tx", "send", "--network", "testnet"], {
-    cwd: repoRoot,
-    encoding: "utf8",
-    input: signed,
+export async function submitSigned(signed, { redact = [], network = "testnet", retryPolicy } = {}) {
+  const computeHash = (envelope) => stellar(["tx", "hash", "--network", network], envelope, redact);
+  const transactionHash = computeHash(signed);
+  let lastStderr = "";
+  let sentStatus = 0;
+
+  await submitTransactionWithRetry({
+    signedXdr: signed,
+    expectedTransactionHash: transactionHash,
+    computeTransactionHash: computeHash,
+    retryPolicy,
+    checkTransactionStatus: async (hash, { timeoutMs }) => {
+      try {
+        return await rpcCall("getTransaction", { hash }, { timeoutMs });
+      } catch {
+        return { status: "NOT_FOUND" };
+      }
+    },
+    sendTransaction: async ({ signedXdr, timeoutMs }) => {
+      const sent = spawnSync("stellar", ["tx", "send", "--network", network], {
+        cwd: repoRoot,
+        encoding: "utf8",
+        input: signedXdr,
+        timeout: timeoutMs ?? DEFAULT_RPC_RETRY_POLICY.attemptTimeoutMs,
+      });
+      sentStatus = sent.status ?? 1;
+      lastStderr = sent.stderr ?? sent.error?.message ?? "";
+      if (sent.error || sentStatus !== 0) {
+        const err = new Error(sanitizeCliOutput(lastStderr, redact));
+        err.stderr = lastStderr;
+        err.code = sent.error?.code;
+        // Only retry if the send failure is explicitly classified as transient RPC/transport.
+        // On-ledger or contract failures are terminal and proceed to receipt fetching.
+        if (classifyRpcError(err).retryable) {
+          throw err;
+        }
+      }
+      return { transactionHash, status: sentStatus };
+    },
   });
+
   // A transaction that fails on ledger can make `tx send` exit non-zero; the receipt is authoritative.
   let receipt;
   try {
-    receipt = await fetchReceipt(transactionHash, { timeoutMs: sent.status === 0 ? 120_000 : 30_000 });
+    receipt = await fetchReceipt(transactionHash, { timeoutMs: sentStatus === 0 ? 120_000 : 30_000 });
   } catch (error) {
     // Preserve timeout/expiry evidence. A CLI exit code cannot establish finality.
-    error.message = `${sanitizeCliOutput(error.message, redact)}; CLI context: ${sanitizeCliOutput(sent.stderr ?? "", redact)}`;
+    error.message = `${sanitizeCliOutput(error.message, redact)}; CLI context: ${sanitizeCliOutput(lastStderr, redact)}`;
     throw error;
   }
   writeReceipt(receipt);
@@ -54,6 +111,7 @@ export async function submitSigned(signed, { redact = [] } = {}) {
 }
 
 export async function buildSimulateAndSubmit(buildArgs, identity, { includeAuth = true } = {}) {
+  await verifyTestnetNetwork();
   const xdr = stellar(buildArgs, undefined, [identity]);
   const simulation = await simulate(xdr);
   const signed = signTransaction(assembleTransaction(xdr, simulation, { includeAuth, redact: [identity] }), identity);
