@@ -65,6 +65,8 @@ impl Escrow {
                     asset: asset.clone(),
                     max_session_amount: i128::MAX,
                     min_session_amount: 1,
+                    max_asset_exposure: i128::MAX,
+                    max_buyer_exposure: i128::MAX,
                 },
             ],
         );
@@ -175,6 +177,7 @@ pub fn create(data: &[u8]) {
             amount.into_val(env),
             expires.into_val(env),
             wrong_length_bytes(env, raw[0]).into_val(env),
+            resource.into_val(env),
         ];
         h.invoke_raw_rejected("create_session", args);
         assert_eq!(h.observe(), before, "rejected create changed state");
@@ -189,10 +192,9 @@ pub fn create(data: &[u8]) {
         && expires - ledger <= MAX_SESSION_DURATION_LEDGERS
         && resource != BytesN::from_array(env, &[0; 32])
         && asset == h.asset;
-    let result = defined(
-        h.client()
-            .try_create_session(&buyer, &seller, &asset, &amount, &expires, &resource),
-    );
+    let result = defined(h.client().try_create_session(
+        &buyer, &seller, &asset, &amount, &expires, &resource, &resource,
+    ));
     match (result, valid) {
         (Ok(id), true) => {
             let session = h.session(&id).expect("created session is readable");
@@ -244,6 +246,7 @@ pub fn settle(data: &[u8]) {
         &h.asset,
         &cap,
         &expiry,
+        &BytesN::from_array(env, &[7; 32]),
         &BytesN::from_array(env, &[7; 32]),
     );
     let state = input.u8(17) % 5;

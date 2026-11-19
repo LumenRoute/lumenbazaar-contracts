@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { recordReceipt, requireTestnet } from "../lib/network-receipts.mjs";
+import { recordReceipt, requireTestnet, verifyTestnetNetwork } from "../lib/network-receipts.mjs";
 import { buildSimulateAndSubmit } from "../lib/soroban-transactions.mjs";
 import {
   buildContracts,
@@ -42,7 +42,10 @@ const selected = selectContracts();
 
 if (!dryRun) {
   requireTestnet();
+  await verifyTestnetNetwork();
   requireCleanContractSources();
+} else {
+  requireTestnet();
 }
 
 buildContracts({ dryRun });

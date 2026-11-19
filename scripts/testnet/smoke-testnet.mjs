@@ -12,7 +12,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { latestLedger, recordReceipt, requireTestnet, waitForLedger } from "../lib/network-receipts.mjs";
+import {
+  latestLedger,
+  recordReceipt,
+  requireTestnet,
+  verifyTestnetNetwork,
+  waitForLedger,
+} from "../lib/network-receipts.mjs";
 import {
   assembleTransaction,
   signTransaction,
@@ -68,6 +74,8 @@ if (hasFlag("--dry-run")) {
   console.log(`dry run: would exercise ${contractId} with token ${asset.contractId}; no transaction submitted`);
   process.exit(0);
 }
+
+await verifyTestnetNetwork();
 
 await setup("mint_test_tokens", null, () =>
   invoke(asset.contractId, identities.admin, ["mint", "--to", actors.buyer, "--amount", "100000000"]),

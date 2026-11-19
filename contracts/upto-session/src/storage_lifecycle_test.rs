@@ -67,6 +67,11 @@ impl Lifecycle {
     }
 
     fn create(&self, expires_at_ledger: u32) -> BytesN<32> {
+        let seq = self.env.as_contract(&self.contract_id, || {
+            storage::read_next_session_sequence(&self.env)
+        });
+        let mut key = [7u8; 32];
+        key[..8].copy_from_slice(&seq.to_be_bytes());
         self.client().create_session(
             &self.buyer,
             &self.seller,
@@ -74,6 +79,7 @@ impl Lifecycle {
             &CAP,
             &expires_at_ledger,
             &BytesN::from_array(&self.env, &[7; 32]),
+            &BytesN::from_array(&self.env, &key),
         )
     }
 
@@ -463,6 +469,7 @@ fn sr9_missing_instance_config_blocks_creation_and_admin_but_not_exits() {
             &CAP,
             &EXPIRY,
             &BytesN::from_array(&h.env, &[7; 32]),
+            &BytesN::from_array(&h.env, &[7; 32]),
         ),
         Err(Ok(ContractError::NotInitialized))
     );
@@ -482,7 +489,9 @@ fn sr9_missing_instance_config_blocks_creation_and_admin_but_not_exits() {
     // Existing escrow can still leave through the session's own record.
     client.cancel(&cancelled);
     client.settle(&settled, &CAP, &h.usage_hash());
-    assert_eq!(client.get_escrow_liability(&h.asset), 0);
+    h.env.as_contract(&h.contract_id, || {
+        assert_eq!(storage::read_liability(&h.env, &h.asset), 0);
+    });
 }
 
 #[test]

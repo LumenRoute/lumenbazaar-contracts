@@ -1,5 +1,7 @@
 import { join, resolve } from "node:path";
+import { verifyTestnetNetwork } from "../lib/network-receipts.mjs";
 import {
+  DEFAULT_RPC_RETRY_POLICY,
   hasFlag,
   networkArgs,
   readManifest,
@@ -8,6 +10,9 @@ import {
 } from "../lib/stellar-cli.mjs";
 
 const dryRun = hasFlag("--dry-run");
+if (!dryRun) {
+  await verifyTestnetNetwork();
+}
 const manifestPath = process.env.LUMENBAZAAR_DEPLOYMENT_MANIFEST
   ? resolve(repoRoot, process.env.LUMENBAZAAR_DEPLOYMENT_MANIFEST)
   : join(repoRoot, "deployments", "testnet.json");
@@ -36,7 +41,7 @@ for (const name of deployed) {
 
   const liveHash = runStellar(
     ["contract", "info", "hash", "--id", contractId, ...networkArgs("testnet")],
-    { capture: true, dryRun },
+    { capture: true, dryRun, timeoutMs: DEFAULT_RPC_RETRY_POLICY.attemptTimeoutMs },
   );
   const localHash = runStellar(
     ["contract", "info", "hash", "--wasm", wasmPaths[name]],

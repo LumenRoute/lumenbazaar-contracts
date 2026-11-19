@@ -57,6 +57,11 @@ impl Harness {
     }
 
     fn create(&self, expires_at_ledger: u32) -> BytesN<32> {
+        let seq = self.env.as_contract(&self.contract_id, || {
+            storage::read_next_session_sequence(&self.env)
+        });
+        let mut key = [7u8; 32];
+        key[..8].copy_from_slice(&seq.to_be_bytes());
         self.client().create_session(
             &self.buyer,
             &self.seller,
@@ -64,6 +69,7 @@ impl Harness {
             &CAP,
             &expires_at_ledger,
             &BytesN::from_array(&self.env, &[7; 32]),
+            &BytesN::from_array(&self.env, &key),
         )
     }
 
@@ -171,17 +177,17 @@ fn instance_ttl_extension_boundary_is_exact_for_config_changes() {
     // One ledger above the threshold: the admin call must not extend.
     harness.ledger(AT_THRESHOLD - 1);
     assert_eq!(harness.instance_ttl(), DEFAULT_TTL_THRESHOLD + 1);
-    client.set_asset_max_session_amount(&harness.asset, &(CAP * 2));
+    client.set_asset_max_session_amount(&harness.asset, &(CAP * 3));
     assert_eq!(harness.instance_ttl(), DEFAULT_TTL_THRESHOLD + 1);
 
     // Exactly at the threshold: the same call extends to the full amount.
     harness.ledger(AT_THRESHOLD);
     assert_eq!(harness.instance_ttl(), DEFAULT_TTL_THRESHOLD);
-    client.set_asset_max_session_amount(&harness.asset, &(CAP * 3));
+    client.set_asset_max_session_amount(&harness.asset, &(CAP * 2));
     assert_eq!(harness.instance_ttl(), TTL_EXTENSION_AMOUNT);
     assert_eq!(
         client.get_asset_max_session_amount(&harness.asset),
-        CAP * 3
+        CAP * 2
     );
 }
 
@@ -499,6 +505,7 @@ fn lapsed_instance_config_fails_closed_for_admin_and_new_sessions_only() {
             &CAP,
             &SESSION_EXPIRY,
             &BytesN::from_array(&harness.env, &[9; 32]),
+            &BytesN::from_array(&harness.env, &[9; 32]),
         ),
         Err(Ok(ContractError::NotInitialized))
     );
@@ -556,6 +563,8 @@ fn creation_and_rotation_expiry_windows_have_exact_bounds() {
     harness.ledger(1_000);
     let hash = BytesN::from_array(&harness.env, &[9; 32]);
     let create = |expires_at_ledger: u32| {
+        let mut key = [9u8; 32];
+        key[..4].copy_from_slice(&expires_at_ledger.to_be_bytes());
         client.try_create_session(
             &harness.buyer,
             &harness.seller,
@@ -563,6 +572,7 @@ fn creation_and_rotation_expiry_windows_have_exact_bounds() {
             &1,
             &expires_at_ledger,
             &hash,
+            &BytesN::from_array(&harness.env, &key),
         )
     };
 

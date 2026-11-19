@@ -27,6 +27,22 @@ For testnet:
 
 Validate committed public evidence with `node scripts/check-deployment-evidence.mjs`.
 
+## Pre-signing network passphrase verification
+
+Before constructing, authorizing, or signing any deployment or initialization transaction, scripts
+resolve the target network's passphrase and compare both the exact passphrase string and its SHA-256
+network ID against the expected identity (`scripts/lib/stellar-cli.mjs`).
+
+- Known aliases have canonical expected passphrases:
+  - `testnet`: `Test SDF Network ; September 2015`
+  - `local` / `standalone`: `Standalone Network ; February 2017`
+  - `futurenet`: `Test SDF Future Network ; October 2022`
+  - `mainnet`: `Public Global Stellar Network ; September 2015`
+- Custom network aliases require an explicit expected passphrase via `STELLAR_NETWORK_PASSPHRASE`
+  or `LUMENBAZAAR_EXPECTED_NETWORK_PASSPHRASE`.
+- Identity is never inferred from RPC hostnames or URLs, and signing material is never logged. Any
+  passphrase or network-ID mismatch aborts before account authorization or submission.
+
 ## Generating public manifests
 
 The deploy and initialize scripts record every transaction hash in the ignored

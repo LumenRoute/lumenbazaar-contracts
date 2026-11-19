@@ -191,6 +191,7 @@ fn attempt_callback(env: &Env) -> Result<(), ReentryTokenError> {
                     env.current_contract_address(),
                     amount,
                     expires_at,
+                    resource_hash.clone(),
                     resource_hash,
                 )
                     .into_val(env),

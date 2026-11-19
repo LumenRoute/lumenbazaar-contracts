@@ -135,6 +135,7 @@ fn create_session(
                     input.cap,
                     EXPIRY_LEDGER,
                     input.resource_hash.clone(),
+                    input.resource_hash.clone(),
                 )
                     .into_val(env),
                 sub_invokes: &[MockAuthInvoke {
@@ -156,6 +157,7 @@ fn create_session(
             input.asset,
             &input.cap,
             &EXPIRY_LEDGER,
+            input.resource_hash,
             input.resource_hash,
         )
 }

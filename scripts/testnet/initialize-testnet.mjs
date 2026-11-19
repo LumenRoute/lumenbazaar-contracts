@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { recordReceipt, requireTestnet } from "../lib/network-receipts.mjs";
+import { recordReceipt, requireTestnet, verifyTestnetNetwork } from "../lib/network-receipts.mjs";
 import {
   hasFlag,
   invokeContractTransaction,
@@ -17,6 +17,9 @@ const manifest = readManifest(manifestPath);
 const contracts = manifest.contracts || {};
 
 if (!dryRun) {
+  requireTestnet();
+  await verifyTestnetNetwork();
+} else {
   requireTestnet();
 }
 

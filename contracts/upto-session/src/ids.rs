@@ -503,6 +503,13 @@ mod tests {
                 .parse()
                 .expect("valid u64");
 
+            let mut idempotency_bytes = [8u8; 32];
+            if let Some(idempotency_hex) = vec["idempotencyKeyHex"].as_str() {
+                hex::decode_to_slice(idempotency_hex, &mut idempotency_bytes)
+                    .expect("valid idempotency key hex");
+            }
+            let idempotency_key = BytesN::from_array(&env, &idempotency_bytes);
+
             let input = SessionIdInput {
                 buyer: &buyer,
                 seller: &seller,
@@ -511,6 +518,7 @@ mod tests {
                 expires_at_ledger,
                 resource_hash: &resource_hash,
                 sequence,
+                idempotency_key: &idempotency_key,
             };
 
             env.register_at(&contract, crate::UptoSessionContract, ());

@@ -8,6 +8,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   assertErrorMapMatchesFixture,
   diffErrorMaps,
@@ -17,9 +18,10 @@ import {
 const bindings = await import("../bindings/upto-session/dist/index.js");
 const { CONTRACT_ERROR_CODES, CONTRACT_ERROR_NAMES, decodeContractError, isContractError } =
   bindings;
-const templatePath = new URL("./templates/contractErrors.ts", import.meta.url).pathname;
-const fixturePath = new URL("../artifacts/interface/upto-session-v3.json", import.meta.url)
-  .pathname;
+const templatePath = fileURLToPath(new URL("./templates/contractErrors.ts", import.meta.url));
+const fixturePath = fileURLToPath(
+  new URL("../artifacts/interface/upto-session-v3.json", import.meta.url),
+);
 const fixture = JSON.parse(readFileSync(fixturePath, "utf8"));
 
 test("every frozen contract error code has exactly one typed name", () => {
@@ -43,7 +45,7 @@ test("decodes host contract errors from simulation and transaction text", () => 
   });
 
   const thrown = new Error(
-    'Transaction simulation failed: "HostError: Error(Contract, #38)"',
+    'Transaction simulation failed: "HostError: Error(Contract, #53)"',
   );
   const decoded = decodeContractError(thrown);
   assert.equal(decoded.kind, "contract");
@@ -68,12 +70,12 @@ test("decodes RPC simulation responses and nested causes", () => {
 });
 
 test("decodes the binding's Result error values", () => {
-  const err = new bindings.contract.Err(bindings.ContractError[37]);
+  const err = new bindings.contract.Err(bindings.ContractError[52]);
   const decoded = decodeContractError(err);
   assert.equal(decoded.kind, "contract");
-  assert.equal(decoded.code, 37);
+  assert.equal(decoded.code, 52);
   assert.equal(decoded.name, "AssetDeprecated");
-  assert.equal(decodeContractError({ message: "AssetAlreadyActive" }).code, 36);
+  assert.equal(decodeContractError({ message: "AssetAlreadyActive" }).code, 51);
 });
 
 test("keeps unknown and malformed contract errors distinguishable", () => {
@@ -155,10 +157,10 @@ test("binding generation fails when the error map drifts", () => {
   const drifted = join(dir, "contractErrors.ts");
   writeFileSync(
     drifted,
-    readFileSync(templatePath, "utf8").replace("  AssetLimitReached: 38,\n", ""),
+    readFileSync(templatePath, "utf8").replace("  AssetLimitReached: 53,\n", ""),
   );
   assert.throws(
     () => assertErrorMapMatchesFixture(drifted, fixturePath),
-    /drifted[\s\S]*missing AssetLimitReached=38/,
+    /drifted[\s\S]*missing AssetLimitReached=53/,
   );
 });
