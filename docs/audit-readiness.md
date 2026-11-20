@@ -114,6 +114,11 @@ Primary evidence:
 - `artifacts/resource-usage/upto-session.md`
 - `docs/backend-integration-handoff.md`
 - `docs/release-toolchain.md`
+- `audits/dependency-feature-allowlist.json`
+- `artifacts/audit-readiness/wasm-allowlist-upto-session.json`
+- `artifacts/audit-readiness/wasm-allowlist-policy-wallet-example.json`
+- `artifacts/audit-readiness/wasm-allowlist-test-token.json`
+- `artifacts/coverage/thresholds.json`
 - `deployments/testnet-2026-10-07.json`
 - `artifacts/testnet/lifecycle-2026-10-07.json`
 

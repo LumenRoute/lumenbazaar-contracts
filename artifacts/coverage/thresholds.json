@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "description": "Initial reviewed native production coverage minimums. Excludes test modules, fixtures, generated bindings, and fuzz harnesses; WASM release builds are never instrumented.",
+  "contracts": {
+    "upto-session": {
+      "minLinePercent": 80,
+      "minBranchPercent": 70
+    },
+    "policy-wallet-example": {
+      "minLinePercent": 80,
+      "minBranchPercent": 70
+    },
+    "test-token": {
+      "minLinePercent": 80,
+      "minBranchPercent": 70
+    },
+    "escrow-model": {
+      "minLinePercent": 80,
+      "minBranchPercent": 70
+    }
+  },
+  "criticalModules": {
+    "contracts/upto-session/src/lib.rs": {
+      "minLinePercent": 80,
+      "minBranchPercent": 70,
+      "rationale": "Core escrow, authorization, and terminal transition entrypoints."
+    },
+    "contracts/upto-session/src/validation.rs": {
+      "minLinePercent": 85,
+      "minBranchPercent": 75,
+      "rationale": "Guards amount caps, exposure ceilings, expiry bounds, and asset probes."
+    },
+    "contracts/upto-session/src/storage.rs": {
+      "minLinePercent": 80,
+      "minBranchPercent": 70,
+      "rationale": "Enforces checked liability arithmetic, session persistence, and TTL extensions."
+    },
+    "contracts/upto-session/src/ids.rs": {
+      "minLinePercent": 85,
+      "minBranchPercent": 75,
+      "rationale": "Derives domain-separated session IDs and usage/terminal evidence digests."
+    },
+    "contracts/policy-wallet-example/src/lib.rs": {
+      "minLinePercent": 80,
+      "minBranchPercent": 70,
+      "rationale": "Enforces spending policy ceilings, daily limits, and owner rotation."
+    },
+    "formal/escrow-model/src/lib.rs": {
+      "minLinePercent": 80,
+      "minBranchPercent": 70,
+      "rationale": "Exhaustive state-machine model checking of escrow invariants."
+    }
+  }
+}

@@ -83,8 +83,15 @@ fn fixture() -> Fixture {
 }
 
 fn open(f: &Fixture, buyer: &Address, asset: &Address, amount: i128, salt: u8) -> BytesN<32> {
-    f.client
-        .create_session(buyer, &f.seller, asset, &amount, &50, &hash(&f.env, salt))
+    f.client.create_session(
+        buyer,
+        &f.seller,
+        asset,
+        &amount,
+        &50,
+        &hash(&f.env, salt),
+        &hash(&f.env, salt.wrapping_add(100)),
+    )
 }
 
 fn try_open(
@@ -94,10 +101,15 @@ fn try_open(
     amount: i128,
     salt: u8,
 ) -> Result<BytesN<32>, ContractError> {
-    match f
-        .client
-        .try_create_session(buyer, &f.seller, asset, &amount, &50, &hash(&f.env, salt))
-    {
+    match f.client.try_create_session(
+        buyer,
+        &f.seller,
+        asset,
+        &amount,
+        &50,
+        &hash(&f.env, salt),
+        &hash(&f.env, salt.wrapping_add(150)),
+    ) {
         Ok(Ok(id)) => Ok(id),
         Err(Ok(error)) => Err(error),
         other => panic!("unexpected create result: {other:?}"),
@@ -231,14 +243,56 @@ fn asset_ceiling_is_exact_and_checked_before_authorization_or_transfer() {
     let asset = mint_asset(&env, &[(&buyer, 1_000)]);
     env.mock_all_auths_allowing_non_root_auth();
     client.initialize(&admin, &vec![&env, policy(&asset, 300, 300, 1_000)]);
-    client.create_session(&buyer, &seller, &asset, &100, &50, &hash(&env, 1));
-    client.create_session(&buyer, &seller, &asset, &200, &50, &hash(&env, 2));
+    client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &100,
+        &50,
+        &hash(&env, 1),
+        &BytesN::from_array(
+            &env,
+            &[
+                0, 131, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 1,
+            ],
+        ),
+    );
+    client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &50,
+        &hash(&env, 2),
+        &BytesN::from_array(
+            &env,
+            &[
+                0, 132, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 1,
+            ],
+        ),
+    );
     assert_eq!(client.get_escrow_liability(&asset), 300);
 
     // No authorization is supplied: the ceiling must reject first.
     env.set_auths(&[]);
     assert_eq!(
-        client.try_create_session(&buyer, &seller, &asset, &1, &50, &hash(&env, 3)),
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &asset,
+            &1,
+            &50,
+            &hash(&env, 3),
+            &BytesN::from_array(
+                &env,
+                &[
+                    0, 133, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 1
+                ]
+            )
+        ),
         Err(Ok(ContractError::AssetExposureCeilingExceeded))
     );
     let token = token::Client::new(&env, &asset);
@@ -391,7 +445,8 @@ fn deprecated_assets_reject_creation_but_still_release_capacity() {
     f.client
         .initialize(&f.admin, &vec![&f.env, policy(&asset, 500, 500, 500)]);
     let session = open(&f, &buyer, &asset, 200, 1);
-    f.client.deprecate_asset(&asset);
+    f.client
+        .deprecate_asset(&asset, &BytesN::from_array(&f.env, &[0x5a; 32]));
     assert_eq!(
         try_open(&f, &buyer, &asset, 1, 2),
         Err(ContractError::UnsupportedAsset)
@@ -402,7 +457,8 @@ fn deprecated_assets_reject_creation_but_still_release_capacity() {
     f.env.as_contract(&f.contract_id, || {
         assert_eq!(storage::read_liability(&f.env, &asset), 0);
     });
-    f.client.remove_asset(&asset);
+    f.client
+        .remove_asset(&asset, &BytesN::from_array(&f.env, &[0x5a; 32]));
     assert_eq!(
         f.client.try_get_buyer_exposure(&buyer, &asset),
         Err(Ok(ContractError::UnsupportedAsset))
@@ -458,11 +514,39 @@ fn buyer_ceiling_is_checked_before_buyer_authorization() {
     let asset = mint_asset(&env, &[(&buyer, 1_000)]);
     env.mock_all_auths_allowing_non_root_auth();
     client.initialize(&admin, &vec![&env, policy(&asset, 500, 1_000, 200)]);
-    client.create_session(&buyer, &seller, &asset, &200, &50, &hash(&env, 1));
+    client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &50,
+        &hash(&env, 1),
+        &BytesN::from_array(
+            &env,
+            &[
+                0, 134, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 1,
+            ],
+        ),
+    );
 
     env.set_auths(&[]);
     assert_eq!(
-        client.try_create_session(&buyer, &seller, &asset, &1, &50, &hash(&env, 2)),
+        client.try_create_session(
+            &buyer,
+            &seller,
+            &asset,
+            &1,
+            &50,
+            &hash(&env, 2),
+            &BytesN::from_array(
+                &env,
+                &[
+                    0, 135, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 1
+                ]
+            )
+        ),
         Err(Ok(ContractError::BuyerExposureCeilingExceeded))
     );
     assert_eq!(token::Client::new(&env, &asset).balance(&buyer), 800);
@@ -764,7 +848,8 @@ fn solvency_is_read_only_authorization_free_and_covers_deprecated_assets() {
     f.client
         .initialize(&f.admin, &vec![&f.env, policy(&asset, 100, 100, 100)]);
     let session = open(&f, &buyer, &asset, 100, 1);
-    f.client.deprecate_asset(&asset);
+    f.client
+        .deprecate_asset(&asset, &BytesN::from_array(&f.env, &[0x5a; 32]));
 
     f.env.set_auths(&[]);
     let first = snapshot(&f, &asset);
@@ -782,7 +867,8 @@ fn solvency_is_read_only_authorization_free_and_covers_deprecated_assets() {
 
     f.env.mock_all_auths_allowing_non_root_auth();
     f.client.cancel(&session);
-    f.client.remove_asset(&asset);
+    f.client
+        .remove_asset(&asset, &BytesN::from_array(&f.env, &[0x5a; 32]));
     assert_eq!(
         f.client.try_get_asset_solvency(&asset),
         Err(Ok(ContractError::UnsupportedAsset))

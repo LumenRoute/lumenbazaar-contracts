@@ -53,6 +53,8 @@ fn initialized_contract<'a>(
             asset: asset.clone(),
             max_session_amount: cap,
             min_session_amount: 1,
+            max_asset_exposure: i128::MAX,
+            max_buyer_exposure: i128::MAX,
         }
     ];
     client
@@ -105,7 +107,7 @@ fn create_with_buyer_auth(
                 }],
             },
         }])
-        .create_session(buyer, seller, asset, &cap, &expires, resource_hash)
+        .create_session(buyer, seller, asset, &cap, &expires, resource_hash, &BytesN::from_array(env, &[0, 141, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]))
 }
 
 /// Settle a session using an explicit seller authorization tree.
@@ -171,7 +173,7 @@ fn mutation_buyer_auth_removal_in_create_session_is_caught() {
 
     // No mock_auths — the contract must enforce buyer.require_auth() itself.
     let result =
-        client.try_create_session(&buyer, &seller, &asset, &100, &50, &resource_hash);
+        client.try_create_session(&buyer, &seller, &asset, &100, &50, &resource_hash, &BytesN::from_array(&env, &[0, 142, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]));
 
     assert!(
         result.is_err(),
@@ -228,7 +230,7 @@ fn mutation_buyer_auth_wrong_party_in_create_session_is_caught() {
                 sub_invokes: &[],
             },
         }])
-        .try_create_session(&buyer, &seller, &asset, &100, &50, &resource_hash);
+        .try_create_session(&buyer, &seller, &asset, &100, &50, &resource_hash, &BytesN::from_array(&env, &[0, 143, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]));
 
     assert!(
         result.is_err(),
@@ -491,7 +493,7 @@ fn mutation_asset_cap_inversion_in_create_session_is_caught() {
 
     // Attempt exactly cap + 1.
     let result =
-        client.try_create_session(&buyer, &seller, &asset, &(cap + 1), &50, &resource_hash);
+        client.try_create_session(&buyer, &seller, &asset, &(cap + 1), &50, &resource_hash, &BytesN::from_array(&env, &[0, 144, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]));
 
     assert_eq!(
         result,
@@ -1115,7 +1117,7 @@ fn mutation_end_to_end_auth_and_cap_guards_are_all_present() {
 
     // 1. Cap check fires before buyer auth (no auth needed to see the error).
     assert_eq!(
-        client.try_create_session(&buyer, &seller, &asset, &(cap + 1), &50, &resource_hash),
+        client.try_create_session(&buyer, &seller, &asset, &(cap + 1), &50, &resource_hash, &BytesN::from_array(&env, &[0, 145, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])),
         Err(Ok(ContractError::AmountExceedsCap)),
         "cap check did not fire"
     );
@@ -1123,7 +1125,7 @@ fn mutation_end_to_end_auth_and_cap_guards_are_all_present() {
     // 2. Buyer auth is required for a valid amount.
     assert!(
         client
-            .try_create_session(&buyer, &seller, &asset, &cap, &50, &resource_hash)
+            .try_create_session(&buyer, &seller, &asset, &cap, &50, &resource_hash, &BytesN::from_array(&env, &[0, 146, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]))
             .is_err(),
         "buyer auth was not enforced"
     );

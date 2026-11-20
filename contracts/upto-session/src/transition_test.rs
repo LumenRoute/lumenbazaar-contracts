@@ -227,7 +227,7 @@ fn run_sequence(actions: &[Action]) -> Outcome {
         &CAP,
         &EXPIRES_AT,
         &BytesN::from_array(&env, &[41; 32]),
-    );
+     &BytesN::from_array(&env, &[0, 152, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]));
 
     let mut model = Model {
         status: ModelStatus::Open,

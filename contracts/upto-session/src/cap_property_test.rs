@@ -118,6 +118,10 @@ fn open_session(env: &Env, cap: i128, expires: u32) -> Session {
         resource_hash: BytesN::from_array(env, &[2; 32]),
         usage_hash: None,
         status: SessionStatus::Open,
+        creation_ledger: 0,
+        finalized_ledger: None,
+        resource_scheme_version: validation::SUPPORTED_RESOURCE_SCHEME_VERSION,
+        usage_scheme_version: None,
     }
 }
 
@@ -139,7 +143,7 @@ fn run_settlements(cap: i128, amounts: &[i128]) {
         &cap,
         &EXPIRES_AT,
         &BytesN::from_array(&env, &[31; 32]),
-    );
+     &BytesN::from_array(&env, &[0, 147, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]));
     let usage_hash = BytesN::from_array(&env, &[32; 32]);
     let mut finalized = false;
 
@@ -274,7 +278,7 @@ proptest! {
             &amount,
             &EXPIRES_AT,
             &BytesN::from_array(&env, &[33; 32]),
-        );
+         &BytesN::from_array(&env, &[0, 148, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]));
         let events = contract_event_count(&env, &contract_id);
 
         let expected = if amount <= 0 {
@@ -397,14 +401,14 @@ fn overflow_adjacent_escrow_totals_fail_without_state_change() {
     initialize_for_asset(&env, &client, &first_buyer, &asset);
     let hash = BytesN::from_array(&env, &[34; 32]);
 
-    client.create_session(&first_buyer, &seller, &asset, &(i128::MAX - 5), &EXPIRES_AT, &hash);
+    client.create_session(&first_buyer, &seller, &asset, &(i128::MAX - 5), &EXPIRES_AT, &hash, &BytesN::from_array(&env, &[0, 149, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]));
     // Exactly reaching i128::MAX of aggregate liability is still valid.
-    client.create_session(&second_buyer, &seller, &asset, &5, &EXPIRES_AT, &hash);
+    client.create_session(&second_buyer, &seller, &asset, &5, &EXPIRES_AT, &hash, &BytesN::from_array(&env, &[0, 150, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]));
     assert_eq!(client.get_escrow_liability(&asset), i128::MAX);
     assert_eq!(token.balance(&contract_id), i128::MAX);
 
     // One more unit would overflow the aggregate; it must fail with no side effect.
-    let result = client.try_create_session(&third_buyer, &seller, &asset, &1, &EXPIRES_AT, &hash);
+    let result = client.try_create_session(&third_buyer, &seller, &asset, &1, &EXPIRES_AT, &hash, &BytesN::from_array(&env, &[0, 151, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]));
     assert!(result.is_err());
     assert_eq!(client.get_escrow_liability(&asset), i128::MAX);
     assert_eq!(token.balance(&third_buyer), 1);

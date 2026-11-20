@@ -2,6 +2,9 @@
 **/test_snapshots/
 **/*.wasm
 artifacts/provenance/
+artifacts/coverage/report.json
+artifacts/coverage/*.profraw
+artifacts/coverage/*.profdata
 bindings/*/dist/
 .env
 .env.local

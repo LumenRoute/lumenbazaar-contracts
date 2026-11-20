@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "contract": "test-token",
+  "classification": "utility-only",
+  "artifact": "target/wasm32v1-none/release/test_token.wasm",
+  "notes": "Separate allowlist for utility-only local/testnet token contract.",
+  "imports": [
+    {
+      "module": "a",
+      "name": "0",
+      "kind": "function"
+    },
+    {
+      "module": "b",
+      "name": "i",
+      "kind": "function"
+    },
+    {
+      "module": "b",
+      "name": "j",
+      "kind": "function"
+    },
+    {
+      "module": "i",
+      "name": "6",
+      "kind": "function"
+    },
+    {
+      "module": "i",
+      "name": "7",
+      "kind": "function"
+    },
+    {
+      "module": "i",
+      "name": "8",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "_",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "0",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "1",
+      "kind": "function"
+    },
+    {
+      "module": "v",
+      "name": "g",
+      "kind": "function"
+    }
+  ],
+  "exports": [
+    {
+      "name": "_",
+      "kind": "global"
+    },
+    {
+      "name": "__data_end",
+      "kind": "global"
+    },
+    {
+      "name": "__heap_base",
+      "kind": "global"
+    },
+    {
+      "name": "balance",
+      "kind": "function"
+    },
+    {
+      "name": "decimals",
+      "kind": "function"
+    },
+    {
+      "name": "initialize",
+      "kind": "function"
+    },
+    {
+      "name": "initialize_with_ceiling",
+      "kind": "function"
+    },
+    {
+      "name": "memory",
+      "kind": "memory"
+    },
+    {
+      "name": "mint",
+      "kind": "function"
+    },
+    {
+      "name": "mint_ceiling",
+      "kind": "function"
+    },
+    {
+      "name": "name",
+      "kind": "function"
+    },
+    {
+      "name": "symbol",
+      "kind": "function"
+    },
+    {
+      "name": "total_supply",
+      "kind": "function"
+    },
+    {
+      "name": "transfer",
+      "kind": "function"
+    },
+    {
+      "name": "utility_only",
+      "kind": "function"
+    }
+  ]
+}

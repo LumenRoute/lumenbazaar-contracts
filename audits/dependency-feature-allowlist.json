@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "releaseTarget": "wasm32v1-none",
+  "releasePackages": [
+    "upto-session",
+    "policy-wallet-example",
+    "test-token"
+  ],
+  "testPackages": [
+    "upto-session",
+    "policy-wallet-example",
+    "test-token",
+    "escrow-model",
+    "lumenbazaar-fuzz"
+  ],
+  "releaseAllowlist": {
+    "base64": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "cfg_eval": [
+      "default"
+    ],
+    "crypto-common": [
+      "std"
+    ],
+    "darling": [
+      "default",
+      "suggestions"
+    ],
+    "darling_core": [
+      "strsim",
+      "suggestions"
+    ],
+    "data-encoding": [
+      "alloc"
+    ],
+    "digest": [
+      "alloc",
+      "block-buffer",
+      "core-api",
+      "default",
+      "std"
+    ],
+    "either": [
+      "std",
+      "use_std"
+    ],
+    "escape-bytes": [
+      "alloc"
+    ],
+    "fnv": [
+      "default",
+      "std"
+    ],
+    "generic-array": [
+      "more_lengths"
+    ],
+    "hex": [
+      "alloc",
+      "default",
+      "serde",
+      "std"
+    ],
+    "indexmap": [
+      "default",
+      "std"
+    ],
+    "itertools": [
+      "default",
+      "use_alloc",
+      "use_std"
+    ],
+    "memchr": [
+      "alloc",
+      "std"
+    ],
+    "num-bigint": [
+      "default",
+      "std"
+    ],
+    "num-integer": [
+      "i128",
+      "std"
+    ],
+    "num-traits": [
+      "i128",
+      "std"
+    ],
+    "proc-macro2": [
+      "default",
+      "proc-macro"
+    ],
+    "quote": [
+      "default",
+      "proc-macro"
+    ],
+    "semver": [
+      "default",
+      "std"
+    ],
+    "serde": [
+      "default",
+      "derive",
+      "serde_derive",
+      "std"
+    ],
+    "serde_core": [
+      "alloc",
+      "result",
+      "std"
+    ],
+    "serde_derive": [
+      "default"
+    ],
+    "serde_json": [
+      "alloc",
+      "default",
+      "std"
+    ],
+    "serde_with": [
+      "alloc",
+      "default",
+      "macros",
+      "schemars_0_8",
+      "std"
+    ],
+    "serde_with_macros": [
+      "schemars_0_8"
+    ],
+    "sha2": [
+      "default",
+      "std"
+    ],
+    "stellar-strkey": [
+      "default"
+    ],
+    "stellar-xdr": [
+      "alloc",
+      "hex",
+      "serde",
+      "std"
+    ],
+    "syn": [
+      "clone-impls",
+      "default",
+      "derive",
+      "extra-traits",
+      "full",
+      "parsing",
+      "printing",
+      "proc-macro"
+    ]
+  },
+  "exceptions": []
+}

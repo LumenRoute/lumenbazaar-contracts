@@ -33,6 +33,7 @@ use soroban_sdk::{
     xdr::{self, Limits, ScAddress, ScVal, ToXdr, WriteXdr},
     Address, Bytes, BytesN, Env, String as SorobanString,
 };
+use std::string::ToString;
 use std::{borrow::ToOwned, format, path::PathBuf, str::FromStr, string::String, vec, vec::Vec};
 
 /// Version of the published vector set. Bump it (and add a new lock and

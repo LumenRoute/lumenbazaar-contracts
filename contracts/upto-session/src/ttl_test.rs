@@ -57,6 +57,11 @@ impl Harness {
     }
 
     fn create(&self, expires_at_ledger: u32) -> BytesN<32> {
+        static NEXT_IDEMPOTENCY: std::sync::atomic::AtomicU64 =
+            std::sync::atomic::AtomicU64::new(1);
+        let n = NEXT_IDEMPOTENCY.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let mut key = [0u8; 32];
+        key[..8].copy_from_slice(&n.to_be_bytes());
         self.client().create_session(
             &self.buyer,
             &self.seller,
@@ -64,6 +69,7 @@ impl Harness {
             &CAP,
             &expires_at_ledger,
             &BytesN::from_array(&self.env, &[7; 32]),
+            &BytesN::from_array(&self.env, &key),
         )
     }
 
@@ -499,6 +505,7 @@ fn lapsed_instance_config_fails_closed_for_admin_and_new_sessions_only() {
             &CAP,
             &SESSION_EXPIRY,
             &BytesN::from_array(&harness.env, &[9; 32]),
+            &BytesN::from_array(&harness.env, &[0xaa; 32]),
         ),
         Err(Ok(ContractError::NotInitialized))
     );
@@ -556,6 +563,8 @@ fn creation_and_rotation_expiry_windows_have_exact_bounds() {
     harness.ledger(1_000);
     let hash = BytesN::from_array(&harness.env, &[9; 32]);
     let create = |expires_at_ledger: u32| {
+        let mut key = [0u8; 32];
+        key[..4].copy_from_slice(&expires_at_ledger.to_be_bytes());
         client.try_create_session(
             &harness.buyer,
             &harness.seller,
@@ -563,6 +572,7 @@ fn creation_and_rotation_expiry_windows_have_exact_bounds() {
             &1,
             &expires_at_ledger,
             &hash,
+            &BytesN::from_array(&harness.env, &key),
         )
     };
 

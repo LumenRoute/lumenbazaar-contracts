@@ -162,7 +162,7 @@ fn create_session(
             &input.cap,
             &EXPIRY_LEDGER,
             input.resource_hash,
-        )
+         &BytesN::from_array(env, &[0, 140, 0xab, 0xcd, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]))
 }
 
 fn try_settle(

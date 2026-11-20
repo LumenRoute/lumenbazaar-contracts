@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 1,
+  "contract": "policy-wallet-example",
+  "classification": "example-only",
+  "artifact": "target/wasm32v1-none/release/policy_wallet_example.wasm",
+  "notes": "Separate allowlist for example-only smart account policy contract.",
+  "imports": [
+    {
+      "module": "a",
+      "name": "0",
+      "kind": "function"
+    },
+    {
+      "module": "b",
+      "name": "8",
+      "kind": "function"
+    },
+    {
+      "module": "b",
+      "name": "j",
+      "kind": "function"
+    },
+    {
+      "module": "i",
+      "name": "6",
+      "kind": "function"
+    },
+    {
+      "module": "i",
+      "name": "7",
+      "kind": "function"
+    },
+    {
+      "module": "i",
+      "name": "8",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "_",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "0",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "1",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "2",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "8",
+      "kind": "function"
+    },
+    {
+      "module": "m",
+      "name": "9",
+      "kind": "function"
+    },
+    {
+      "module": "m",
+      "name": "b",
+      "kind": "function"
+    },
+    {
+      "module": "m",
+      "name": "c",
+      "kind": "function"
+    },
+    {
+      "module": "v",
+      "name": "1",
+      "kind": "function"
+    },
+    {
+      "module": "v",
+      "name": "3",
+      "kind": "function"
+    },
+    {
+      "module": "v",
+      "name": "d",
+      "kind": "function"
+    },
+    {
+      "module": "v",
+      "name": "g",
+      "kind": "function"
+    },
+    {
+      "module": "x",
+      "name": "0",
+      "kind": "function"
+    },
+    {
+      "module": "x",
+      "name": "1",
+      "kind": "function"
+    },
+    {
+      "module": "x",
+      "name": "3",
+      "kind": "function"
+    }
+  ],
+  "exports": [
+    {
+      "name": "_",
+      "kind": "global"
+    },
+    {
+      "name": "__data_end",
+      "kind": "global"
+    },
+    {
+      "name": "__heap_base",
+      "kind": "global"
+    },
+    {
+      "name": "accept_owner",
+      "kind": "function"
+    },
+    {
+      "name": "authorize_payment",
+      "kind": "function"
+    },
+    {
+      "name": "authorized_count_today",
+      "kind": "function"
+    },
+    {
+      "name": "cancel_owner_rotation",
+      "kind": "function"
+    },
+    {
+      "name": "check_payment",
+      "kind": "function"
+    },
+    {
+      "name": "create_policy",
+      "kind": "function"
+    },
+    {
+      "name": "example_only",
+      "kind": "function"
+    },
+    {
+      "name": "get_config",
+      "kind": "function"
+    },
+    {
+      "name": "get_owner",
+      "kind": "function"
+    },
+    {
+      "name": "get_owner_rotation",
+      "kind": "function"
+    },
+    {
+      "name": "get_policy",
+      "kind": "function"
+    },
+    {
+      "name": "get_policy_revision",
+      "kind": "function"
+    },
+    {
+      "name": "get_policy_revocation",
+      "kind": "function"
+    },
+    {
+      "name": "initialize",
+      "kind": "function"
+    },
+    {
+      "name": "memory",
+      "kind": "memory"
+    },
+    {
+      "name": "propose_owner",
+      "kind": "function"
+    },
+    {
+      "name": "require_owner",
+      "kind": "function"
+    },
+    {
+      "name": "revoke_policy",
+      "kind": "function"
+    },
+    {
+      "name": "set_policy",
+      "kind": "function"
+    },
+    {
+      "name": "spent_today",
+      "kind": "function"
+    },
+    {
+      "name": "spent_today_resource",
+      "kind": "function"
+    },
+    {
+      "name": "spent_today_seller",
+      "kind": "function"
+    }
+  ]
+}

@@ -44,7 +44,7 @@ jobs:
 
       - name: Install Rust
         run: |
-          rustup toolchain install 1.93.1 --profile minimal --component rustfmt --component clippy
+          rustup toolchain install 1.93.1 --profile minimal --component rustfmt --component clippy --component llvm-tools-preview
           rustup default 1.93.1
           rustup target add wasm32v1-none --toolchain 1.93.1
 
@@ -100,6 +100,11 @@ jobs:
           node scripts/check-dependency-exceptions.mjs
           cargo audit --deny warnings --ignore RUSTSEC-2024-0436
 
+      - name: Check dependency feature allowlist
+        run: |
+          node --test scripts/lib/dependency-features.test.mjs
+          node scripts/check-dependency-features.mjs --report "${{ runner.temp }}/dependency-features-report.json"
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
@@ -125,6 +130,21 @@ jobs:
 
       - name: Model-check escrow state machine
         run: cargo test -p escrow-model -- --nocapture
+
+      - name: Check native contract code coverage
+        env:
+          LUMENBAZAAR_PROPERTY_CASES: "128"
+        run: |
+          node --test scripts/lib/coverage.test.mjs
+          node scripts/run-native-coverage.mjs --report "${{ runner.temp }}/native-coverage-report.json"
+
+      - name: Upload native coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-coverage-report
+          path: ${{ runner.temp }}/native-coverage-report.json
+          if-no-files-found: error
 
       - name: Check replacement deployment rehearsal
         run: |
@@ -163,6 +183,19 @@ jobs:
         with:
           name: wasm-size-report
           path: ${{ runner.temp }}/wasm-size-report.json
+          if-no-files-found: error
+
+      - name: Check WASM import and export allowlist
+        run: |
+          node --test scripts/lib/wasm-allowlist.test.mjs
+          node scripts/check-wasm-allowlist.mjs --report "${{ runner.temp }}/wasm-allowlist-report.json"
+
+      - name: Upload WASM allowlist report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-allowlist-report
+          path: ${{ runner.temp }}/wasm-allowlist-report.json
           if-no-files-found: error
 
       - name: Check generated specs

@@ -1,0 +1,441 @@
+{
+  "schemaVersion": 1,
+  "contract": "upto-session",
+  "classification": "production",
+  "artifact": "target/wasm32v1-none/release/upto_session.wasm",
+  "notes": "Reviewed production contract import/export surface. Symbol presence is not proof of safe behavior.",
+  "imports": [
+    {
+      "module": "a",
+      "name": "0",
+      "kind": "function"
+    },
+    {
+      "module": "b",
+      "name": "_",
+      "kind": "function"
+    },
+    {
+      "module": "b",
+      "name": "3",
+      "kind": "function"
+    },
+    {
+      "module": "b",
+      "name": "8",
+      "kind": "function"
+    },
+    {
+      "module": "b",
+      "name": "j",
+      "kind": "function"
+    },
+    {
+      "module": "b",
+      "name": "k",
+      "kind": "function"
+    },
+    {
+      "module": "b",
+      "name": "m",
+      "kind": "function"
+    },
+    {
+      "module": "c",
+      "name": "_",
+      "kind": "function"
+    },
+    {
+      "module": "d",
+      "name": "_",
+      "kind": "function"
+    },
+    {
+      "module": "d",
+      "name": "0",
+      "kind": "function"
+    },
+    {
+      "module": "i",
+      "name": "_",
+      "kind": "function"
+    },
+    {
+      "module": "i",
+      "name": "0",
+      "kind": "function"
+    },
+    {
+      "module": "i",
+      "name": "6",
+      "kind": "function"
+    },
+    {
+      "module": "i",
+      "name": "7",
+      "kind": "function"
+    },
+    {
+      "module": "i",
+      "name": "8",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "_",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "0",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "1",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "2",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "7",
+      "kind": "function"
+    },
+    {
+      "module": "l",
+      "name": "8",
+      "kind": "function"
+    },
+    {
+      "module": "m",
+      "name": "9",
+      "kind": "function"
+    },
+    {
+      "module": "m",
+      "name": "b",
+      "kind": "function"
+    },
+    {
+      "module": "m",
+      "name": "c",
+      "kind": "function"
+    },
+    {
+      "module": "v",
+      "name": "_",
+      "kind": "function"
+    },
+    {
+      "module": "v",
+      "name": "1",
+      "kind": "function"
+    },
+    {
+      "module": "v",
+      "name": "3",
+      "kind": "function"
+    },
+    {
+      "module": "v",
+      "name": "6",
+      "kind": "function"
+    },
+    {
+      "module": "v",
+      "name": "g",
+      "kind": "function"
+    },
+    {
+      "module": "x",
+      "name": "0",
+      "kind": "function"
+    },
+    {
+      "module": "x",
+      "name": "1",
+      "kind": "function"
+    },
+    {
+      "module": "x",
+      "name": "3",
+      "kind": "function"
+    },
+    {
+      "module": "x",
+      "name": "6",
+      "kind": "function"
+    },
+    {
+      "module": "x",
+      "name": "7",
+      "kind": "function"
+    }
+  ],
+  "exports": [
+    {
+      "name": "_",
+      "kind": "global"
+    },
+    {
+      "name": "__data_end",
+      "kind": "global"
+    },
+    {
+      "name": "__heap_base",
+      "kind": "global"
+    },
+    {
+      "name": "accept_admin",
+      "kind": "function"
+    },
+    {
+      "name": "accept_asset_cap_increase",
+      "kind": "function"
+    },
+    {
+      "name": "activate_asset",
+      "kind": "function"
+    },
+    {
+      "name": "cancel",
+      "kind": "function"
+    },
+    {
+      "name": "cancel_admin_rotation",
+      "kind": "function"
+    },
+    {
+      "name": "cancel_asset_cap_increase",
+      "kind": "function"
+    },
+    {
+      "name": "create_session",
+      "kind": "function"
+    },
+    {
+      "name": "deprecate_asset",
+      "kind": "function"
+    },
+    {
+      "name": "extend_session_expiry",
+      "kind": "function"
+    },
+    {
+      "name": "extend_ttl",
+      "kind": "function"
+    },
+    {
+      "name": "get_admin",
+      "kind": "function"
+    },
+    {
+      "name": "get_admin_rotation",
+      "kind": "function"
+    },
+    {
+      "name": "get_asset_cap_increase",
+      "kind": "function"
+    },
+    {
+      "name": "get_asset_exposure_ceiling",
+      "kind": "function"
+    },
+    {
+      "name": "get_asset_max_session_amount",
+      "kind": "function"
+    },
+    {
+      "name": "get_asset_min_session_amount",
+      "kind": "function"
+    },
+    {
+      "name": "get_asset_policy",
+      "kind": "function"
+    },
+    {
+      "name": "get_asset_solvency",
+      "kind": "function"
+    },
+    {
+      "name": "get_buyer_exposure",
+      "kind": "function"
+    },
+    {
+      "name": "get_buyer_exposure_ceiling",
+      "kind": "function"
+    },
+    {
+      "name": "get_buyer_open_sessions",
+      "kind": "function"
+    },
+    {
+      "name": "get_buyer_session_count",
+      "kind": "function"
+    },
+    {
+      "name": "get_commitment_domain_metadata",
+      "kind": "function"
+    },
+    {
+      "name": "get_configuration",
+      "kind": "function"
+    },
+    {
+      "name": "get_escrow_liability",
+      "kind": "function"
+    },
+    {
+      "name": "get_initialization_digest",
+      "kind": "function"
+    },
+    {
+      "name": "get_max_buyer_open_sessions",
+      "kind": "function"
+    },
+    {
+      "name": "get_max_seller_open_sessions",
+      "kind": "function"
+    },
+    {
+      "name": "get_recoverability",
+      "kind": "function"
+    },
+    {
+      "name": "get_seller_exposure",
+      "kind": "function"
+    },
+    {
+      "name": "get_seller_exposure_ceiling",
+      "kind": "function"
+    },
+    {
+      "name": "get_seller_open_sessions",
+      "kind": "function"
+    },
+    {
+      "name": "get_seller_session_counts",
+      "kind": "function"
+    },
+    {
+      "name": "get_session",
+      "kind": "function"
+    },
+    {
+      "name": "get_session_batch",
+      "kind": "function"
+    },
+    {
+      "name": "get_session_state_counts",
+      "kind": "function"
+    },
+    {
+      "name": "get_session_status",
+      "kind": "function"
+    },
+    {
+      "name": "get_sessions_by_commitment",
+      "kind": "function"
+    },
+    {
+      "name": "get_solvency",
+      "kind": "function"
+    },
+    {
+      "name": "get_terminal_evidence",
+      "kind": "function"
+    },
+    {
+      "name": "initialize",
+      "kind": "function"
+    },
+    {
+      "name": "interface_version",
+      "kind": "function"
+    },
+    {
+      "name": "max_session_duration_ledgers",
+      "kind": "function"
+    },
+    {
+      "name": "memory",
+      "kind": "memory"
+    },
+    {
+      "name": "pause_creation",
+      "kind": "function"
+    },
+    {
+      "name": "preview_settle",
+      "kind": "function"
+    },
+    {
+      "name": "propose_admin",
+      "kind": "function"
+    },
+    {
+      "name": "propose_asset_cap_increase",
+      "kind": "function"
+    },
+    {
+      "name": "recover_expired",
+      "kind": "function"
+    },
+    {
+      "name": "recover_expired_batch",
+      "kind": "function"
+    },
+    {
+      "name": "recover_surplus",
+      "kind": "function"
+    },
+    {
+      "name": "reduce_session_cap",
+      "kind": "function"
+    },
+    {
+      "name": "reject",
+      "kind": "function"
+    },
+    {
+      "name": "remove_asset",
+      "kind": "function"
+    },
+    {
+      "name": "resume_creation",
+      "kind": "function"
+    },
+    {
+      "name": "set_asset_exposure_ceiling",
+      "kind": "function"
+    },
+    {
+      "name": "set_asset_max_session_amount",
+      "kind": "function"
+    },
+    {
+      "name": "set_buyer_exposure_ceiling",
+      "kind": "function"
+    },
+    {
+      "name": "set_max_buyer_open_sessions",
+      "kind": "function"
+    },
+    {
+      "name": "set_max_seller_open_sessions",
+      "kind": "function"
+    },
+    {
+      "name": "set_seller_exposure_ceiling",
+      "kind": "function"
+    },
+    {
+      "name": "settle",
+      "kind": "function"
+    }
+  ]
+}

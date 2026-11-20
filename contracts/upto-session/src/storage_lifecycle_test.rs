@@ -67,6 +67,11 @@ impl Lifecycle {
     }
 
     fn create(&self, expires_at_ledger: u32) -> BytesN<32> {
+        static NEXT_IDEMPOTENCY: std::sync::atomic::AtomicU64 =
+            std::sync::atomic::AtomicU64::new(1);
+        let n = NEXT_IDEMPOTENCY.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let mut key = [0u8; 32];
+        key[..8].copy_from_slice(&n.to_be_bytes());
         self.client().create_session(
             &self.buyer,
             &self.seller,
@@ -74,6 +79,7 @@ impl Lifecycle {
             &CAP,
             &expires_at_ledger,
             &BytesN::from_array(&self.env, &[7; 32]),
+            &BytesN::from_array(&self.env, &key),
         )
     }
 
@@ -463,6 +469,7 @@ fn sr9_missing_instance_config_blocks_creation_and_admin_but_not_exits() {
             &CAP,
             &EXPIRY,
             &BytesN::from_array(&h.env, &[7; 32]),
+            &BytesN::from_array(&h.env, &[0xbb; 32]),
         ),
         Err(Ok(ContractError::NotInitialized))
     );

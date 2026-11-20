@@ -4,6 +4,13 @@
 
 ### Added
 
+- Add an auditable administrator method authorization matrix in `contracts/upto-session/src/auth_test.rs`,
+  a release/test dependency feature allowlist (`audits/dependency-feature-allowlist.json`),
+  per-contract WASM import/export allowlists (`artifacts/audit-readiness/wasm-allowlist-*.json`),
+  and reproducible native production coverage reporting (`artifacts/coverage/thresholds.json`).
+  Compatibility: additive verification, testing, and CI controls; contract ABI and storage layouts are unchanged.
+  Migration: none.
+
 - Add typed transaction evidence helpers to the TypeScript binding
   (`createSessionWithEvidence`, `settleWithEvidence`, `cancelWithEvidence`,
   `extendTtlWithEvidence`) that sign through an injected signer, confirm through RPC and
