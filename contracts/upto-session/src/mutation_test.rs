@@ -53,6 +53,8 @@ fn initialized_contract<'a>(
             asset: asset.clone(),
             max_session_amount: cap,
             min_session_amount: 1,
+            max_asset_exposure: i128::MAX,
+            max_buyer_exposure: i128::MAX,
         }
     ];
     client

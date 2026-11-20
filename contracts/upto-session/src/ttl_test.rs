@@ -12,9 +12,11 @@
 //   implements nor relies on.
 
 use super::*;
+use super::authorization_harness::auth_entry_with_expiration;
 use crate::storage::{DataKey, DEFAULT_TTL_THRESHOLD, TTL_EXTENSION_AMOUNT};
 use crate::validation::{MAX_ADMIN_ROTATION_DURATION_LEDGERS, MAX_SESSION_DURATION_LEDGERS};
 use soroban_sdk::testutils::storage::{Instance as _, Persistent as _};
+use soroban_sdk::testutils::{MockAuth, MockAuthInvoke};
 
 /// Ledger at which an entry written at ledger 0 has exactly `DEFAULT_TTL_THRESHOLD` ledgers left.
 const AT_THRESHOLD: u32 = TTL_EXTENSION_AMOUNT - DEFAULT_TTL_THRESHOLD;
@@ -171,17 +173,17 @@ fn instance_ttl_extension_boundary_is_exact_for_config_changes() {
     // One ledger above the threshold: the admin call must not extend.
     harness.ledger(AT_THRESHOLD - 1);
     assert_eq!(harness.instance_ttl(), DEFAULT_TTL_THRESHOLD + 1);
-    client.set_asset_max_session_amount(&harness.asset, &(CAP * 2));
+    client.set_asset_max_session_amount(&harness.asset, &(CAP * 3));
     assert_eq!(harness.instance_ttl(), DEFAULT_TTL_THRESHOLD + 1);
 
     // Exactly at the threshold: the same call extends to the full amount.
     harness.ledger(AT_THRESHOLD);
     assert_eq!(harness.instance_ttl(), DEFAULT_TTL_THRESHOLD);
-    client.set_asset_max_session_amount(&harness.asset, &(CAP * 3));
+    client.set_asset_max_session_amount(&harness.asset, &(CAP * 2));
     assert_eq!(harness.instance_ttl(), TTL_EXTENSION_AMOUNT);
     assert_eq!(
         client.get_asset_max_session_amount(&harness.asset),
-        CAP * 3
+        CAP * 2
     );
 }
 
@@ -586,4 +588,93 @@ fn creation_and_rotation_expiry_windows_have_exact_bounds() {
     assert!(client
         .try_propose_admin(&pending, &(1_000 + MAX_ADMIN_ROTATION_DURATION_LEDGERS))
         .is_ok());
+}
+
+#[test]
+fn auth_expiration_boundary_is_deterministic_and_independent_of_storage_ttl() {
+    let harness = Harness::new();
+    let client = harness.client();
+    let id = harness.create(SESSION_EXPIRY);
+
+    // Initial storage TTL is large (> 4,000,000)
+    let session_ttl_before = harness.session_ttl(&id);
+    let liability_ttl_before = harness.liability_ttl();
+    assert!(session_ttl_before > DEFAULT_TTL_THRESHOLD);
+
+    // At ledger 200 (< SESSION_EXPIRY 500)
+    harness.ledger(200);
+
+    let settle_mock = MockAuth {
+        address: &harness.seller,
+        invoke: &MockAuthInvoke {
+            contract: &harness.contract_id,
+            fn_name: "settle",
+            args: (id.clone(), 100_i128, harness.usage_hash()).into_val(&harness.env),
+            sub_invokes: &[],
+        },
+    };
+
+    // 1. Expired auth (199 < 200) fails closed with authorization error, NOT ExpiredSession.
+    // It does not alter balances, session state, or storage TTL.
+    harness.env.mock_auths(core::slice::from_ref(&settle_mock));
+    harness.env.set_auths(&[auth_entry_with_expiration(&settle_mock, 199)]);
+    let expired_auth_res = client.try_settle(&id, &100, &harness.usage_hash());
+    assert!(expired_auth_res.is_err());
+    assert_ne!(expired_auth_res, Err(Ok(ContractError::ExpiredSession)));
+    assert_eq!(harness.session_ttl(&id), session_ttl_before - 200);
+    assert_eq!(harness.liability_ttl(), liability_ttl_before - 200);
+    assert_eq!(client.get_session(&id).status, SessionStatus::Open);
+
+    // 2. Advance to session expiry: ledger 500
+    harness.ledger(SESSION_EXPIRY);
+
+    // With valid auth (exp 600), fails with ContractError::ExpiredSession
+    harness.env.mock_auths(core::slice::from_ref(&settle_mock));
+    harness.env.set_auths(&[auth_entry_with_expiration(&settle_mock, 600)]);
+    assert_eq!(
+        client.try_settle(&id, &100, &harness.usage_hash()),
+        Err(Ok(ContractError::ExpiredSession))
+    );
+
+    // When session is expired, contract validates expiry before evaluating auth,
+    // so it deterministically returns ExpiredSession without attempting auth.
+    harness.env.mock_auths(core::slice::from_ref(&settle_mock));
+    harness.env.set_auths(&[auth_entry_with_expiration(&settle_mock, 499)]);
+    assert_eq!(
+        client.try_settle(&id, &100, &harness.usage_hash()),
+        Err(Ok(ContractError::ExpiredSession))
+    );
+}
+
+#[test]
+fn auth_expiration_upper_boundary_and_overflow_adjacent_limits_in_ttl_host() {
+    let harness = Harness::new();
+    let client = harness.client();
+    let id = harness.create(SESSION_EXPIRY);
+
+    harness.ledger(100);
+    let max_ttl = harness.env.storage().max_ttl();
+    let max_valid_exp = 100 + max_ttl;
+
+    let cancel_mock = MockAuth {
+        address: &harness.buyer,
+        invoke: &MockAuthInvoke {
+            contract: &harness.contract_id,
+            fn_name: "cancel",
+            args: (id.clone(),).into_val(&harness.env),
+            sub_invokes: &[],
+        },
+    };
+
+    // Exceeding max TTL (overflow-adjacent) fails closed without mutating state
+    harness.env.mock_auths(core::slice::from_ref(&cancel_mock));
+    harness.env.set_auths(&[auth_entry_with_expiration(&cancel_mock, max_valid_exp + 1)]);
+    assert!(client.try_cancel(&id).is_err());
+    assert_eq!(client.get_session(&id).status, SessionStatus::Open);
+
+    // Exactly at upper boundary max_valid_exp succeeds
+    harness.env.mock_auths(core::slice::from_ref(&cancel_mock));
+    harness.env.set_auths(&[auth_entry_with_expiration(&cancel_mock, max_valid_exp)]);
+    assert!(client.try_cancel(&id).is_ok());
+    assert_eq!(client.get_session(&id).status, SessionStatus::Cancelled);
 }

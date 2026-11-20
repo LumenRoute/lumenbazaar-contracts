@@ -552,8 +552,7 @@ pub fn extend_session_and_liability_ttl(env: &Env, session: &Session) {
             TTL_EXTENSION_AMOUNT,
         );
     }
-    let buyer_exposure_key =
-        DataKey::BuyerExposure(session.buyer.clone(), session.asset.clone());
+    let buyer_exposure_key = DataKey::BuyerExposure(session.buyer.clone(), session.asset.clone());
     if env.storage().persistent().has(&buyer_exposure_key) {
         env.storage().persistent().extend_ttl(
             &buyer_exposure_key,

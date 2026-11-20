@@ -391,7 +391,8 @@ fn deprecated_assets_reject_creation_but_still_release_capacity() {
     f.client
         .initialize(&f.admin, &vec![&f.env, policy(&asset, 500, 500, 500)]);
     let session = open(&f, &buyer, &asset, 200, 1);
-    f.client.deprecate_asset(&asset);
+    f.client
+        .deprecate_asset(&asset, &BytesN::from_array(&f.env, &[1; 32]));
     assert_eq!(
         try_open(&f, &buyer, &asset, 1, 2),
         Err(ContractError::UnsupportedAsset)
@@ -402,7 +403,8 @@ fn deprecated_assets_reject_creation_but_still_release_capacity() {
     f.env.as_contract(&f.contract_id, || {
         assert_eq!(storage::read_liability(&f.env, &asset), 0);
     });
-    f.client.remove_asset(&asset);
+    f.client
+        .remove_asset(&asset, &BytesN::from_array(&f.env, &[1; 32]));
     assert_eq!(
         f.client.try_get_buyer_exposure(&buyer, &asset),
         Err(Ok(ContractError::UnsupportedAsset))
@@ -764,7 +766,8 @@ fn solvency_is_read_only_authorization_free_and_covers_deprecated_assets() {
     f.client
         .initialize(&f.admin, &vec![&f.env, policy(&asset, 100, 100, 100)]);
     let session = open(&f, &buyer, &asset, 100, 1);
-    f.client.deprecate_asset(&asset);
+    f.client
+        .deprecate_asset(&asset, &BytesN::from_array(&f.env, &[1; 32]));
 
     f.env.set_auths(&[]);
     let first = snapshot(&f, &asset);
@@ -782,7 +785,8 @@ fn solvency_is_read_only_authorization_free_and_covers_deprecated_assets() {
 
     f.env.mock_all_auths_allowing_non_root_auth();
     f.client.cancel(&session);
-    f.client.remove_asset(&asset);
+    f.client
+        .remove_asset(&asset, &BytesN::from_array(&f.env, &[1; 32]));
     assert_eq!(
         f.client.try_get_asset_solvency(&asset),
         Err(Ok(ContractError::UnsupportedAsset))

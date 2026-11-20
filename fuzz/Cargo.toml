@@ -15,3 +15,6 @@ path = "src/lib.rs"
 soroban-sdk = { workspace = true, features = ["testutils"] }
 upto-session = { path = "../contracts/upto-session" }
 policy-wallet-example = { path = "../contracts/policy-wallet-example" }
+escrow-model = { path = "../formal/escrow-model" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

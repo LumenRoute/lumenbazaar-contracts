@@ -494,3 +494,169 @@ fn transition_seed_override_parses_decimal_and_hex() {
     assert_eq!(parse_u64("0x4c554d4554524e53"), Some(TRANSITION_SEED));
     assert_eq!(parse_u64("nope"), None);
 }
+
+#[test]
+fn settlement_and_recovery_race_at_boundary_ledgers_asserts_one_terminal_outcome_and_conserved_funds() {
+    let settle_amount = 350_i128;
+    let refund_amount = CAP - settle_amount;
+
+    for &boundary_ledger in &[EXPIRES_AT - 1, EXPIRES_AT, EXPIRES_AT + 1] {
+        let is_before_expiry = boundary_ledger < EXPIRES_AT;
+
+        // Ordering 1: [try_settle, try_recover]
+        {
+            let env = Env::default();
+            env.mock_all_auths_allowing_non_root_auth();
+            let contract_id = env.register(UptoSessionContract, ());
+            let client = UptoSessionContractClient::new(&env, &contract_id);
+            let buyer = Address::generate(&env);
+            let seller = Address::generate(&env);
+            let asset = create_test_asset(&env, &buyer, CAP);
+            let token = token::Client::new(&env, &asset);
+            initialize_for_asset(&env, &client, &buyer, &asset);
+            let session_id = client.create_session(
+                &buyer,
+                &seller,
+                &asset,
+                &CAP,
+                &EXPIRES_AT,
+                &BytesN::from_array(&env, &[41; 32]),
+            );
+
+            env.ledger().set_sequence_number(boundary_ledger);
+            let usage_hash = BytesN::from_array(&env, &[77; 32]);
+
+            let settle_res = client.try_settle(&session_id, &settle_amount, &usage_hash);
+            let recover_res = client.try_recover_expired(&session_id);
+
+            let session = client.get_session(&session_id);
+            let buyer_balance = token.balance(&buyer);
+            let seller_balance = token.balance(&seller);
+            let contract_balance = token.balance(&contract_id);
+            let liability = client.get_escrow_liability(&asset);
+
+            // Funds strictly conserved:
+            assert_eq!(buyer_balance + seller_balance + contract_balance, CAP);
+            assert_eq!(contract_balance, 0);
+            assert_eq!(liability, 0);
+
+            if is_before_expiry {
+                // Settle won
+                assert!(settle_res.is_ok());
+                assert_eq!(recover_res, Err(Ok(ContractError::SessionAlreadySettled)));
+                assert_eq!(session.status, SessionStatus::Settled);
+                assert_eq!(session.settled_amount, settle_amount);
+                assert_eq!(seller_balance, settle_amount);
+                assert_eq!(buyer_balance, refund_amount);
+            } else {
+                // Recover won
+                assert_eq!(settle_res, Err(Ok(ContractError::ExpiredSession)));
+                assert!(recover_res.is_ok());
+                assert_eq!(session.status, SessionStatus::Expired);
+                assert_eq!(session.settled_amount, 0);
+                assert_eq!(seller_balance, 0);
+                assert_eq!(buyer_balance, CAP);
+            }
+        }
+
+        // Ordering 2: [try_recover, try_settle]
+        {
+            let env = Env::default();
+            env.mock_all_auths_allowing_non_root_auth();
+            let contract_id = env.register(UptoSessionContract, ());
+            let client = UptoSessionContractClient::new(&env, &contract_id);
+            let buyer = Address::generate(&env);
+            let seller = Address::generate(&env);
+            let asset = create_test_asset(&env, &buyer, CAP);
+            let token = token::Client::new(&env, &asset);
+            initialize_for_asset(&env, &client, &buyer, &asset);
+            let session_id = client.create_session(
+                &buyer,
+                &seller,
+                &asset,
+                &CAP,
+                &EXPIRES_AT,
+                &BytesN::from_array(&env, &[41; 32]),
+            );
+
+            env.ledger().set_sequence_number(boundary_ledger);
+            let usage_hash = BytesN::from_array(&env, &[77; 32]);
+
+            let recover_res = client.try_recover_expired(&session_id);
+            let settle_res = client.try_settle(&session_id, &settle_amount, &usage_hash);
+
+            let session = client.get_session(&session_id);
+            let buyer_balance = token.balance(&buyer);
+            let seller_balance = token.balance(&seller);
+            let contract_balance = token.balance(&contract_id);
+            let liability = client.get_escrow_liability(&asset);
+
+            assert_eq!(buyer_balance + seller_balance + contract_balance, CAP);
+            assert_eq!(contract_balance, 0);
+            assert_eq!(liability, 0);
+
+            if is_before_expiry {
+                // Recover rejected because not expired; Settle then won
+                assert_eq!(recover_res, Err(Ok(ContractError::SessionNotExpired)));
+                assert!(settle_res.is_ok());
+                assert_eq!(session.status, SessionStatus::Settled);
+                assert_eq!(session.settled_amount, settle_amount);
+                assert_eq!(seller_balance, settle_amount);
+                assert_eq!(buyer_balance, refund_amount);
+            } else {
+                // Recover won; Settle then rejected because session is already expired
+                assert!(recover_res.is_ok());
+                assert_eq!(settle_res, Err(Ok(ContractError::SessionExpired)));
+                assert_eq!(session.status, SessionStatus::Expired);
+                assert_eq!(session.settled_amount, 0);
+                assert_eq!(seller_balance, 0);
+                assert_eq!(buyer_balance, CAP);
+            }
+        }
+
+        // Ordering 3 & 4: settlement racing against recover_expired_batch
+        {
+            let env = Env::default();
+            env.mock_all_auths_allowing_non_root_auth();
+            let contract_id = env.register(UptoSessionContract, ());
+            let client = UptoSessionContractClient::new(&env, &contract_id);
+            let buyer = Address::generate(&env);
+            let seller = Address::generate(&env);
+            let asset = create_test_asset(&env, &buyer, CAP);
+            let token = token::Client::new(&env, &asset);
+            initialize_for_asset(&env, &client, &buyer, &asset);
+            let session_id = client.create_session(
+                &buyer,
+                &seller,
+                &asset,
+                &CAP,
+                &EXPIRES_AT,
+                &BytesN::from_array(&env, &[41; 32]),
+            );
+
+            env.ledger().set_sequence_number(boundary_ledger);
+            let usage_hash = BytesN::from_array(&env, &[77; 32]);
+            let batch = soroban_sdk::vec![&env, session_id.clone()];
+
+            if is_before_expiry {
+                // [batch, settle]
+                let batch_results = client.recover_expired_batch(&batch);
+                assert_eq!(batch_results.get(0).unwrap().status, BatchRecoveryStatus::NotExpired);
+                assert!(client.try_settle(&session_id, &settle_amount, &usage_hash).is_ok());
+                assert_eq!(client.get_session(&session_id).status, SessionStatus::Settled);
+            } else {
+                // [batch, settle]
+                let batch_results = client.recover_expired_batch(&batch);
+                assert_eq!(batch_results.get(0).unwrap().status, BatchRecoveryStatus::Recovered);
+                assert_eq!(
+                    client.try_settle(&session_id, &settle_amount, &usage_hash),
+                    Err(Ok(ContractError::SessionExpired))
+                );
+                assert_eq!(client.get_session(&session_id).status, SessionStatus::Expired);
+            }
+            assert_eq!(token.balance(&buyer) + token.balance(&seller), CAP);
+            assert_eq!(token.balance(&contract_id), 0);
+            assert_eq!(client.get_escrow_liability(&asset), 0);
+        }
+    }
+}

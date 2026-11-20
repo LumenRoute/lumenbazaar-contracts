@@ -118,6 +118,10 @@ fn open_session(env: &Env, cap: i128, expires: u32) -> Session {
         resource_hash: BytesN::from_array(env, &[2; 32]),
         usage_hash: None,
         status: SessionStatus::Open,
+        creation_ledger: 0,
+        finalized_ledger: None,
+        resource_scheme_version: 1,
+        usage_scheme_version: None,
     }
 }
 
@@ -316,8 +320,13 @@ proptest! {
 
         let result = client.try_set_asset_max_session_amount(&asset, &update);
         if update > 0 {
-            prop_assert!(result.is_ok());
-            prop_assert_eq!(client.get_asset_max_session_amount(&asset), update);
+            if update > initial {
+                prop_assert_eq!(result.map(|_| ()), Err(Ok(ContractError::CapIncreasePending)));
+                prop_assert_eq!(client.get_asset_max_session_amount(&asset), initial);
+            } else {
+                prop_assert!(result.is_ok());
+                prop_assert_eq!(client.get_asset_max_session_amount(&asset), update);
+            }
         } else {
             prop_assert_eq!(result.map(|_| ()), Err(Ok(ContractError::InvalidAssetCap)));
             prop_assert_eq!(client.get_asset_max_session_amount(&asset), initial);

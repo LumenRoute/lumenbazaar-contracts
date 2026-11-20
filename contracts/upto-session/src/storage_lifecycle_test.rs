@@ -482,7 +482,9 @@ fn sr9_missing_instance_config_blocks_creation_and_admin_but_not_exits() {
     // Existing escrow can still leave through the session's own record.
     client.cancel(&cancelled);
     client.settle(&settled, &CAP, &h.usage_hash());
-    assert_eq!(client.get_escrow_liability(&h.asset), 0);
+    h.env.as_contract(&h.contract_id, || {
+        assert_eq!(storage::read_liability(&h.env, &h.asset), 0);
+    });
 }
 
 #[test]

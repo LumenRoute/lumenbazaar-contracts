@@ -1,0 +1,10 @@
+{
+  "current": 1,
+  "versions": {
+    "1": {
+      "file": "encoding-vectors.v1.json",
+      "sha256": "0103e2f2d83e73e70e8d4ac735131fe1c0307d33a73e5c0480382cae933ff74b",
+      "status": "current"
+    }
+  }
+}

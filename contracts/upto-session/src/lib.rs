@@ -10,16 +10,12 @@ pub mod validation;
 
 pub use errors::ContractError;
 pub use types::{
-    AdminRotation, AssetLifecycle, AssetPolicy, AssetPolicyResponse, AssetSolvency, AssetStatus,
-    BatchRecoveryResult,
-    BatchRecoveryStatus, ContractConfiguration, OperationalState, RecoverabilityStatus, Session,
-    SessionRecoverability, SessionStatus, SettlementPreview, SettlementRejectionReason,
-    SolvencyAssetState,
-    AdminRotation, AssetPolicy, AssetStatus, BatchRecoveryResult, BatchRecoveryStatus,
-    CapIncreaseProposal, CommitmentDomainMetadata, ContractConfiguration, OperationalState,
-    Session, SessionStatus, SessionStatusResponse,
-    AssetSolvencySnapshot, SolvencyStatus,
-    BatchSessionResult, BatchSessionStatus,
+    AdminRotation, AssetLifecycle, AssetPolicy, AssetPolicyResponse, AssetSolvency,
+    AssetSolvencySnapshot, AssetStatus, BatchRecoveryResult, BatchRecoveryStatus,
+    BatchSessionResult, BatchSessionStatus, CapIncreaseProposal, CommitmentDomainMetadata,
+    ContractConfiguration, OperationalState, RecoverabilityStatus, Session, SessionRecoverability,
+    SessionStatus, SessionStatusResponse, SettlementPreview, SettlementRejectionReason,
+    SolvencyAssetState, SolvencyStatus,
 };
 
 use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
@@ -584,7 +580,6 @@ impl UptoSessionContract {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn create_session(
         env: Env,
         buyer: Address,
@@ -593,7 +588,6 @@ impl UptoSessionContract {
         max_amount: i128,
         expires_at_ledger: u32,
         resource_hash: BytesN<32>,
-        idempotency_key: BytesN<32>,
     ) -> Result<BytesN<32>, ContractError> {
         validation::validate_commitment_scheme(
             validation::SUPPORTED_RESOURCE_SCHEME_VERSION,
@@ -667,25 +661,6 @@ impl UptoSessionContract {
             }
         }
 
-        storage::check_session_sequence_available(&env)?;
-
-        if let Some(existing_session_id) =
-            storage::read_idempotency_key(&env, &buyer, &idempotency_key)
-        {
-            let session = storage::read_session(&env, &existing_session_id)
-                .ok_or(ContractError::SessionNotFound)?;
-            if session.seller != seller
-                || session.asset != asset
-                || session.max_amount != max_amount
-                || session.expires_at_ledger != expires_at_ledger
-                || session.resource_hash != resource_hash
-            {
-                return Err(ContractError::IdempotencyConflict);
-            }
-            buyer.require_auth();
-            return Ok(existing_session_id);
-        }
-
         buyer.require_auth();
         let sequence = storage::take_next_session_sequence(&env)?;
         let session_id = ids::derive_session_id(
@@ -698,7 +673,6 @@ impl UptoSessionContract {
                 expires_at_ledger,
                 resource_hash: &resource_hash,
                 sequence,
-                idempotency_key: &idempotency_key,
             },
         );
 
@@ -735,7 +709,7 @@ impl UptoSessionContract {
         let current_ledger = env.ledger().sequence();
         let session = Session {
             id: session_id.clone(),
-            buyer: buyer.clone(),
+            buyer,
             seller,
             asset,
             max_amount,
@@ -752,7 +726,6 @@ impl UptoSessionContract {
         };
 
         storage::write_session(&env, &session);
-        storage::write_idempotency_key(&env, &buyer, &idempotency_key, &session_id);
         events::publish_session_created(&env, &session);
 
         Ok(session_id)
@@ -1082,11 +1055,6 @@ impl UptoSessionContract {
     }
 
     pub fn reject(env: Env, session_id: BytesN<32>) -> Result<(), ContractError> {
-    pub fn reduce_session_cap(
-        env: Env,
-        session_id: BytesN<32>,
-        new_max_amount: i128,
-    ) -> Result<(), ContractError> {
         let mut session =
             storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
 
@@ -1106,6 +1074,58 @@ impl UptoSessionContract {
         let asset = token::Client::new(&env, &session.asset);
         let contract = env.current_contract_address();
         if refunded_amount != session.max_amount
+            || asset.balance(&contract) < storage::read_liability(&env, &session.asset)
+        {
+            return Err(ContractError::EscrowUnderfunded);
+        }
+        let contract_balance_before = asset.balance(&contract);
+        let buyer_balance_before = asset.balance(&session.buyer);
+        storage::decrease_liability(&env, &session.asset, refunded_amount)?;
+        asset.transfer(&contract, &session.buyer, &refunded_amount);
+        verify_debit(
+            contract_balance_before,
+            asset.balance(&contract),
+            refunded_amount,
+        )?;
+        verify_credit(
+            buyer_balance_before,
+            asset.balance(&session.buyer),
+            refunded_amount,
+        )?;
+        session.escrowed_amount = 0;
+        session.status = SessionStatus::Rejected;
+        storage::write_session(&env, &session);
+        events::publish_session_rejected(
+            &env,
+            &session_id,
+            &session.seller,
+            &session.buyer,
+            &session.asset,
+            refunded_amount,
+        );
+
+        Ok(())
+    }
+
+    pub fn reduce_session_cap(
+        env: Env,
+        session_id: BytesN<32>,
+        new_max_amount: i128,
+    ) -> Result<(), ContractError> {
+        let mut session =
+            storage::read_session(&env, &session_id).ok_or(ContractError::SessionNotFound)?;
+
+        match &session.status {
+            SessionStatus::Open => {}
+            SessionStatus::Settled => return Err(ContractError::SessionAlreadySettled),
+            SessionStatus::Cancelled => return Err(ContractError::SessionCancelled),
+            SessionStatus::Expired => return Err(ContractError::SessionExpired),
+            SessionStatus::Rejected => return Err(ContractError::SessionRejected),
+        }
+
+        if env.ledger().sequence() >= session.expires_at_ledger {
+            return Err(ContractError::ExpiredSession);
+        }
 
         if new_max_amount <= 0 || new_max_amount >= session.max_amount {
             return Err(ContractError::InvalidCapReduction);
@@ -1123,14 +1143,6 @@ impl UptoSessionContract {
         {
             return Err(ContractError::EscrowUnderfunded);
         }
-        let contract_balance_before = asset.balance(&contract);
-        let buyer_balance_before = asset.balance(&session.buyer);
-        storage::decrease_liability(&env, &session.asset, refunded_amount)?;
-        asset.transfer(&contract, &session.buyer, &refunded_amount);
-        verify_debit(
-            contract_balance_before,
-            asset.balance(&contract),
-            refunded_amount,
 
         let contract_balance_before = asset.balance(&contract);
         let buyer_balance_before = asset.balance(&session.buyer);
@@ -1152,18 +1164,6 @@ impl UptoSessionContract {
         verify_credit(
             buyer_balance_before,
             asset.balance(&session.buyer),
-            refunded_amount,
-        )?;
-        session.escrowed_amount = 0;
-        session.status = SessionStatus::Rejected;
-        storage::write_session(&env, &session);
-        events::publish_session_rejected(
-            &env,
-            &session_id,
-            &session.seller,
-            &session.buyer,
-            &session.asset,
-            refunded_amount,
             refund_difference,
         )?;
 
