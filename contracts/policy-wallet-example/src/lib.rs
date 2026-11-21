@@ -1,7 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, Address, BytesN, Env, Vec,
+    contract, contracterror, contractevent, contractimpl, contracttype, xdr::ToXdr, Address, BytesN, Env, Vec,
 };
 
 pub const LEDGERS_PER_DAY: u32 = 17_280;
@@ -57,6 +57,33 @@ pub struct WalletConfig {
     pub upto_session_contract: Address,
     pub initialized_at_ledger: u32,
     pub example_only: bool,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DecisionReceipt {
+    pub policy_version: u32,
+    pub agent: Address,
+    pub seller: Address,
+    pub asset: Address,
+    pub amount: i128,
+    pub resource_hash: BytesN<32>,
+    pub ledger_day: u32,
+    pub new_daily_spend: i128,
+    pub new_seller_spend: i128,
+    pub new_resource_spend: i128,
+    pub new_auth_count: u32,
+}
+
+#[contractevent]
+pub struct PolicyDecisionCommitted {
+    #[topic]
+    pub agent: Address,
+    #[topic]
+    pub seller: Address,
+    pub decision_digest: BytesN<32>,
+    pub amount: i128,
+    pub ledger_day: u32,
 }
 
 #[contracttype]
@@ -295,12 +322,28 @@ impl PolicyWalletExampleContract {
             .checked_add(amount)
             .ok_or(PolicyWalletError::AmountExceedsDailyCap)?;
         env.storage().instance().set(
-            &DataKey::DailyResourceSpend(agent, resource_hash, ledger_day),
+            &DataKey::DailyResourceSpend(agent.clone(), resource_hash.clone(), ledger_day),
             &next_resource_spent,
         );
         env.storage()
             .instance()
             .extend_ttl(DEFAULT_TTL_THRESHOLD, TTL_EXTENSION_AMOUNT);
+
+        let policy = read_policy(&env, &agent)?;
+        let mut digest_payload = soroban_sdk::Bytes::new(&env);
+        digest_payload.append(&policy.revision.clone().to_xdr(&env));
+        digest_payload.append(&amount.to_xdr(&env));
+        digest_payload.append(&ledger_day.to_xdr(&env));
+        let decision_digest = env.crypto().sha256(&digest_payload).into();
+
+        PolicyDecisionCommitted {
+            agent,
+            seller,
+            decision_digest,
+            amount,
+            ledger_day,
+        }
+        .publish(&env);
 
         Ok(())
     }
