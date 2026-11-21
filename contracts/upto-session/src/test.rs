@@ -5099,6 +5099,226 @@ fn reduce_session_cap_lowers_cap_refunds_buyer_and_reduces_liability() {
 }
 
 #[test]
+fn preview_reduce_session_cap_calculates_exact_refund_and_exposure_reduction() {
+    let env = Env::default();
+    env.mock_all_auths_allowing_non_root_auth();
+    let contract_id = env.register(UptoSessionContract, ());
+    let client = UptoSessionContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let asset = create_test_asset(&env, &buyer, 10_000);
+    let token = token::Client::new(&env, &asset);
+
+    let policies = soroban_sdk::vec![&env, asset_policy(&asset, 1_000)];
+    client.initialize(&admin, &policies);
+    client.set_seller_exposure_ceiling(&asset, &2_000);
+
+    let resource_hash = BytesN::from_array(&env, &[1; 32]);
+    let usage_hash = BytesN::from_array(&env, &[2; 32]);
+
+    let session_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &1_000,
+        &100,
+        &resource_hash,
+        &unique_idempotency_key(&env),
+    );
+
+    // 1. Valid reduction preview (1,000 -> 600)
+    let preview = client.preview_reduce_session_cap(&session_id, &600);
+    assert_eq!(
+        preview,
+        CapReductionPreview {
+            eligible: true,
+            new_max_amount: 600,
+            refund_amount: 400,
+            exposure_reduction: 400,
+            is_expired: false,
+            rejection_reason: CapReductionRejectionReason::None,
+        }
+    );
+
+    // Minimum reduction preview (1,000 -> 999: delta = 1)
+    let min_preview = client.preview_reduce_session_cap(&session_id, &999);
+    assert_eq!(
+        min_preview,
+        CapReductionPreview {
+            eligible: true,
+            new_max_amount: 999,
+            refund_amount: 1,
+            exposure_reduction: 1,
+            is_expired: false,
+            rejection_reason: CapReductionRejectionReason::None,
+        }
+    );
+
+    // Minimum valid cap preview (1,000 -> 1: delta = 999)
+    let min_cap_preview = client.preview_reduce_session_cap(&session_id, &1);
+    assert_eq!(
+        min_cap_preview,
+        CapReductionPreview {
+            eligible: true,
+            new_max_amount: 1,
+            refund_amount: 999,
+            exposure_reduction: 999,
+            is_expired: false,
+            rejection_reason: CapReductionRejectionReason::None,
+        }
+    );
+
+    // Verify preview did not mutate contract state or balances
+    let session_before = client.get_session(&session_id);
+    assert_eq!(session_before.max_amount, 1_000);
+    assert_eq!(session_before.escrowed_amount, 1_000);
+    assert_eq!(token.balance(&buyer), 9_000);
+    assert_eq!(client.get_escrow_liability(&asset), 1_000);
+    assert_eq!(client.get_seller_exposure(&seller, &asset), 1_000);
+    assert_eq!(client.get_buyer_exposure(&buyer, &asset), 1_000);
+
+    // 2. Unchanged cap (1,000 -> 1,000) is invalid
+    let same_preview = client.preview_reduce_session_cap(&session_id, &1_000);
+    assert_eq!(
+        same_preview,
+        CapReductionPreview {
+            eligible: false,
+            new_max_amount: 1_000,
+            refund_amount: 0,
+            exposure_reduction: 0,
+            is_expired: false,
+            rejection_reason: CapReductionRejectionReason::InvalidCapReduction,
+        }
+    );
+
+    // 3. Increased cap (1,000 -> 1,200) is invalid
+    let inc_preview = client.preview_reduce_session_cap(&session_id, &1_200);
+    assert_eq!(
+        inc_preview,
+        CapReductionPreview {
+            eligible: false,
+            new_max_amount: 1_200,
+            refund_amount: 0,
+            exposure_reduction: 0,
+            is_expired: false,
+            rejection_reason: CapReductionRejectionReason::InvalidCapReduction,
+        }
+    );
+
+    // 4. Zero and negative cap are invalid
+    let zero_preview = client.preview_reduce_session_cap(&session_id, &0);
+    assert_eq!(
+        zero_preview.rejection_reason,
+        CapReductionRejectionReason::InvalidCapReduction
+    );
+    assert!(!zero_preview.eligible);
+
+    let neg_preview = client.preview_reduce_session_cap(&session_id, &-50);
+    assert_eq!(
+        neg_preview.rejection_reason,
+        CapReductionRejectionReason::InvalidCapReduction
+    );
+    assert!(!neg_preview.eligible);
+
+    // 5. Unknown session ID
+    let missing_id = BytesN::from_array(&env, &[99; 32]);
+    let missing_preview = client.preview_reduce_session_cap(&missing_id, &500);
+    assert_eq!(
+        missing_preview,
+        CapReductionPreview {
+            eligible: false,
+            new_max_amount: 500,
+            refund_amount: 0,
+            exposure_reduction: 0,
+            is_expired: false,
+            rejection_reason: CapReductionRejectionReason::NotFound,
+        }
+    );
+
+    // 6. Expired session preview
+    let exp_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &500,
+        &50,
+        &resource_hash,
+        &unique_idempotency_key(&env),
+    );
+    env.ledger().set_sequence_number(55);
+    let expired_preview = client.preview_reduce_session_cap(&exp_id, &300);
+    assert_eq!(
+        expired_preview,
+        CapReductionPreview {
+            eligible: false,
+            new_max_amount: 300,
+            refund_amount: 0,
+            exposure_reduction: 0,
+            is_expired: true,
+            rejection_reason: CapReductionRejectionReason::Expired,
+        }
+    );
+
+    // 7. Terminal states preview
+    env.ledger().set_sequence_number(1);
+    let s_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &60,
+        &resource_hash,
+        &unique_idempotency_key(&env),
+    );
+    client.settle(&s_id, &100, &usage_hash);
+    assert_eq!(
+        client.preview_reduce_session_cap(&s_id, &50).rejection_reason,
+        CapReductionRejectionReason::AlreadySettled
+    );
+
+    let c_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &60,
+        &resource_hash,
+        &unique_idempotency_key(&env),
+    );
+    client.cancel(&c_id);
+    assert_eq!(
+        client.preview_reduce_session_cap(&c_id, &50).rejection_reason,
+        CapReductionRejectionReason::AlreadyCancelled
+    );
+
+    let r_id = client.create_session(
+        &buyer,
+        &seller,
+        &asset,
+        &200,
+        &60,
+        &resource_hash,
+        &unique_idempotency_key(&env),
+    );
+    client.reject(&r_id);
+    assert_eq!(
+        client.preview_reduce_session_cap(&r_id, &50).rejection_reason,
+        CapReductionRejectionReason::AlreadyRejected
+    );
+
+    // 8. Execute actual reduction and verify it matches preview
+    let balance_before = token.balance(&buyer);
+    let liability_before = client.get_escrow_liability(&asset);
+    let buyer_exposure_before = client.get_buyer_exposure(&buyer, &asset);
+
+    client.reduce_session_cap(&session_id, &600);
+    assert_eq!(token.balance(&buyer), balance_before + preview.refund_amount);
+    assert_eq!(client.get_escrow_liability(&asset), liability_before - preview.exposure_reduction);
+    assert_eq!(client.get_buyer_exposure(&buyer, &asset), buyer_exposure_before - preview.exposure_reduction);
+}
+
+#[test]
 fn creation_pause_requires_admin_and_fails_closed_before_transfer() {
     let env = Env::default();
     let contract_id = env.register(UptoSessionContract, ());
