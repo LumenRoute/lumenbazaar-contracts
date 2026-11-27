@@ -150,6 +150,13 @@ pub struct PolicyDecisionCommitted {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StorageTtlHealth {
+    pub instance_ttl: u32,
+    pub config_ttl: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpendingPolicy {
     pub agent: Address,
     pub max_amount_per_payment: i128,
@@ -739,6 +746,14 @@ impl PolicyWalletExampleContract {
 
     pub fn get_owner(env: Env) -> Result<Address, PolicyWalletError> {
         Ok(read_config(&env)?.owner)
+    }
+
+    pub fn get_storage_ttl_health(env: Env) -> StorageTtlHealth {
+        let instance_ttl = env.storage().instance().get_ttl();
+        StorageTtlHealth {
+            instance_ttl,
+            config_ttl: instance_ttl,
+        }
     }
 
     pub fn example_only(_env: Env) -> bool {
