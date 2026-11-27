@@ -149,6 +149,14 @@ pub struct PolicyPage {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SellerAllowlistPage {
+    pub sellers: Vec<Address>,
+    pub next_cursor: Option<u32>,
+    pub total_count: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AuthorizationRecord {
     pub request_hash: BytesN<32>,
     pub authorized_at_ledger: u32,
@@ -190,6 +198,7 @@ pub enum PolicyWalletError {
     ReplayConflict = 22,
     InvalidPageLimit = 23,
     PolicyIndexFull = 24,
+    InvalidCursor = 25,
 }
 
 /// Emitted once when the owner revokes an agent's policy.
@@ -391,6 +400,55 @@ impl PolicyWalletExampleContract {
                 total_count,
             })
         }
+    }
+
+    /// Returns a paginated view of configured allowed sellers for an agent's policy.
+    /// Results are deterministically ordered matching the configured allowlist
+    /// and page size is bounded by MAX_POLICY_PAGE_SIZE. Oversized pages and invalid
+    /// cursors (cursor > total_count) are rejected.
+    pub fn get_allowed_sellers(
+        env: Env,
+        agent: Address,
+        cursor: Option<u32>,
+        limit: Option<u32>,
+    ) -> Result<SellerAllowlistPage, PolicyWalletError> {
+        let policy = read_policy(&env, &agent)?;
+
+        let page_limit = match limit {
+            Some(l) => {
+                if l == 0 || l > MAX_POLICY_PAGE_SIZE {
+                    return Err(PolicyWalletError::InvalidPageLimit);
+                }
+                l
+            }
+            None => MAX_POLICY_PAGE_SIZE,
+        };
+
+        let sellers = policy.allowed_sellers;
+        let total_count = sellers.len();
+
+        let start = match cursor {
+            Some(c) => {
+                if c > total_count {
+                    return Err(PolicyWalletError::InvalidCursor);
+                }
+                c
+            }
+            None => 0,
+        };
+
+        let mut page_sellers = Vec::new(&env);
+        let end = (start + page_limit).min(total_count);
+        for i in start..end {
+            page_sellers.push_back(sellers.get(i).unwrap());
+        }
+        let next_cursor = if end < total_count { Some(end) } else { None };
+
+        Ok(SellerAllowlistPage {
+            sellers: page_sellers,
+            next_cursor,
+            total_count,
+        })
     }
 
     /// Read-only status query reporting whether an agent's policy is Pending, Active,

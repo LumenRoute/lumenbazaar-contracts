@@ -31,6 +31,8 @@ Each policy carries a monotonic `revision`. `set_policy(policy, expected_revisio
 
 `get_agent_policies(agent, cursor, limit)` provides deterministic cursor pagination over policy identifiers assigned to an agent. The stored index length is bounded by `MAX_STORED_AGENT_POLICIES` (32) and the page size is bounded by `MAX_POLICY_PAGE_SIZE` (10). Revocation clears the agent's index, and querying policies for one agent cannot expose identifiers for another.
 
+`get_allowed_sellers(agent, cursor, limit)` provides deterministic cursor pagination over configured seller addresses for an agent's policy. Page size is bounded by `MAX_POLICY_PAGE_SIZE` (10), oversized pages and invalid cursors are rejected, and ordering matches the configured duplicate-free allowlist.
+
 When a cap reduction and a session-creation authorization land in the same ledger sequence, each executes against the policy revision visible in its transaction order; preserved daily-spend counters block any post-reduction spend above the tightened ceiling. See [Same-Ledger Cap-Reduction and Session-Creation Ordering Semantics](docs/policy-examples.md#same-ledger-cap-reduction-and-session-creation-ordering-semantics).
 
 ## Revocation

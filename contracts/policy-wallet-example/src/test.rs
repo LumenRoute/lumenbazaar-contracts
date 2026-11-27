@@ -1402,6 +1402,93 @@ fn agent_policy_cursor_pagination_and_index_lifecycle() {
         Err(Ok(PolicyWalletError::InvalidPageLimit))
     );
 }
+
+#[test]
+fn test_get_allowed_sellers_pagination_and_validation() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, agent, seller, asset, _owner, resource_hash) = initialized_wallet(&env);
+
+    // 1. Policy not found for unregistered agent
+    let unregistered = Address::generate(&env);
+    assert_eq!(
+        client.try_get_allowed_sellers(&unregistered, &None, &None),
+        Err(Ok(PolicyWalletError::PolicyNotFound))
+    );
+
+    // 2. Set policy with 7 unique sellers
+    let mut sellers = Vec::new(&env);
+    sellers.push_back(seller.clone());
+    for _ in 1..7 {
+        sellers.push_back(Address::generate(&env));
+    }
+    let mut policy = standard_policy(&env, &agent, &seller, &asset, &resource_hash, 100);
+    policy.allowed_sellers = sellers.clone();
+    client.set_policy(&policy, &0);
+
+    // Page 1: limit 3, cursor None (default start 0)
+    let p1 = client.get_allowed_sellers(&agent, &None, &Some(3));
+    assert_eq!(p1.total_count, 7);
+    assert_eq!(p1.sellers.len(), 3);
+    assert_eq!(p1.next_cursor, Some(3));
+    assert_eq!(p1.sellers.get(0).unwrap(), sellers.get(0).unwrap());
+    assert_eq!(p1.sellers.get(1).unwrap(), sellers.get(1).unwrap());
+    assert_eq!(p1.sellers.get(2).unwrap(), sellers.get(2).unwrap());
+
+    // Page 2: limit 3, cursor 3
+    let p2 = client.get_allowed_sellers(&agent, &Some(3), &Some(3));
+    assert_eq!(p2.total_count, 7);
+    assert_eq!(p2.sellers.len(), 3);
+    assert_eq!(p2.next_cursor, Some(6));
+    assert_eq!(p2.sellers.get(0).unwrap(), sellers.get(3).unwrap());
+    assert_eq!(p2.sellers.get(1).unwrap(), sellers.get(4).unwrap());
+    assert_eq!(p2.sellers.get(2).unwrap(), sellers.get(5).unwrap());
+
+    // Page 3: limit 3, cursor 6 (remaining 1 seller)
+    let p3 = client.get_allowed_sellers(&agent, &Some(6), &Some(3));
+    assert_eq!(p3.total_count, 7);
+    assert_eq!(p3.sellers.len(), 1);
+    assert_eq!(p3.next_cursor, None);
+    assert_eq!(p3.sellers.get(0).unwrap(), sellers.get(6).unwrap());
+
+    // Cursor exact at total_count returns empty sellers and None next_cursor
+    let p_end = client.get_allowed_sellers(&agent, &Some(7), &Some(3));
+    assert_eq!(p_end.total_count, 7);
+    assert!(p_end.sellers.is_empty());
+    assert_eq!(p_end.next_cursor, None);
+
+    // Default limit (None -> MAX_POLICY_PAGE_SIZE = 10): returns all 7 in single page
+    let p_default = client.get_allowed_sellers(&agent, &None, &None);
+    assert_eq!(p_default.total_count, 7);
+    assert_eq!(p_default.sellers.len(), 7);
+    assert_eq!(p_default.next_cursor, None);
+    assert_eq!(p_default.sellers, sellers);
+
+    // Invalid cursor (cursor > total_count) rejected with InvalidCursor
+    assert_eq!(
+        client.try_get_allowed_sellers(&agent, &Some(8), &Some(3)),
+        Err(Ok(PolicyWalletError::InvalidCursor))
+    );
+
+    // Oversized limit (limit > MAX_POLICY_PAGE_SIZE) rejected with InvalidPageLimit
+    assert_eq!(
+        client.try_get_allowed_sellers(&agent, &None, &Some(MAX_POLICY_PAGE_SIZE + 1)),
+        Err(Ok(PolicyWalletError::InvalidPageLimit))
+    );
+
+    // Zero limit rejected with InvalidPageLimit
+    assert_eq!(
+        client.try_get_allowed_sellers(&agent, &None, &Some(0)),
+        Err(Ok(PolicyWalletError::InvalidPageLimit))
+    );
+
+    // Revocation enforcement: revoking policy causes get_allowed_sellers to return PolicyRevoked
+    client.revoke_policy(&agent);
+    assert_eq!(
+        client.try_get_allowed_sellers(&agent, &None, &None),
+        Err(Ok(PolicyWalletError::PolicyRevoked))
+    );
+}
 #[test]
 fn test_policy_active_window_status_boundaries_and_revocation() {
     let env = Env::default();
