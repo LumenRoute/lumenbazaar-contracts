@@ -980,3 +980,45 @@ fn same_ledger_authorization_permutations_and_rejections_preserve_consistency() 
     assert_eq!(client.spent_today(&actors.agent), 100);
     assert_eq!(client.authorized_count_today(&actors.agent), 3);
 }
+
+/// P10: generated arithmetic boundaries across u32 counter rollover and exhausted limits (#255).
+#[test]
+fn p10_counter_arithmetic_boundaries_and_rollover() {
+    let env = Env::default();
+    let (client, actors) = setup(&env);
+    let mut policy = pinned_policy(&env, &actors, 10_000, START_LEDGER + 50_000);
+    policy.max_authorizations_per_day = 3;
+    client.set_policy(&policy, &0);
+
+    let pay = |amount: i128| {
+        defined(client.try_authorize_payment(
+            &actors.agent,
+            &actors.sellers[0],
+            &actors.assets[0],
+            &amount,
+            &actors.resources[0],
+        ))
+    };
+
+    assert_eq!(pay(100), Ok(()));
+    assert_eq!(client.authorized_count_today(&actors.agent), 1);
+    assert_eq!(pay(100), Ok(()));
+    assert_eq!(client.authorized_count_today(&actors.agent), 2);
+    assert_eq!(pay(100), Ok(()));
+    assert_eq!(client.authorized_count_today(&actors.agent), 3);
+
+    // Limit exhausted: further attempts fail and leave state unchanged
+    assert_eq!(pay(100), Err(PolicyWalletError::AuthorizationLimitExceeded));
+    assert_eq!(client.authorized_count_today(&actors.agent), 3);
+    assert_eq!(client.spent_today(&actors.agent), 300);
+
+    // Day rollover: advance ledger by LEDGERS_PER_DAY
+    let next_day_ledger = env.ledger().sequence() + LEDGERS_PER_DAY;
+    env.ledger().with_mut(|l| l.sequence = next_day_ledger);
+
+    // Counters reset on the new day
+    assert_eq!(client.authorized_count_today(&actors.agent), 0);
+    assert_eq!(client.spent_today(&actors.agent), 0);
+    assert_eq!(pay(100), Ok(()));
+    assert_eq!(client.authorized_count_today(&actors.agent), 1);
+}

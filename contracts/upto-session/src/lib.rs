@@ -15,12 +15,12 @@ pub use types::{
     AssetPolicyResponse, AssetSolvency, AssetSolvencySnapshot, AssetStatus, AuditIndexCategory,
     BatchRecoveryResult, BatchRecoveryStatus, BatchSessionResult, BatchSessionStatus,
     BuyerExposureHeadroom, BuyerSessionCount, CancellationPreview, CancellationRejectionReason,
-    CapIncreaseProposal, CapIncreaseStatus, CapIncreaseStatusResponse, CommitmentDomainMetadata,
-    CommitmentKind, ContractConfiguration, OperationalState, RecoverabilityStatus,
-    SellerExposureHeadroom, Session, SessionIndexAuditResult, SessionIndexMismatch,
-    SessionRecoverability, SessionStateCounts, SessionStatus, SessionStatusResponse,
-    SettlementPreview, SettlementRejectionReason, SolvencyAssetState, SolvencyStatus,
-    TerminalEvidence, TerminalEvidenceDigest,
+    CapIncreaseProposal, CapIncreaseStatus, CapIncreaseStatusResponse, CapReductionPreview,
+    CapReductionRejectionReason, CommitmentDomainMetadata, CommitmentKind, ContractConfiguration,
+    OperationalState, RecoverabilityStatus, SellerExposureHeadroom, Session,
+    SessionIndexAuditResult, SessionIndexMismatch, SessionRecoverability, SessionStateCounts,
+    SessionStatus, SessionStatusResponse, SettlementPreview, SettlementRejectionReason,
+    SolvencyAssetState, SolvencyStatus, TerminalEvidence, TerminalEvidenceDigest,
 };
 
 use soroban_sdk::{contract, contractimpl, token, Address, BytesN, Env, Vec};
@@ -1465,9 +1465,7 @@ impl UptoSessionContract {
         if env.ledger().sequence() >= session.expires_at_ledger {
             return Err(ContractError::ExpiredSession);
         }
-        if new_max_amount <= 0 || new_max_amount >= session.max_amount {
-            return Err(ContractError::InvalidCapReduction);
-        }
+        validation::validate_cap_reduction_amount(&session, new_max_amount)?;
 
         session.buyer.require_auth();
 
@@ -1525,6 +1523,69 @@ impl UptoSessionContract {
         );
 
         Ok(())
+    }
+
+    pub fn preview_reduce_session_cap(
+        env: Env,
+        session_id: BytesN<32>,
+        new_max_amount: i128,
+    ) -> CapReductionPreview {
+        let session = match storage::read_session(&env, &session_id) {
+            Some(s) => s,
+            None => {
+                return CapReductionPreview {
+                    eligible: false,
+                    new_max_amount,
+                    refund_amount: 0,
+                    exposure_reduction: 0,
+                    is_expired: false,
+                    rejection_reason: CapReductionRejectionReason::NotFound,
+                };
+            }
+        };
+
+        let is_expired = env.ledger().sequence() >= session.expires_at_ledger;
+
+        let rejection_reason = match &session.status {
+            SessionStatus::Settled => CapReductionRejectionReason::AlreadySettled,
+            SessionStatus::Cancelled => CapReductionRejectionReason::AlreadyCancelled,
+            SessionStatus::Expired => CapReductionRejectionReason::AlreadyExpired,
+            SessionStatus::Rejected => CapReductionRejectionReason::AlreadyRejected,
+            SessionStatus::Open => {
+                if is_expired {
+                    CapReductionRejectionReason::Expired
+                } else if validation::validate_cap_reduction_amount(&session, new_max_amount).is_err() {
+                    CapReductionRejectionReason::InvalidCapReduction
+                } else {
+                    let contract = env.current_contract_address();
+                    let asset = token::Client::new(&env, &session.asset);
+                    if session.escrowed_amount != session.max_amount
+                        || asset.balance(&contract) < storage::read_liability(&env, &session.asset)
+                    {
+                        CapReductionRejectionReason::EscrowUnderfunded
+                    } else {
+                        CapReductionRejectionReason::None
+                    }
+                }
+            }
+        };
+
+        let eligible = rejection_reason == CapReductionRejectionReason::None;
+        let (refund_amount, exposure_reduction) = if eligible {
+            let delta = session.max_amount.checked_sub(new_max_amount).unwrap_or(0);
+            (delta, delta)
+        } else {
+            (0, 0)
+        };
+
+        CapReductionPreview {
+            eligible,
+            new_max_amount,
+            refund_amount,
+            exposure_reduction,
+            is_expired,
+            rejection_reason,
+        }
     }
 
     pub fn reject(env: Env, session_id: BytesN<32>) -> Result<(), ContractError> {
