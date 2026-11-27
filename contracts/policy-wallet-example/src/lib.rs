@@ -123,6 +123,33 @@ pub struct PolicyActiveWindowStatus {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DecisionReceipt {
+    pub policy_version: u32,
+    pub agent: Address,
+    pub seller: Address,
+    pub asset: Address,
+    pub amount: i128,
+    pub resource_hash: BytesN<32>,
+    pub ledger_day: u32,
+    pub new_daily_spend: i128,
+    pub new_seller_spend: i128,
+    pub new_resource_spend: i128,
+    pub new_auth_count: u32,
+}
+
+#[contractevent]
+pub struct PolicyDecisionCommitted {
+    #[topic]
+    pub agent: Address,
+    #[topic]
+    pub seller: Address,
+    pub decision_digest: BytesN<32>,
+    pub amount: i128,
+    pub ledger_day: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SpendingPolicy {
     pub agent: Address,
     pub max_amount_per_payment: i128,
@@ -536,6 +563,22 @@ impl PolicyWalletExampleContract {
         let ledger_day = current_ledger_day(&env);
         record_payment_spend(&env, &agent, &seller, &resource_hash, amount, ledger_day)?;
         extend_instance_ttl(&env);
+
+        let policy = read_policy(&env, &agent)?;
+        let mut digest_payload = soroban_sdk::Bytes::new(&env);
+        digest_payload.append(&policy.revision.clone().to_xdr(&env));
+        digest_payload.append(&amount.to_xdr(&env));
+        digest_payload.append(&ledger_day.to_xdr(&env));
+        let decision_digest = env.crypto().sha256(&digest_payload).into();
+
+        PolicyDecisionCommitted {
+            agent,
+            seller,
+            decision_digest,
+            amount,
+            ledger_day,
+        }
+        .publish(&env);
 
         Ok(())
     }
