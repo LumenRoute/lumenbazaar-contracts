@@ -254,6 +254,8 @@ pub struct SettlementPreview {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CancellationRejectionReason {
     None,
     NotFound,
@@ -272,6 +274,31 @@ pub struct CancellationPreview {
     pub refundable_amount: i128,
     pub is_expired: bool,
     pub rejection_reason: CancellationRejectionReason,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CapReductionRejectionReason {
+    None,
+    NotFound,
+    AlreadySettled,
+    AlreadyCancelled,
+    AlreadyExpired,
+    AlreadyRejected,
+    Expired,
+    InvalidCapReduction,
+    EscrowUnderfunded,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CapReductionPreview {
+    pub eligible: bool,
+    pub new_max_amount: i128,
+    pub refund_amount: i128,
+    pub exposure_reduction: i128,
+    pub is_expired: bool,
+    pub rejection_reason: CapReductionRejectionReason,
 }
 
 #[contracttype]

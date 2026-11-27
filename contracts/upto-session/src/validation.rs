@@ -198,6 +198,16 @@ pub fn validate_settlement_amount(
     Ok(())
 }
 
+pub fn validate_cap_reduction_amount(
+    session: &Session,
+    new_max_amount: i128,
+) -> Result<(), ContractError> {
+    if new_max_amount <= 0 || new_max_amount >= session.max_amount {
+        return Err(ContractError::InvalidCapReduction);
+    }
+    Ok(())
+}
+
 pub fn validate_usage_hash(env: &Env, usage_hash: &BytesN<32>) -> Result<(), ContractError> {
     if usage_hash == &BytesN::from_array(env, &[0; 32]) {
         return Err(ContractError::InvalidUsageHash);
